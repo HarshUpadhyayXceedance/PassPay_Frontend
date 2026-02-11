@@ -1,0 +1,37 @@
+import { PublicKey } from "@solana/web3.js";
+
+export const PROGRAM_ID = new PublicKey(
+  "DpGem4WZnFefyG1Qt3EKb8Rwtw9zoLNKHUxmDe2K3JZB"
+);
+
+export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
+  "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+);
+
+export const DEVNET_RPC = "https://api.devnet.solana.com";
+export const MAINNET_RPC = "https://api.mainnet-beta.solana.com";
+
+// SuperAdmin wallet (hardcoded - can only be set once during deployment)
+export const SUPER_ADMIN_PUBKEY = new PublicKey(
+  "LssxRdEeDV3fLd4y4m3akAPfz3HApTBw9yh7TJvFFhP"
+);
+
+// PDA seeds
+export const ADMIN_SEED = "admin";
+export const EVENT_SEED = "event";
+export const TICKET_SEED = "ticket";
+export const MERCHANT_SEED = "merchant";
+export const TREASURY_SEED = "treasury";
+export const MINT_AUTHORITY_SEED = "mint_authority";
+export const COLLECTION_SEED = "collection";
+export const ATTENDANCE_SEED = "attendance";
+export const BADGE_AUTHORITY_SEED = "badge_authority";
+
+// Limits
+export const MAX_EVENT_NAME_LEN = 64;
+export const MAX_VENUE_LEN = 128;
+export const MAX_MERCHANT_NAME_LEN = 64;
+export const MAX_METADATA_URI_LEN = 200;
+
+// SOL
+export const LAMPORTS_PER_SOL = 1_000_000_000;

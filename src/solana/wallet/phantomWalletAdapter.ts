@@ -31,11 +31,11 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
   constructor() {
     // Use real Phantom wallet (requires expo-dev-client or custom build)
     // Set to true to use mock wallet for Expo Go testing
-    this.isDevelopment = false;
+    this.isDevelopment = true; // Set to true for Expo Go development
 
     if (this.isDevelopment) {
-      console.log("🔧 Development Mode: Using Mock Wallet Adapter");
-      console.log("💡 For production, rebuild with expo-dev-client for real Phantom");
+      console.log("🔧 Development Mode: Using Mock Wallet Adapter (Expo Go)");
+      console.log("💡 Mock wallet configured as SuperAdmin for testing");
     } else {
       console.log("🚀 Production Mode: Using Real Phantom Wallet");
     }
