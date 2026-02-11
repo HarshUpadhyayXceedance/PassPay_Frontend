@@ -1,27 +1,101 @@
-import React from "react";
-import { View, Text, StyleSheet, ScrollView } from "react-native";
+import React, { useEffect, useState } from "react";
+import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from "react-native";
+import { PublicKey, Connection } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
+import { SuperAdminBadge } from "../../components/admin/SuperAdminBadge";
 import { colors } from "../../theme/colors";
+import { typography } from "../../theme/typography";
+import { spacing } from "../../theme/spacing";
+import { useWallet } from "../../hooks/useWallet";
+import { getProgram } from "../../solana/config/program";
+import { DEVNET_RPC } from "../../solana/config/constants";
 
 export function SuperAdminDashboardScreen() {
+  const { publicKey } = useWallet();
+  const [stats, setStats] = useState({
+    totalAdmins: 0,
+    totalEvents: 0,
+    badgesIssued: 0,
+    activeUsers: 0,
+  });
+
+  useEffect(() => {
+    fetchStats();
+  }, [publicKey]);
+
+  const fetchStats = async () => {
+    if (!publicKey) return;
+
+    try {
+      const connection = new Connection(DEVNET_RPC, "confirmed");
+      const provider = new AnchorProvider(
+        connection,
+        {} as any,
+        { commitment: "confirmed" }
+      );
+      const program = getProgram(provider);
+
+      // Fetch all Admin accounts
+      const adminAccounts = await program.account.admin.all();
+
+      // Fetch all Event accounts
+      const eventAccounts = await program.account.event.all();
+
+      setStats({
+        totalAdmins: adminAccounts.length,
+        totalEvents: eventAccounts.length,
+        badgesIssued: 0, // Will be implemented with badge collection
+        activeUsers: 0, // Will be implemented with attendance records
+      });
+
+      console.log("✅ Stats loaded:", {
+        admins: adminAccounts.length,
+        events: eventAccounts.length,
+      });
+    } catch (error: any) {
+      console.error("❌ Failed to fetch stats:", error);
+    }
+  };
+
+  const handleCreateAdmin = () => {
+    Alert.alert(
+      "Create Admin",
+      "Navigate to CreateAdminScreen to add a new admin.\n\n(Full navigation will be added in next update)"
+    );
+  };
+
+  const handleInitializeBadges = () => {
+    Alert.alert(
+      "Initialize Badges",
+      "Badge collection initialization screen coming soon!\n\nThis will allow you to set up the global badge system for loyalty rewards."
+    );
+  };
+
+  const handleViewAdmins = () => {
+    Alert.alert(
+      "View Admins",
+      "Check the 'Admins' tab to see all admin accounts in the system."
+    );
+  };
+
   return (
     <ScrollView style={styles.container}>
       <View style={styles.header}>
-        <View style={styles.badgeContainer}>
-          <Text style={styles.badgeText}>⚡ SUPER ADMIN</Text>
-        </View>
+        <SuperAdminBadge size="large" />
         <Text style={styles.title}>System Overview</Text>
       </View>
 
       <View style={styles.statsGrid}>
-        <StatCard title="Total Admins" value="0" icon="👥" />
-        <StatCard title="Total Events" value="0" icon="🎫" />
-        <StatCard title="Badges Issued" value="0" icon="🏆" />
-        <StatCard title="Active Users" value="0" icon="✅" />
+        <StatCard title="Total Admins" value={stats.totalAdmins.toString()} icon="👥" />
+        <StatCard title="Total Events" value={stats.totalEvents.toString()} icon="🎫" />
+        <StatCard title="Badges Issued" value={stats.badgesIssued.toString()} icon="🏆" />
+        <StatCard title="Active Users" value={stats.activeUsers.toString()} icon="✅" />
       </View>
 
       <View style={styles.section}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
-        <View style={styles.actionCard}>
+
+        <TouchableOpacity style={styles.actionCard} onPress={handleCreateAdmin}>
           <Text style={styles.actionIcon}>➕</Text>
           <View style={styles.actionText}>
             <Text style={styles.actionTitle}>Add New Admin</Text>
@@ -29,9 +103,9 @@ export function SuperAdminDashboardScreen() {
               Grant admin access to event organizers
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.actionCard}>
+        <TouchableOpacity style={styles.actionCard} onPress={handleInitializeBadges}>
           <Text style={styles.actionIcon}>🎖️</Text>
           <View style={styles.actionText}>
             <Text style={styles.actionTitle}>Initialize Badge Collection</Text>
@@ -39,9 +113,9 @@ export function SuperAdminDashboardScreen() {
               One-time setup for global badge system
             </Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.actionCard}>
+        <TouchableOpacity style={styles.actionCard} onPress={handleViewAdmins}>
           <Text style={styles.actionIcon}>📋</Text>
           <View style={styles.actionText}>
             <Text style={styles.actionTitle}>View All Admins</Text>
@@ -49,13 +123,7 @@ export function SuperAdminDashboardScreen() {
               Manage and deactivate admin accounts
             </Text>
           </View>
-        </View>
-      </View>
-
-      <View style={styles.comingSoon}>
-        <Text style={styles.comingSoonText}>
-          🚧 Full SuperAdmin features coming in Phase 1
-        </Text>
+        </TouchableOpacity>
       </View>
     </ScrollView>
   );
@@ -85,26 +153,12 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   header: {
-    padding: 24,
-    paddingTop: 60,
-  },
-  badgeContainer: {
-    alignSelf: "flex-start",
-    backgroundColor: colors.secondary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 12,
-    marginBottom: 16,
-  },
-  badgeText: {
-    color: colors.text,
-    fontSize: 14,
-    fontWeight: "800",
-    letterSpacing: 1,
+    padding: spacing.lg,
+    paddingTop: spacing.xxxl,
+    gap: spacing.md,
   },
   title: {
-    fontSize: 32,
-    fontWeight: "800",
+    ...typography.h1,
     color: colors.text,
   },
   statsGrid: {
