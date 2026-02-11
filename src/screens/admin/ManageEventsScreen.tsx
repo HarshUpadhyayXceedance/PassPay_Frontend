@@ -5,9 +5,9 @@ import {
   FlatList,
   StyleSheet,
   RefreshControl,
+  Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import { EventCard } from "../../components/event/EventCard";
 import { AppLoader } from "../../components/ui/AppLoader";
 import { AppButton } from "../../components/ui/AppButton";
@@ -17,12 +17,9 @@ import { spacing } from "../../theme/spacing";
 import { useEvents } from "../../hooks/useEvents";
 import { useWalletStore } from "../../store/walletStore";
 import { EventDisplay } from "../../types/event";
-import { AdminStackParamList } from "../../types/navigation";
-
-type Nav = NativeStackNavigationProp<AdminStackParamList>;
 
 export function ManageEventsScreen() {
-  const navigation = useNavigation<Nav>();
+  const router = useRouter();
   const { events, fetchEvents, isLoading } = useEvents();
   const publicKey = useWalletStore((s) => s.publicKey);
 
@@ -36,9 +33,10 @@ export function ManageEventsScreen() {
     <EventCard
       event={item}
       onPress={() =>
-        navigation.navigate("CheckInScanner", {
-          eventKey: item.publicKey,
-        })
+        Alert.alert(
+          "Event Selected",
+          `Selected: ${item.name}\nCheck-in scanner coming soon!`
+        )
       }
     />
   );
@@ -60,7 +58,12 @@ export function ManageEventsScreen() {
         ListHeaderComponent={
           <AppButton
             title="+ Create Event"
-            onPress={() => navigation.navigate("CreateEvent")}
+            onPress={() =>
+              Alert.alert(
+                "Coming Soon",
+                "Event creation screen will be implemented in the next phase"
+              )
+            }
             variant="outline"
             style={styles.createButton}
           />

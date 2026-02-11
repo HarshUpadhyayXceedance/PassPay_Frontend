@@ -1,3 +1,6 @@
+// IMPORTANT: Polyfill must be imported BEFORE any Solana imports
+import "react-native-get-random-values";
+
 import { Slot, SplashScreen, useRouter, useSegments } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";

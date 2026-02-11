@@ -5,9 +5,9 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import { AppCard } from "../../components/ui/AppCard";
 import { AppButton } from "../../components/ui/AppButton";
 import { colors } from "../../theme/colors";
@@ -16,12 +16,9 @@ import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
 import { useEvents } from "../../hooks/useEvents";
 import { shortenAddress, formatSOL } from "../../utils/formatters";
-import { AdminStackParamList } from "../../types/navigation";
-
-type Nav = NativeStackNavigationProp<AdminStackParamList>;
 
 export function AdminDashboardScreen() {
-  const navigation = useNavigation<Nav>();
+  const router = useRouter();
   const { publicKey, balance, refreshBalance } = useWallet();
   const { events, fetchEvents, isLoading } = useEvents();
 
@@ -74,7 +71,12 @@ export function AdminDashboardScreen() {
 
       <AppButton
         title="Create New Event"
-        onPress={() => navigation.navigate("CreateEvent")}
+        onPress={() =>
+          Alert.alert(
+            "Coming Soon",
+            "Event creation screen will be implemented in the next phase"
+          )
+        }
         size="lg"
       />
     </ScrollView>
