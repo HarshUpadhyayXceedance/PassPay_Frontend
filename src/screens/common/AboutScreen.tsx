@@ -1,17 +1,17 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
 
 export function AboutScreen() {
-  const navigation = useNavigation();
+  const router = useRouter();
 
   return (
     <View style={styles.container}>
-      <AppHeader title="About" onBack={() => navigation.goBack()} />
+      <AppHeader title="About" onBack={() => router.back()} />
 
       <View style={styles.content}>
         <Text style={styles.appName}>PassPay</Text>

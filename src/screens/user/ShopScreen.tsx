@@ -1,370 +1,443 @@
-import React, { useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
+  FlatList,
   TouchableOpacity,
   TextInput,
-  Dimensions,
-  FlatList,
+  RefreshControl,
+  Image,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
+import { useMerchants } from "../../hooks/useMerchants";
+import { useEvents } from "../../hooks/useEvents";
+import { useLoyalty } from "../../hooks/useLoyalty";
+import { MerchantDisplay } from "../../types/merchant";
+import { formatSOL } from "../../utils/formatters";
+import { colors } from "../../theme/colors";
+import { fonts } from "../../theme/fonts";
+import { spacing, borderRadius } from "../../theme/spacing";
 
-const { width } = Dimensions.get("window");
-const CARD_WIDTH = width * 0.6;
-
-const categories = ["All", "Food", "Drinks", "Merch"];
-
-const popularItems = [
-  { id: "1", name: "Neon Smash Burger", vendor: "Tasty Bites", price: 0.35, wait: "10 min wait", color: ["#FF6B6B", "#EE5A24"] },
-  { id: "2", name: "Galaxy Lemonade", vendor: "SolBar", price: 0.12, wait: "Instant", color: ["#6C5CE7", "#A29BFE"] },
-  { id: "3", name: "Crypto Cookie", vendor: "CryptoCorn", price: 0.08, wait: "5 min wait", color: ["#00CEC9", "#00B894"] },
-];
-
-const vendors = [
-  { id: "1", name: "Tasty Bites", category: "Burgers & Fries", rating: 4.8, reviews: 120 },
-  { id: "2", name: "SolBar", category: "Cocktails & Drinks", rating: 4.9, reviews: 342 },
-  { id: "3", name: "Official Merch", category: "Clothing & Accessories", rating: 5.0, reviews: 85 },
-  { id: "4", name: "CryptoCorn", category: "Popcorn & Snacks", rating: 4.5, reviews: 56 },
+const GRADIENT_PALETTES: [string, string][] = [
+  ["#6C5CE7", "#a855f7"],
+  ["#00CEC9", "#0891b2"],
+  ["#e17055", "#f97316"],
+  ["#fd79a8", "#ec4899"],
+  ["#0984e3", "#6366f1"],
 ];
 
 export function ShopScreen() {
-  const [activeCategory, setActiveCategory] = useState("All");
+  const router = useRouter();
+  const { merchants, fetchMerchants, isLoading } = useMerchants();
+  const { events } = useEvents();
+  const { loyaltyBenefits } = useLoyalty();
   const [search, setSearch] = useState("");
 
-  return (
-    <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.title}>Event Shop</Text>
-        <View style={styles.cartButton}>
-          <Text style={styles.cartIcon}>🛒</Text>
-          <View style={styles.cartBadge}>
-            <Text style={styles.cartBadgeText}>2</Text>
+  useEffect(() => {
+    fetchMerchants();
+  }, []);
+
+  const merchantDiscount = loyaltyBenefits?.merchantDiscount ?? 0;
+
+  // Filter merchants by search and active status
+  const filteredMerchants = useMemo(() => {
+    const active = merchants.filter((m) => m.isActive);
+    if (!search.trim()) return active;
+    const query = search.toLowerCase();
+    return active.filter(
+      (m) =>
+        m.name.toLowerCase().includes(query) ||
+        m.description.toLowerCase().includes(query)
+    );
+  }, [merchants, search]);
+
+  // Get event name for a merchant
+  const getEventName = useCallback(
+    (eventKey: string): string => {
+      const event = events.find((e) => e.publicKey === eventKey);
+      return event?.name ?? "Event";
+    },
+    [events]
+  );
+
+  const navigateToScan = useCallback(() => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push("/(user)/scan");
+  }, [router]);
+
+  const renderMerchant = ({ item, index }: { item: MerchantDisplay; index: number }) => {
+    const gradient = GRADIENT_PALETTES[index % GRADIENT_PALETTES.length];
+    const eventName = getEventName(item.eventKey);
+
+    return (
+      <View style={styles.merchantCard}>
+        <View style={styles.merchantRow}>
+          {/* Avatar */}
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.merchantAvatar} />
+          ) : (
+            <LinearGradient colors={gradient} style={styles.merchantAvatar}>
+              <Text style={styles.merchantInitial}>
+                {item.name.charAt(0).toUpperCase()}
+              </Text>
+            </LinearGradient>
+          )}
+
+          {/* Info */}
+          <View style={styles.merchantInfo}>
+            <Text style={styles.merchantName} numberOfLines={1}>
+              {item.name}
+            </Text>
+            {item.description ? (
+              <Text style={styles.merchantDesc} numberOfLines={1}>
+                {item.description}
+              </Text>
+            ) : null}
+            <View style={styles.merchantMeta}>
+              <Ionicons name="calendar-outline" size={12} color={colors.textMuted} />
+              <Text style={styles.merchantEvent} numberOfLines={1}>
+                {eventName}
+              </Text>
+            </View>
+          </View>
+
+          {/* Earnings + Pay */}
+          <View style={styles.merchantRight}>
+            <Text style={styles.merchantEarnings}>
+              {formatSOL(item.totalReceived)} SOL
+            </Text>
+            <TouchableOpacity
+              style={styles.payButton}
+              onPress={navigateToScan}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.payButtonText}>Pay</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
+    );
+  };
+
+  const ListHeader = () => (
+    <View>
+      {/* Scan to Pay CTA */}
+      <TouchableOpacity activeOpacity={0.8} onPress={navigateToScan}>
+        <LinearGradient
+          colors={[colors.primary, colors.secondary]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 1 }}
+          style={styles.scanCta}
+        >
+          <View style={styles.scanCtaContent}>
+            <View style={styles.scanCtaLeft}>
+              <Text style={styles.scanCtaTitle}>Scan to Pay</Text>
+              <Text style={styles.scanCtaSubtitle}>
+                Scan a merchant's QR code to pay instantly with SOL
+              </Text>
+              {merchantDiscount > 0 && (
+                <View style={styles.discountBadge}>
+                  <Ionicons name="star" size={12} color={colors.background} />
+                  <Text style={styles.discountText}>
+                    {merchantDiscount}% loyalty discount
+                  </Text>
+                </View>
+              )}
+            </View>
+            <Ionicons name="qr-code" size={48} color="rgba(255,255,255,0.3)" />
+          </View>
+        </LinearGradient>
+      </TouchableOpacity>
 
       {/* Search */}
       <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+        <Ionicons name="search" size={18} color={colors.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Find food, drinks, or merch..."
-          placeholderTextColor="#4A4E69"
+          placeholder="Search merchants..."
+          placeholderTextColor={colors.textMuted}
           value={search}
           onChangeText={setSearch}
         />
+        {search.length > 0 && (
+          <TouchableOpacity onPress={() => setSearch("")}>
+            <Ionicons name="close-circle" size={18} color={colors.textMuted} />
+          </TouchableOpacity>
+        )}
       </View>
 
-      {/* Categories */}
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.categories}>
-        {categories.map((cat) => (
-          <TouchableOpacity
-            key={cat}
-            style={[styles.chip, activeCategory === cat && styles.chipActive]}
-            onPress={() => setActiveCategory(cat)}
-          >
-            <Text style={[styles.chipText, activeCategory === cat && styles.chipTextActive]}>
-              {cat}
-            </Text>
-          </TouchableOpacity>
-        ))}
-      </ScrollView>
-
-      {/* Popular Now */}
+      {/* Merchant count */}
       <View style={styles.sectionHeader}>
-        <Text style={styles.sectionTitle}>Popular Now</Text>
-        <TouchableOpacity>
-          <Text style={styles.seeAll}>See All</Text>
+        <Text style={styles.sectionTitle}>
+          {filteredMerchants.length === 0
+            ? "No Merchants"
+            : `${filteredMerchants.length} Active Merchant${filteredMerchants.length !== 1 ? "s" : ""}`}
+        </Text>
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <Text style={styles.title}>Event Shop</Text>
+        <TouchableOpacity
+          style={styles.scanButton}
+          onPress={navigateToScan}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="qr-code-outline" size={22} color={colors.primary} />
         </TouchableOpacity>
       </View>
 
       <FlatList
-        horizontal
-        data={popularItems}
-        keyExtractor={(item) => item.id}
-        showsHorizontalScrollIndicator={false}
-        contentContainerStyle={styles.popularList}
-        renderItem={({ item }) => (
-          <View style={styles.popularCard}>
-            <LinearGradient
-              colors={item.color as [string, string]}
-              style={styles.popularImage}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
-            >
-              <View style={styles.vendorBadge}>
-                <Text style={styles.vendorBadgeText}>{item.vendor}</Text>
-              </View>
-            </LinearGradient>
-            <Text style={styles.popularName} numberOfLines={1}>{item.name}</Text>
-            <View style={styles.popularFooter}>
-              <Text style={styles.popularWait}>⏱ {item.wait}</Text>
+        data={filteredMerchants}
+        keyExtractor={(item) => item.publicKey}
+        renderItem={renderMerchant}
+        ListHeaderComponent={ListHeader}
+        contentContainerStyle={styles.listContent}
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={() => fetchMerchants()}
+            tintColor={colors.primary}
+          />
+        }
+        ListEmptyComponent={
+          !isLoading ? (
+            <View style={styles.emptyContainer}>
+              <Ionicons
+                name="storefront-outline"
+                size={48}
+                color={colors.textMuted}
+              />
+              <Text style={styles.emptyTitle}>
+                {search ? "No Results" : "No Merchants Yet"}
+              </Text>
+              <Text style={styles.emptyMessage}>
+                {search
+                  ? `No merchants matching "${search}"`
+                  : "Merchants registered for events will appear here. Use Scan to Pay to pay at vendor booths."}
+              </Text>
             </View>
-            <View style={styles.popularPriceRow}>
-              <Text style={styles.popularPrice}>{item.price} SOL</Text>
-              <TouchableOpacity style={styles.addButton}>
-                <Text style={styles.addButtonText}>+</Text>
-              </TouchableOpacity>
-            </View>
-          </View>
-        )}
+          ) : null
+        }
+        showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
-
-      {/* All Vendors */}
-      <Text style={styles.sectionTitle}>All Vendors</Text>
-      {vendors.map((vendor) => (
-        <View key={vendor.id} style={styles.vendorRow}>
-          <LinearGradient
-            colors={["#1E2235", "#2D3154"]}
-            style={styles.vendorAvatar}
-          >
-            <Text style={styles.vendorInitial}>{vendor.name[0]}</Text>
-          </LinearGradient>
-          <View style={styles.vendorInfo}>
-            <Text style={styles.vendorName}>{vendor.name}</Text>
-            <Text style={styles.vendorCategory}>{vendor.category}</Text>
-            <Text style={styles.vendorRating}>
-              ⭐ {vendor.rating} ({vendor.reviews} reviews)
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.payButton}>
-            <Text style={styles.payButtonText}>Pay</Text>
-          </TouchableOpacity>
-        </View>
-      ))}
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A0E1A",
-  },
-  content: {
-    paddingBottom: 100,
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 8,
+    paddingHorizontal: spacing.lg,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.sm,
   },
   title: {
     fontSize: 28,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily: fonts.heading,
+    color: colors.text,
   },
-  cartButton: {
-    position: "relative",
-  },
-  cartIcon: {
-    fontSize: 24,
-  },
-  cartBadge: {
-    position: "absolute",
-    top: -4,
-    right: -8,
-    backgroundColor: "#00CEC9",
-    width: 18,
-    height: 18,
-    borderRadius: 9,
+  scanButton: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.primaryMuted,
     alignItems: "center",
     justifyContent: "center",
   },
-  cartBadgeText: {
-    color: "#0A0E1A",
-    fontSize: 11,
-    fontWeight: "700",
+  listContent: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xxl + 20,
+    flexGrow: 1,
   },
+
+  // Scan CTA
+  scanCta: {
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.md,
+  },
+  scanCtaContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  scanCtaLeft: {
+    flex: 1,
+    marginRight: spacing.md,
+  },
+  scanCtaTitle: {
+    fontSize: 20,
+    fontFamily: fonts.heading,
+    color: "#fff",
+    marginBottom: 4,
+  },
+  scanCtaSubtitle: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: "rgba(255,255,255,0.7)",
+    lineHeight: 18,
+  },
+  discountBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(0,0,0,0.25)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: borderRadius.full,
+    alignSelf: "flex-start",
+    marginTop: spacing.sm,
+    gap: 4,
+  },
+  discountText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: "#fff",
+  },
+
+  // Search
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#141829",
-    borderRadius: 14,
-    marginHorizontal: 20,
-    marginVertical: 12,
-    paddingHorizontal: 16,
-    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    height: 44,
     borderWidth: 1,
-    borderColor: "#1E2235",
-  },
-  searchIcon: {
-    fontSize: 16,
-    marginRight: 10,
+    borderColor: colors.border,
+    marginBottom: spacing.md,
+    gap: spacing.sm,
   },
   searchInput: {
     flex: 1,
-    color: "#FFFFFF",
+    color: colors.text,
+    fontFamily: fonts.body,
     fontSize: 15,
   },
-  categories: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
-  },
-  chip: {
-    paddingHorizontal: 18,
-    paddingVertical: 10,
-    borderRadius: 24,
-    backgroundColor: "#141829",
-    marginRight: 10,
-    borderWidth: 1,
-    borderColor: "#1E2235",
-  },
-  chipActive: {
-    backgroundColor: "#00CEC9",
-    borderColor: "#00CEC9",
-  },
-  chipText: {
-    color: "#8F95B2",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  chipTextActive: {
-    color: "#0A0E1A",
-  },
+
+  // Section header
   sectionHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    marginBottom: 14,
+    marginBottom: spacing.sm,
   },
   sectionTitle: {
-    fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
-    paddingHorizontal: 20,
-    marginBottom: 14,
+    fontSize: 16,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.textSecondary,
   },
-  seeAll: {
-    color: "#00CEC9",
-    fontSize: 14,
-    fontWeight: "600",
-  },
-  popularList: {
-    paddingHorizontal: 20,
-    marginBottom: 28,
-  },
-  popularCard: {
-    width: CARD_WIDTH,
-    marginRight: 14,
-    backgroundColor: "#141829",
-    borderRadius: 16,
+
+  // Merchant card
+  merchantCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.border,
+  },
+  merchantRow: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  merchantAvatar: {
+    width: 48,
+    height: 48,
+    borderRadius: borderRadius.md,
+    alignItems: "center",
+    justifyContent: "center",
     overflow: "hidden",
   },
-  popularImage: {
-    height: 140,
-    justifyContent: "flex-start",
-    padding: 10,
+  merchantInitial: {
+    color: "#fff",
+    fontSize: 20,
+    fontFamily: fonts.heading,
   },
-  vendorBadge: {
-    backgroundColor: "rgba(0,0,0,0.6)",
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 8,
-    alignSelf: "flex-start",
-  },
-  vendorBadgeText: {
-    color: "#FFFFFF",
-    fontSize: 12,
-    fontWeight: "600",
-  },
-  popularName: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
-    paddingHorizontal: 12,
-    paddingTop: 10,
-  },
-  popularFooter: {
-    paddingHorizontal: 12,
-    paddingTop: 4,
-  },
-  popularWait: {
-    color: "#8F95B2",
-    fontSize: 13,
-  },
-  popularPriceRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-  },
-  popularPrice: {
-    color: "#00CEC9",
-    fontSize: 16,
-    fontWeight: "700",
-  },
-  addButton: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
-    backgroundColor: "#1E2235",
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  addButtonText: {
-    color: "#FFFFFF",
-    fontSize: 18,
-    fontWeight: "600",
-  },
-  vendorRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 14,
-    borderBottomWidth: 1,
-    borderBottomColor: "#1E2235",
-  },
-  vendorAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 14,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  vendorInitial: {
-    color: "#FFFFFF",
-    fontSize: 22,
-    fontWeight: "700",
-  },
-  vendorInfo: {
+  merchantInfo: {
     flex: 1,
-    marginLeft: 14,
+    marginLeft: spacing.sm,
+    marginRight: spacing.sm,
   },
-  vendorName: {
-    color: "#FFFFFF",
-    fontSize: 16,
-    fontWeight: "600",
+  merchantName: {
+    fontSize: 15,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.text,
   },
-  vendorCategory: {
-    color: "#8F95B2",
-    fontSize: 13,
-    marginTop: 2,
+  merchantDesc: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    marginTop: 1,
   },
-  vendorRating: {
-    color: "#8F95B2",
-    fontSize: 13,
-    marginTop: 2,
+  merchantMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 3,
+    gap: 4,
+  },
+  merchantEvent: {
+    fontSize: 11,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  merchantRight: {
+    alignItems: "flex-end",
+  },
+  merchantEarnings: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    marginBottom: 6,
   },
   payButton: {
-    backgroundColor: "#00CEC9",
-    paddingHorizontal: 20,
-    paddingVertical: 8,
-    borderRadius: 20,
+    backgroundColor: colors.primary,
+    paddingHorizontal: 18,
+    paddingVertical: 7,
+    borderRadius: borderRadius.full,
   },
   payButtonText: {
-    color: "#0A0E1A",
+    color: colors.background,
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+  },
+
+  // Separator
+  separator: {
+    height: spacing.sm,
+  },
+
+  // Empty state
+  emptyContainer: {
+    alignItems: "center",
+    paddingTop: spacing.xxl,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: fonts.heading,
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  emptyMessage: {
     fontSize: 14,
-    fontWeight: "700",
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
   },
 });

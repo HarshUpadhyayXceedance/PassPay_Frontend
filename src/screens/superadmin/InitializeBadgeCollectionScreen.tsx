@@ -284,7 +284,7 @@ export function InitializeBadgeCollectionScreen() {
           <AppButton
             title={isSubmitting ? "Initializing..." : "Initialize Collection"}
             onPress={handleInitialize}
-            isLoading={isSubmitting}
+            loading={isSubmitting}
             style={styles.submitButton}
           />
         </View>

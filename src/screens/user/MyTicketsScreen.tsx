@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef } from "react";
 import {
   View,
   Text,
@@ -7,30 +7,22 @@ import {
   RefreshControl,
   TouchableOpacity,
   Dimensions,
+  Animated,
+  Share,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { useTickets } from "../../hooks/useTickets";
 import { TicketDisplay } from "../../types/ticket";
-import { UserStackParamList } from "../../types/navigation";
 import { formatDate } from "../../utils/formatters";
-
-type Nav = NativeStackNavigationProp<UserStackParamList>;
+import { colors } from "../../theme/colors";
+import { fonts } from "../../theme/fonts";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const CARD_HORIZONTAL_PADDING = 20;
 const CARD_WIDTH = SCREEN_WIDTH - CARD_HORIZONTAL_PADDING * 2;
 const IMAGE_HEIGHT = 180;
-
-const COLORS = {
-  background: "#0A0E1A",
-  card: "#141829",
-  green: "#00CEC9",
-  text: "#FFFFFF",
-  secondary: "#8F95B2",
-  tabInactive: "#1C2038",
-};
 
 const GRADIENTS: [string, string][] = [
   ["#6C5CE7", "#00CEC9"],
@@ -42,14 +34,61 @@ const GRADIENTS: [string, string][] = [
 
 type TabKey = "upcoming" | "past";
 
+// Helper: Check if event is happening today
+function isEventToday(eventDate: Date): boolean {
+  const now = new Date();
+  const event = new Date(eventDate);
+  return (
+    event.getDate() === now.getDate() &&
+    event.getMonth() === now.getMonth() &&
+    event.getFullYear() === now.getFullYear()
+  );
+}
+
+// Helper: Check if event has started
+function hasEventStarted(eventDate: Date): boolean {
+  return new Date() >= new Date(eventDate);
+}
+
+// Helper: Get time until event
+function getTimeUntilEvent(eventDate: Date): string {
+  const now = new Date();
+  const event = new Date(eventDate);
+  const diff = event.getTime() - now.getTime();
+
+  if (diff <= 0) return "Event Started";
+
+  const days = Math.floor(diff / (1000 * 60 * 60 * 24));
+  const hours = Math.floor((diff % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+  const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+
+  if (days > 0) return `in ${days}d ${hours}h`;
+  if (hours > 0) return `in ${hours}h ${minutes}m`;
+  return `in ${minutes}m`;
+}
+
 export function MyTicketsScreen() {
-  const navigation = useNavigation<Nav>();
+  const router = useRouter();
   const { tickets, fetchMyTickets, isLoading } = useTickets();
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
+  const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     fetchMyTickets();
+    // Entrance animation
+    Animated.timing(fadeAnim, {
+      toValue: 1,
+      duration: 400,
+      useNativeDriver: true,
+    }).start();
   }, []);
+
+  const handleTabSwitch = (tab: TabKey) => {
+    if (tab !== activeTab) {
+      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+      setActiveTab(tab);
+    }
+  };
 
   const now = new Date();
 
@@ -74,9 +113,21 @@ export function MyTicketsScreen() {
     index: number;
   }) => {
     const gradient = getGradient(index);
+    const eventDate = new Date(item.eventDate);
+    const isToday = isEventToday(eventDate);
+    const started = hasEventStarted(eventDate);
+    const timeUntil = getTimeUntilEvent(eventDate);
+    const isPast = activeTab === "past";
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push({ pathname: "/(user)/ticket-details", params: { ticketKey: item.publicKey } });
+        }}
+        activeOpacity={0.9}
+      >
         {/* Image area with gradient placeholder */}
         <View style={styles.imageContainer}>
           <LinearGradient
@@ -86,24 +137,56 @@ export function MyTicketsScreen() {
             style={styles.gradientImage}
           />
 
-          {/* VALID badge */}
-          <View style={styles.validBadge}>
-            <Text style={styles.validBadgeText}>VALID</Text>
+          {/* Top row badges */}
+          <View style={styles.topBadgesRow}>
+            {/* VALID or USED badge */}
+            {item.isCheckedIn ? (
+              <View style={[styles.statusBadge, styles.usedBadge]}>
+                <Text style={styles.statusBadgeText}>USED</Text>
+              </View>
+            ) : (
+              <View style={[styles.statusBadge, styles.validBadge]}>
+                <Text style={styles.statusBadgeText}>VALID</Text>
+              </View>
+            )}
+
+            {/* Active badge for today's events */}
+            {isToday && !started && !isPast && (
+              <View style={styles.activeBadge}>
+                <View style={styles.activeDot} />
+                <Text style={styles.activeBadgeText}>TODAY</Text>
+              </View>
+            )}
+
+            {/* Event Started badge */}
+            {started && !isPast && (
+              <View style={styles.startedBadge}>
+                <Text style={styles.startedBadgeText}>LIVE NOW</Text>
+              </View>
+            )}
           </View>
 
           {/* ProofPass number badge */}
           <View style={styles.proofPassBadge}>
             <Text style={styles.proofPassText}>
-              ProofPass #{item.seatNumber}
+              Pass #{item.seatNumber}
             </Text>
           </View>
         </View>
 
         {/* Card content */}
         <View style={styles.cardContent}>
-          <Text style={styles.eventName} numberOfLines={2}>
-            {item.eventName}
-          </Text>
+          <View style={styles.eventNameRow}>
+            <Text style={styles.eventName} numberOfLines={2}>
+              {item.eventName}
+            </Text>
+            {/* Countdown timer for upcoming events */}
+            {!isPast && !started && (
+              <View style={styles.countdownBadge}>
+                <Text style={styles.countdownText}>{timeUntil}</Text>
+              </View>
+            )}
+          </View>
 
           {/* Date row */}
           <View style={styles.infoRow}>
@@ -114,29 +197,45 @@ export function MyTicketsScreen() {
           {/* Venue row */}
           <View style={styles.infoRow}>
             <Text style={styles.infoIcon}>📍</Text>
-            <Text style={styles.infoText}>{item.eventVenue}</Text>
+            <Text style={styles.infoText} numberOfLines={1}>
+              {item.eventVenue}
+            </Text>
           </View>
 
           {/* Bottom action row */}
           <View style={styles.actionRow}>
             <TouchableOpacity
               style={styles.qrButton}
-              onPress={() =>
-                navigation.navigate("TicketQR", {
-                  ticketKey: item.publicKey,
-                })
-              }
+              onPress={(e) => {
+                e.stopPropagation();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push({ pathname: "/(user)/ticket-qr", params: { ticketKey: item.publicKey } });
+              }}
               activeOpacity={0.8}
             >
-              <Text style={styles.qrButtonText}>Show Ticket QR</Text>
+              <Text style={styles.qrButtonText}>
+                {isPast ? "View QR" : "Show Ticket QR"}
+              </Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.shareButton} activeOpacity={0.7}>
+            <TouchableOpacity
+              style={styles.shareButton}
+              onPress={async (e) => {
+                e.stopPropagation();
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                try {
+                  await Share.share({
+                    message: `Check out my ticket for ${item.eventName}!\n\nDate: ${formatDate(item.eventDate)}\nVenue: ${item.eventVenue}\nSeat: #${item.seatNumber}\n\nVerified NFT ticket on Solana`,
+                  });
+                } catch {}
+              }}
+              activeOpacity={0.7}
+            >
               <Text style={styles.shareIcon}>↗</Text>
             </TouchableOpacity>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -145,7 +244,14 @@ export function MyTicketsScreen() {
       {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Passes</Text>
-        <TouchableOpacity style={styles.historyButton} activeOpacity={0.7}>
+        <TouchableOpacity
+          style={styles.historyButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.push("/(user)/transaction-history" as any);
+          }}
+          activeOpacity={0.7}
+        >
           <Text style={styles.historyIcon}>🕘</Text>
         </TouchableOpacity>
       </View>
@@ -157,7 +263,7 @@ export function MyTicketsScreen() {
             styles.tab,
             activeTab === "upcoming" ? styles.tabActive : styles.tabInactive,
           ]}
-          onPress={() => setActiveTab("upcoming")}
+          onPress={() => handleTabSwitch("upcoming")}
           activeOpacity={0.8}
         >
           <Text
@@ -177,7 +283,7 @@ export function MyTicketsScreen() {
             styles.tab,
             activeTab === "past" ? styles.tabActive : styles.tabInactive,
           ]}
-          onPress={() => setActiveTab("past")}
+          onPress={() => handleTabSwitch("past")}
           activeOpacity={0.8}
         >
           <Text
@@ -194,7 +300,8 @@ export function MyTicketsScreen() {
       </View>
 
       {/* Pass list */}
-      <FlatList
+      <Animated.FlatList
+        style={{ opacity: fadeAnim }}
         data={displayedTickets}
         renderItem={renderPassCard}
         keyExtractor={(item) => item.publicKey}
@@ -204,7 +311,7 @@ export function MyTicketsScreen() {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={fetchMyTickets}
-            tintColor={COLORS.green}
+            tintColor={colors.primary}
           />
         }
         ListEmptyComponent={
@@ -231,7 +338,7 @@ export function MyTicketsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
 
   /* ---- Header ---- */
@@ -246,13 +353,16 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontWeight: "700",
-    color: COLORS.text,
+    color: colors.text,
+    fontFamily: fonts.heading,
   },
   historyButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -265,9 +375,11 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     marginHorizontal: 20,
     marginBottom: 20,
-    backgroundColor: COLORS.tabInactive,
+    backgroundColor: colors.surface,
     borderRadius: 28,
     padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   tab: {
     flex: 1,
@@ -277,7 +389,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
   tabActive: {
-    backgroundColor: COLORS.green,
+    backgroundColor: colors.primary,
   },
   tabInactive: {
     backgroundColor: "transparent",
@@ -285,12 +397,13 @@ const styles = StyleSheet.create({
   tabText: {
     fontSize: 14,
     fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
   },
   tabTextActive: {
-    color: COLORS.background,
+    color: colors.background,
   },
   tabTextInactive: {
-    color: COLORS.secondary,
+    color: colors.textSecondary,
   },
 
   /* ---- List ---- */
@@ -301,10 +414,12 @@ const styles = StyleSheet.create({
 
   /* ---- Pass card ---- */
   card: {
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderRadius: 20,
     marginBottom: 20,
     overflow: "hidden",
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   imageContainer: {
     width: "100%",
@@ -314,45 +429,116 @@ const styles = StyleSheet.create({
   gradientImage: {
     ...StyleSheet.absoluteFillObject,
   },
-  validBadge: {
+  topBadgesRow: {
     position: "absolute",
     top: 12,
     left: 12,
-    backgroundColor: COLORS.green,
+    right: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    flexWrap: "wrap",
+  },
+  statusBadge: {
     paddingHorizontal: 12,
     paddingVertical: 4,
     borderRadius: 8,
   },
-  validBadgeText: {
+  validBadge: {
+    backgroundColor: colors.secondary,
+  },
+  usedBadge: {
+    backgroundColor: colors.textMuted,
+  },
+  statusBadgeText: {
     fontSize: 12,
     fontWeight: "700",
-    color: COLORS.background,
+    color: colors.text,
     letterSpacing: 0.5,
+    fontFamily: fonts.bodyBold,
+  },
+  activeBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,193,7,0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+    gap: 4,
+  },
+  activeDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#FFD700",
+  },
+  activeBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FFD700",
+    letterSpacing: 0.5,
+    fontFamily: fonts.bodyBold,
+  },
+  startedBadge: {
+    backgroundColor: "rgba(255,71,87,0.2)",
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  startedBadgeText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: "#FF4757",
+    letterSpacing: 0.5,
+    fontFamily: fonts.bodyBold,
   },
   proofPassBadge: {
     position: "absolute",
     bottom: 12,
     left: 12,
-    backgroundColor: "rgba(10,14,26,0.70)",
+    backgroundColor: "rgba(10,14,26,0.80)",
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(255,255,255,0.1)",
   },
   proofPassText: {
     fontSize: 13,
     fontWeight: "600",
-    color: COLORS.green,
+    color: colors.primary,
+    fontFamily: fonts.bodySemiBold,
   },
 
   /* ---- Card content ---- */
   cardContent: {
     padding: 16,
   },
+  eventNameRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    justifyContent: "space-between",
+    marginBottom: 12,
+    gap: 8,
+  },
   eventName: {
+    flex: 1,
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.text,
-    marginBottom: 12,
+    color: colors.text,
+    fontFamily: fonts.headingSemiBold,
+  },
+  countdownBadge: {
+    backgroundColor: colors.primaryMuted,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+  },
+  countdownText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: colors.primary,
+    fontFamily: fonts.bodyBold,
   },
   infoRow: {
     flexDirection: "row",
@@ -364,8 +550,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   infoText: {
+    flex: 1,
     fontSize: 14,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
+    fontFamily: fonts.body,
   },
 
   /* ---- Action row ---- */
@@ -376,7 +564,7 @@ const styles = StyleSheet.create({
   },
   qrButton: {
     flex: 1,
-    backgroundColor: COLORS.green,
+    backgroundColor: colors.primary,
     paddingVertical: 12,
     borderRadius: 14,
     alignItems: "center",
@@ -386,19 +574,22 @@ const styles = StyleSheet.create({
   qrButtonText: {
     fontSize: 15,
     fontWeight: "700",
-    color: COLORS.background,
+    color: colors.background,
+    fontFamily: fonts.bodySemiBold,
   },
   shareButton: {
     width: 46,
     height: 46,
     borderRadius: 14,
-    backgroundColor: "rgba(143,149,178,0.12)",
+    backgroundColor: colors.surfaceLight,
+    borderWidth: 1,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   shareIcon: {
     fontSize: 20,
-    color: COLORS.text,
+    color: colors.text,
   },
 
   /* ---- Empty state ---- */
@@ -410,13 +601,15 @@ const styles = StyleSheet.create({
   emptyTitle: {
     fontSize: 20,
     fontWeight: "700",
-    color: COLORS.text,
+    color: colors.text,
     marginBottom: 8,
+    fontFamily: fonts.heading,
   },
   emptyText: {
     fontSize: 15,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     textAlign: "center",
     lineHeight: 22,
+    fontFamily: fonts.body,
   },
 });

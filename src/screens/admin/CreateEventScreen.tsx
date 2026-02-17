@@ -6,31 +6,32 @@ import {
   ScrollView,
   Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import { AppButton } from "../../components/ui/AppButton";
 import { AppInput } from "../../components/ui/AppInput";
 import { AppHeader } from "../../components/ui/AppHeader";
+import { ImagePickerButton } from "../../components/ui/ImagePickerButton";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
 import { apiCreateEvent } from "../../services/api/eventApi";
+import { uploadImageToCloudinary } from "../../services/cloudinary/uploadImage";
 import {
   validateEventName,
   validateVenue,
+  validateEventDescription,
   validateTicketPrice,
   validateTotalSeats,
 } from "../../utils/validators";
-import { AdminStackParamList } from "../../types/navigation";
-
-type Nav = NativeStackNavigationProp<AdminStackParamList, "CreateEvent">;
-
 export function CreateEventScreen() {
-  const navigation = useNavigation<Nav>();
+  const router = useRouter();
   const [name, setName] = useState("");
   const [venue, setVenue] = useState("");
+  const [description, setDescription] = useState("");
   const [ticketPrice, setTicketPrice] = useState("");
   const [totalSeats, setTotalSeats] = useState("");
+  const [imageUri, setImageUri] = useState("");
+  const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
 
@@ -38,6 +39,7 @@ export function CreateEventScreen() {
     const newErrors = {
       name: validateEventName(name),
       venue: validateVenue(venue),
+      description: validateEventDescription(description),
       ticketPrice: validateTicketPrice(ticketPrice),
       totalSeats: validateTotalSeats(totalSeats),
     };
@@ -50,6 +52,17 @@ export function CreateEventScreen() {
 
     setCreating(true);
     try {
+      // Upload image to Cloudinary if selected
+      let imageUrl = "";
+      if (imageUri) {
+        setUploading(true);
+        try {
+          imageUrl = await uploadImageToCloudinary(imageUri);
+        } finally {
+          setUploading(false);
+        }
+      }
+
       // Event date set to 7 days from now as default
       const eventDate = new Date();
       eventDate.setDate(eventDate.getDate() + 7);
@@ -57,6 +70,8 @@ export function CreateEventScreen() {
       const tx = await apiCreateEvent({
         name,
         venue,
+        description,
+        imageUrl,
         eventDate,
         ticketPrice: parseFloat(ticketPrice),
         totalSeats: parseInt(totalSeats, 10),
@@ -64,10 +79,25 @@ export function CreateEventScreen() {
       });
 
       Alert.alert("Success", "Event created successfully!", [
-        { text: "OK", onPress: () => navigation.goBack() },
+        { text: "OK", onPress: () => router.back() },
       ]);
     } catch (error: any) {
-      Alert.alert("Error", error.message ?? "Failed to create event");
+      const msg = error.message ?? "Failed to create event";
+      if (msg.includes("Cancelled") || msg.includes("CancellationException")) {
+        Alert.alert("Cancelled", "Transaction was cancelled.");
+      } else if (msg.includes("already in use")) {
+        Alert.alert(
+          "Event Already Exists",
+          `An event named "${name}" already exists for your admin account. Please use a different name.`
+        );
+      } else if (msg.includes("AccountNotInitialized")) {
+        Alert.alert(
+          "Admin Not Initialized",
+          "Your admin account needs to be initialized first. Please contact a super admin."
+        );
+      } else {
+        Alert.alert("Error", msg);
+      }
     } finally {
       setCreating(false);
     }
@@ -75,7 +105,7 @@ export function CreateEventScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Create Event" onBack={() => navigation.goBack()} />
+      <AppHeader title="Create Event" onBack={() => router.back()} />
 
       <ScrollView
         style={styles.scroll}
@@ -98,6 +128,24 @@ export function CreateEventScreen() {
           placeholder="e.g. San Francisco, CA"
           error={errors.venue ?? undefined}
           maxLength={128}
+        />
+
+        <AppInput
+          label="Description"
+          value={description}
+          onChangeText={setDescription}
+          placeholder="Describe your event..."
+          error={errors.description ?? undefined}
+          maxLength={256}
+          multiline
+          numberOfLines={3}
+        />
+
+        <ImagePickerButton
+          label="Event Image"
+          imageUri={imageUri || undefined}
+          onImageSelected={setImageUri}
+          uploading={uploading}
         />
 
         <AppInput

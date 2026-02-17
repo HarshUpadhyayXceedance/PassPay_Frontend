@@ -1,6 +1,5 @@
 import { PublicKey, Connection } from "@solana/web3.js";
 import { Program, AnchorProvider } from "@coral-xyz/anchor";
-import { PassPay } from "../solana/idl/passpay";
 import PassPayIDL from "../solana/idl/passpay.json";
 import {
   PROGRAM_ID,
@@ -50,15 +49,14 @@ export async function detectUserRole(
     );
 
     const program = new Program(
-      PassPayIDL as PassPay,
-      PROGRAM_ID,
+      PassPayIDL as any,
       provider
     );
 
     // Step 2: Check for Admin PDA
     try {
       const [adminPda] = findAdminPda(walletPublicKey);
-      const adminAccount = await program.account.admin.fetch(adminPda);
+      const adminAccount = await (program.account as any).admin.fetch(adminPda);
 
       if (adminAccount.isActive) {
         console.log("✅ Role detected: admin (active Admin PDA found)");
@@ -76,7 +74,7 @@ export async function detectUserRole(
     // Step 3: Check for Merchant PDAs
     // We need to fetch all Merchant accounts where authority = walletPublicKey
     try {
-      const merchantAccounts = await program.account.merchant.all([
+      const merchantAccounts = await (program.account as any).merchant.all([
         {
           memcmp: {
             offset: 8 + 32, // Skip discriminator (8) + event pubkey (32) to get to authority field
@@ -87,7 +85,7 @@ export async function detectUserRole(
 
       // Check if any merchant account is active
       const activeMerchant = merchantAccounts.find(
-        (m) => m.account.isActive
+        (m: any) => m.account.isActive
       );
 
       if (activeMerchant) {

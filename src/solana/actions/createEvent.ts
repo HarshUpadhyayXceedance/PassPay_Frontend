@@ -1,4 +1,8 @@
 import { PublicKey, SystemProgram, Keypair } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
 import { findAdminPda, findEventPda, findTreasuryPda } from "../pda";
@@ -14,6 +18,8 @@ import { TOKEN_METADATA_PROGRAM_ID } from "../config/constants";
 export interface CreateEventParams {
   name: string;
   venue: string;
+  description: string;
+  imageUrl?: string;
   eventDate: Date;
   ticketPrice: number; // in SOL
   totalSeats: number;
@@ -47,6 +53,8 @@ export async function createEvent(
     .createEvent({
       name: params.name,
       venue: params.venue,
+      description: params.description,
+      imageUrl: params.imageUrl ?? "",
       eventDate: new BN(Math.floor(params.eventDate.getTime() / 1000)),
       ticketPrice: ticketPriceLamports,
       totalSeats: params.totalSeats,
@@ -58,12 +66,14 @@ export async function createEvent(
       event: eventPda,
       treasury: treasuryPda,
       collectionMint,
+      mintAuthority,
+      collectionTokenAccount,
       collectionMetadata,
       collectionMasterEdition,
-      collectionTokenAccount,
-      mintAuthority,
-      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
+      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
     })
     .rpc();
 

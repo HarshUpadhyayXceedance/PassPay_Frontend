@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -8,21 +8,88 @@ import {
   ActivityIndicator,
   Alert,
   Linking,
+  Animated,
+  Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { colors } from "../../theme/colors";
+import { fonts } from "../../theme/fonts";
 import { useWalletStore } from "../../store/walletStore";
 import { useAuthStore } from "../../store/authStore";
+import { SuccessAnimation } from "../../components/animations/SuccessAnimation";
+import { RoleDetectionLoader } from "../../components/ui/RoleDetectionLoader";
 
 const { width, height } = Dimensions.get("window");
 
 export function WelcomeScreen() {
   const [isConnecting, setIsConnecting] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
 
   const { connectPhantom } = useWalletStore();
-  const { detectRole } = useAuthStore();
+  const { detectRole, isDetectingRole } = useAuthStore();
+
+  // Animation values
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const logoScale = useRef(new Animated.Value(0.8)).current;
+  const logoPulse = useRef(new Animated.Value(1)).current;
+  const slideUp = useRef(new Animated.Value(30)).current;
+  const buttonScale = useRef(new Animated.Value(0.95)).current;
+
+  useEffect(() => {
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        tension: 40,
+        friction: 7,
+        useNativeDriver: true,
+      }),
+      Animated.spring(slideUp, {
+        toValue: 0,
+        tension: 50,
+        friction: 8,
+        delay: 200,
+        useNativeDriver: true,
+      }),
+      Animated.spring(buttonScale, {
+        toValue: 1,
+        tension: 50,
+        friction: 7,
+        delay: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Continuous logo pulse
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoPulse, {
+          toValue: 1.05,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoPulse, {
+          toValue: 1,
+          duration: 2000,
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+
+    return () => pulse.stop();
+  }, []);
 
   const handleConnectPhantom = async () => {
+    // Haptic feedback on press
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+
     setIsConnecting(true);
     try {
       // Connect to Phantom wallet
@@ -35,13 +102,22 @@ export function WelcomeScreen() {
         throw new Error("Failed to get wallet public key");
       }
 
+      // Show success animation
+      setShowSuccess(true);
+
+      // Wait a moment before role detection
+      await new Promise((resolve) => setTimeout(resolve, 800));
+
       // Detect user role on-chain
       await detectRole(publicKey);
 
       console.log("✅ Connection and role detection complete!");
-      // Navigation will be handled by AppNavigator based on role
+      // Success animation will auto-close and navigation will happen
     } catch (error: any) {
       console.error("❌ Connection failed:", error);
+
+      // Error haptic
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
       // Check if user needs to install Phantom
       if (
@@ -72,67 +148,105 @@ export function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
+      {/* Animated gradient background */}
       <LinearGradient
-        colors={[colors.secondary, colors.accent, "transparent"]}
+        colors={["#6C5CE7", "#00CEC9", "transparent"]}
         style={styles.glowTop}
         start={{ x: 0.3, y: 0 }}
         end={{ x: 0.7, y: 1 }}
       />
+      <LinearGradient
+        colors={["transparent", "#0A0E1A", "#6C5CE7"]}
+        style={styles.glowBottom}
+        start={{ x: 0.5, y: 0 }}
+        end={{ x: 0.5, y: 1 }}
+      />
 
-      <View style={styles.content}>
-        <View style={styles.logoArea}>
-          <View style={styles.logoIcon}>
-            <Text style={styles.logoEmoji}>🎫</Text>
-          </View>
+      <Animated.View style={[styles.content, { opacity: fadeAnim }]}>
+        <Animated.View
+          style={[
+            styles.logoArea,
+            {
+              transform: [{ translateY: slideUp }],
+            },
+          ]}
+        >
+          <Animated.View
+            style={[
+              styles.logoIconContainer,
+              {
+                transform: [{ scale: Animated.multiply(logoScale, logoPulse) }],
+              },
+            ]}
+          >
+            <LinearGradient
+              colors={[colors.primary, colors.accent]}
+              style={styles.logoIcon}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            >
+              <Image
+                source={require("../../../assets/icon.png")}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+            </LinearGradient>
+          </Animated.View>
           <Text style={styles.logoText}>PassPay</Text>
-          <Text style={styles.tagline}>
-            NFT Tickets & Loyalty Rewards{"\n"}Powered by Solana
+          <View style={styles.taglineContainer}>
+            <Text style={styles.tagline}>Your Web3 Event Pass</Text>
+            <View style={styles.taglineDot} />
+          </View>
+          <Text style={styles.subtitle}>
+            NFT Tickets • Loyalty Rewards • Instant Payments
           </Text>
-        </View>
+        </Animated.View>
 
-        <View style={styles.features}>
-          <FeatureItem
-            icon="🎫"
-            title="NFT Tickets"
-            desc="Collectible tickets with loyalty badges"
-          />
-          <FeatureItem
-            icon="🏆"
-            title="Loyalty Rewards"
-            desc="Earn tier-based discounts and perks"
-          />
-          <FeatureItem
-            icon="📊"
-            title="Dynamic Pricing"
-            desc="Smart pricing based on demand"
-          />
-          <FeatureItem
-            icon="📱"
-            title="Scan2Pay"
-            desc="Pay merchants at events with a QR scan"
-          />
-        </View>
+        <Animated.View
+          style={[
+            styles.features,
+            {
+              transform: [{ translateY: slideUp }],
+            },
+          ]}
+        >
+          <FeatureItem icon="🎫" title="NFT Tickets" desc="Collectible event passes" />
+          <FeatureItem icon="🏆" title="Loyalty Rewards" desc="Tier-based benefits" />
+          <FeatureItem icon="⚡" title="Instant Payments" desc="Scan QR to pay merchants" />
+        </Animated.View>
 
-        <View style={styles.actions}>
+        <Animated.View
+          style={[
+            styles.actions,
+            {
+              transform: [{ scale: buttonScale }],
+            },
+          ]}
+        >
           <TouchableOpacity
             style={styles.primaryButton}
             onPress={handleConnectPhantom}
-            activeOpacity={0.8}
+            activeOpacity={0.85}
             disabled={isConnecting}
           >
             <LinearGradient
-              colors={[colors.primary, colors.primaryDark]}
+              colors={isConnecting ? [colors.surfaceLight, colors.surface] : [colors.primary, colors.accent]}
               style={styles.buttonGradient}
               start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
+              end={{ x: 1, y: 1 }}
             >
               {isConnecting ? (
-                <ActivityIndicator color={colors.background} size="small" />
+                <View style={styles.loadingContainer}>
+                  <ActivityIndicator color={colors.text} size="small" />
+                  <Text style={styles.loadingText}>Connecting...</Text>
+                </View>
               ) : (
-                <>
+                <View style={styles.buttonContent}>
+                  <View style={styles.phantomLogo}>
+                    <Text style={styles.phantomEmoji}>👻</Text>
+                  </View>
                   <Text style={styles.buttonText}>Connect Phantom Wallet</Text>
-                  <Text style={styles.buttonArrow}>→</Text>
-                </>
+                </View>
               )}
             </LinearGradient>
           </TouchableOpacity>
@@ -141,12 +255,29 @@ export function WelcomeScreen() {
             onPress={() => Linking.openURL("https://phantom.app")}
             style={styles.linkButton}
           >
-            <Text style={styles.linkText}>What is Phantom? →</Text>
+            <Text style={styles.linkText}>Don't have Phantom? Get it here →</Text>
           </TouchableOpacity>
 
-          <Text style={styles.footerText}>Secured by Solana Blockchain</Text>
-        </View>
-      </View>
+          <View style={styles.footer}>
+            <View style={styles.solanaLogo}>
+              <Text style={styles.solanaText}>◎</Text>
+            </View>
+            <Text style={styles.footerText}>Powered by Solana</Text>
+          </View>
+        </Animated.View>
+      </Animated.View>
+
+      {/* Success animation */}
+      <SuccessAnimation
+        visible={showSuccess}
+        title="Wallet Connected!"
+        message="Detecting your role on-chain..."
+        onComplete={() => setShowSuccess(false)}
+        duration={2000}
+      />
+
+      {/* Role detection loader */}
+      <RoleDetectionLoader visible={isDetectingRole} />
     </View>
   );
 }
@@ -177,105 +308,217 @@ const fStyles = StyleSheet.create({
   container: {
     flexDirection: "row",
     alignItems: "center",
-    marginBottom: 12,
     backgroundColor: colors.surface,
-    padding: 14,
-    borderRadius: 14,
+    padding: 16,
+    borderRadius: 16,
     borderWidth: 1,
     borderColor: colors.border,
   },
   iconBox: {
-    width: 42,
-    height: 42,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 14,
     backgroundColor: colors.surfaceLight,
     alignItems: "center",
     justifyContent: "center",
-    marginRight: 12,
+    marginRight: 14,
   },
-  icon: { fontSize: 20 },
-  textBox: { flex: 1 },
+  icon: {
+    fontSize: 24,
+  },
+  textBox: {
+    flex: 1,
+  },
   title: {
     color: colors.text,
-    fontSize: 15,
-    fontWeight: "600",
-    marginBottom: 2,
+    fontSize: 16,
+    fontWeight: "700",
+    marginBottom: 4,
+    fontFamily: fonts.bodySemiBold,
   },
-  desc: { color: colors.textSecondary, fontSize: 12, lineHeight: 16 },
+  desc: {
+    color: colors.textSecondary,
+    fontSize: 13,
+    lineHeight: 18,
+    fontFamily: fonts.body,
+  },
 });
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: colors.background },
+  container: {
+    flex: 1,
+    backgroundColor: colors.background
+  },
   glowTop: {
     position: "absolute",
     top: -100,
     left: -50,
     width: width + 100,
+    height: 350,
+    opacity: 0.12,
+  },
+  glowBottom: {
+    position: "absolute",
+    bottom: -100,
+    left: 0,
+    right: 0,
     height: 300,
-    opacity: 0.15,
+    opacity: 0.08,
   },
   content: {
     flex: 1,
     justifyContent: "space-between",
     paddingHorizontal: 24,
-    paddingTop: height * 0.08,
-    paddingBottom: 40,
+    paddingTop: height * 0.12,
+    paddingBottom: 50,
   },
-  logoArea: { alignItems: "center" },
+  logoArea: {
+    alignItems: "center",
+    marginBottom: 20,
+  },
+  logoIconContainer: {
+    marginBottom: 24,
+  },
   logoIcon: {
-    width: 72,
-    height: 72,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.primary,
+    width: 100,
+    height: 100,
+    borderRadius: 26,
     alignItems: "center",
     justifyContent: "center",
-    marginBottom: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 20,
+    elevation: 15,
   },
-  logoEmoji: { fontSize: 32 },
+  logoImage: {
+    width: 90,
+    height: 90,
+    borderRadius: 22,
+  },
   logoText: {
-    fontSize: 42,
+    fontSize: 48,
     fontWeight: "800",
     color: colors.text,
+    marginBottom: 12,
+    fontFamily: fonts.displayBold,
+    letterSpacing: -1.5,
+  },
+  taglineContainer: {
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: 8,
   },
   tagline: {
-    fontSize: 16,
+    fontSize: 18,
+    color: colors.primary,
+    textAlign: "center",
+    fontFamily: fonts.headingSemiBold,
+    letterSpacing: 0.5,
+  },
+  taglineDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.primary,
+    marginLeft: 6,
+  },
+  subtitle: {
+    fontSize: 14,
     color: colors.textSecondary,
     textAlign: "center",
-    lineHeight: 24,
+    marginTop: 4,
+    fontFamily: fonts.body,
   },
-  features: { marginTop: 10 },
-  actions: { alignItems: "center" },
+  features: {
+    marginTop: 20,
+    gap: 12,
+  },
+  actions: {
+    alignItems: "center",
+    width: "100%",
+  },
   primaryButton: {
     width: "100%",
-    borderRadius: 16,
+    borderRadius: 18,
     overflow: "hidden",
-    marginBottom: 12,
+    marginBottom: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 12,
+    elevation: 8,
   },
   buttonGradient: {
-    flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 18,
-    minHeight: 56,
+    minHeight: 62,
+  },
+  loadingContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  loadingText: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "600",
+    fontFamily: fonts.bodySemiBold,
+  },
+  buttonContent: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  phantomLogo: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: "rgba(255,255,255,0.1)",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  phantomEmoji: {
+    fontSize: 20,
   },
   buttonText: {
     color: colors.background,
-    fontSize: 18,
+    fontSize: 17,
     fontWeight: "700",
-    marginRight: 8,
+    fontFamily: fonts.bodySemiBold,
   },
-  buttonArrow: { color: colors.background, fontSize: 20, fontWeight: "700" },
   linkButton: {
-    paddingVertical: 10,
-    marginBottom: 8,
+    paddingVertical: 12,
+    marginBottom: 16,
   },
   linkText: {
     color: colors.primary,
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
+    fontFamily: fonts.body,
   },
-  footerText: { color: colors.textMuted, fontSize: 13 },
+  footer: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  solanaLogo: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  solanaText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
+  },
+  footerText: {
+    color: colors.textMuted,
+    fontSize: 12,
+    fontFamily: fonts.body,
+  },
 });

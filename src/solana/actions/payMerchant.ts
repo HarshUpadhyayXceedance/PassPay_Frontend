@@ -1,12 +1,11 @@
 import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
-import { findMerchantPda, findTicketPda } from "../pda";
+import { findMerchantPda, findUserAttendancePda } from "../pda";
 
 export interface PayMerchantParams {
   eventPda: PublicKey;
   merchantAuthority: PublicKey;
-  ticketMint: PublicKey;
   amount: number; // in SOL
 }
 
@@ -20,7 +19,7 @@ export async function payMerchant(
     params.eventPda,
     params.merchantAuthority
   );
-  const [ticketPda] = findTicketPda(params.eventPda, params.ticketMint);
+  const [userAttendanceRecord] = findUserAttendancePda(payer);
 
   const amountLamports = new BN(
     Math.round(params.amount * 1_000_000_000)
@@ -31,9 +30,9 @@ export async function payMerchant(
     .accounts({
       payer,
       event: params.eventPda,
-      ticket: ticketPda,
       merchant: merchantPda,
-      merchantAuthority: params.merchantAuthority,
+      merchantWallet: params.merchantAuthority,
+      userAttendanceRecord,
       systemProgram: SystemProgram.programId,
     })
     .rpc();

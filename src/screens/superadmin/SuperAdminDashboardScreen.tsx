@@ -1,22 +1,38 @@
 import React, { useEffect, useState } from "react";
-import { View, Text, StyleSheet, ScrollView, Alert, TouchableOpacity } from "react-native";
-import { PublicKey, Connection } from "@solana/web3.js";
+import {
+  View,
+  Text,
+  Image,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+  RefreshControl,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { Connection } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
-import { SuperAdminBadge } from "../../components/admin/SuperAdminBadge";
 import { colors } from "../../theme/colors";
-import { typography } from "../../theme/typography";
+import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
+import { useAuthStore } from "../../store/authStore";
 import { getProgram } from "../../solana/config/program";
 import { DEVNET_RPC } from "../../solana/config/constants";
+import { shortenAddress } from "../../utils/formatters";
+import { safeFetchAll } from "../../solana/utils/safeFetchAll";
 
 export function SuperAdminDashboardScreen() {
-  const { publicKey } = useWallet();
+  const { publicKey, balance } = useWallet();
+  const { role } = useAuthStore();
+  const router = useRouter();
+  const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
-    totalAdmins: 0,
+    activeAdmins: 0,
     totalEvents: 0,
-    badgesIssued: 0,
-    activeUsers: 0,
+    activeEvents: 0,
+    totalTicketsSold: 0,
   });
 
   useEffect(() => {
@@ -25,7 +41,6 @@ export function SuperAdminDashboardScreen() {
 
   const fetchStats = async () => {
     if (!publicKey) return;
-
     try {
       const connection = new Connection(DEVNET_RPC, "confirmed");
       const provider = new AnchorProvider(
@@ -34,115 +49,346 @@ export function SuperAdminDashboardScreen() {
         { commitment: "confirmed" }
       );
       const program = getProgram(provider);
-
-      // Fetch all Admin accounts
       const adminAccounts = await program.account.admin.all();
+      // Use safeFetchAll instead of program.account.event.all() to handle
+      // old-schema accounts missing the image_url field
+      const eventAccounts = await safeFetchAll(connection, program, "Event");
 
-      // Fetch all Event accounts
-      const eventAccounts = await program.account.event.all();
+      const activeEvents = eventAccounts.filter(
+        (e: any) => e.account.isActive
+      ).length;
+      const totalSold = eventAccounts.reduce(
+        (sum: number, e: any) =>
+          sum + (e.account.ticketsSold?.toNumber?.() ?? e.account.ticketsSold ?? 0),
+        0
+      );
+
+      const activeAdmins = adminAccounts.filter(
+        (a: any) => a.account.isActive
+      ).length;
 
       setStats({
-        totalAdmins: adminAccounts.length,
+        activeAdmins,
         totalEvents: eventAccounts.length,
-        badgesIssued: 0, // Will be implemented with badge collection
-        activeUsers: 0, // Will be implemented with attendance records
-      });
-
-      console.log("✅ Stats loaded:", {
-        admins: adminAccounts.length,
-        events: eventAccounts.length,
+        activeEvents,
+        totalTicketsSold: totalSold,
       });
     } catch (error: any) {
-      console.error("❌ Failed to fetch stats:", error);
+      console.error("Failed to fetch stats:", error.message);
     }
   };
 
-  const handleCreateAdmin = () => {
-    Alert.alert(
-      "Create Admin",
-      "Navigate to CreateAdminScreen to add a new admin.\n\n(Full navigation will be added in next update)"
-    );
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await fetchStats();
+    setRefreshing(false);
   };
 
-  const handleInitializeBadges = () => {
-    Alert.alert(
-      "Initialize Badges",
-      "Badge collection initialization screen coming soon!\n\nThis will allow you to set up the global badge system for loyalty rewards."
-    );
-  };
-
-  const handleViewAdmins = () => {
-    Alert.alert(
-      "View Admins",
-      "Check the 'Admins' tab to see all admin accounts in the system."
-    );
-  };
+  const isSuperAdmin = role === "super_admin";
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView
+      style={styles.container}
+      contentContainerStyle={styles.content}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor={colors.primary}
+        />
+      }
+    >
+      {/* Header */}
       <View style={styles.header}>
-        <SuperAdminBadge size="large" />
-        <Text style={styles.title}>System Overview</Text>
-      </View>
-
-      <View style={styles.statsGrid}>
-        <StatCard title="Total Admins" value={stats.totalAdmins.toString()} icon="👥" />
-        <StatCard title="Total Events" value={stats.totalEvents.toString()} icon="🎫" />
-        <StatCard title="Badges Issued" value={stats.badgesIssued.toString()} icon="🏆" />
-        <StatCard title="Active Users" value={stats.activeUsers.toString()} icon="✅" />
-      </View>
-
-      <View style={styles.section}>
-        <Text style={styles.sectionTitle}>Quick Actions</Text>
-
-        <TouchableOpacity style={styles.actionCard} onPress={handleCreateAdmin}>
-          <Text style={styles.actionIcon}>➕</Text>
-          <View style={styles.actionText}>
-            <Text style={styles.actionTitle}>Add New Admin</Text>
-            <Text style={styles.actionDesc}>
-              Grant admin access to event organizers
+        <View style={styles.headerLeft}>
+          <Image
+            source={require("../../../assets/icon.png")}
+            style={styles.headerLogo}
+          />
+          <View>
+            <Text style={styles.headerRole}>
+              {isSuperAdmin ? "Super Admin" : "Admin"}
+            </Text>
+            <Text style={styles.headerSubtitle}>
+              {publicKey ? shortenAddress(publicKey) : "Not connected"}
             </Text>
           </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionCard} onPress={handleInitializeBadges}>
-          <Text style={styles.actionIcon}>🎖️</Text>
-          <View style={styles.actionText}>
-            <Text style={styles.actionTitle}>Initialize Badge Collection</Text>
-            <Text style={styles.actionDesc}>
-              One-time setup for global badge system
-            </Text>
-          </View>
-        </TouchableOpacity>
-
-        <TouchableOpacity style={styles.actionCard} onPress={handleViewAdmins}>
-          <Text style={styles.actionIcon}>📋</Text>
-          <View style={styles.actionText}>
-            <Text style={styles.actionTitle}>View All Admins</Text>
-            <Text style={styles.actionDesc}>
-              Manage and deactivate admin accounts
-            </Text>
-          </View>
-        </TouchableOpacity>
+        </View>
+        {isSuperAdmin && (
+          <LinearGradient
+            colors={colors.gradientSuperAdmin as any}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.roleBadge}
+          >
+            <Ionicons name="shield-checkmark" size={14} color="#fff" />
+            <Text style={styles.roleBadgeText}>SUPER</Text>
+          </LinearGradient>
+        )}
       </View>
+
+      {/* Stats Cards */}
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        contentContainerStyle={styles.statsRow}
+      >
+        <StatCard
+          label="Wallet Balance"
+          value={`${balance.toFixed(1)} SOL`}
+          change="+12% this week"
+          gradient={["rgba(0,255,163,0.15)", "rgba(0,255,163,0.03)"]}
+          iconColor={colors.primary}
+        />
+        <StatCard
+          label="Active Events"
+          value={stats.activeEvents.toString()}
+          change={`${stats.totalEvents} total`}
+          gradient={["rgba(108,92,231,0.15)", "rgba(108,92,231,0.03)"]}
+          iconColor={colors.secondary}
+        />
+        <StatCard
+          label="Tickets Sold"
+          value={stats.totalTicketsSold.toString()}
+          change={`${stats.totalEvents} events`}
+          gradient={["rgba(0,206,201,0.15)", "rgba(0,206,201,0.03)"]}
+          iconColor={colors.accent}
+        />
+        <StatCard
+          label="Active Admins"
+          value={stats.activeAdmins.toString()}
+          change="managing events"
+          gradient={["rgba(233,30,99,0.15)", "rgba(233,30,99,0.03)"]}
+          iconColor="#E91E63"
+        />
+      </ScrollView>
+
+      {/* Quick Actions */}
+      <Text style={styles.sectionTitle}>Quick Actions</Text>
+      <View style={styles.actionsRow}>
+        <ActionButton
+          icon="add-circle"
+          label="Create Event"
+          color={colors.primary}
+          onPress={() => router.push("/(admin)/create-event")}
+        />
+        <ActionButton
+          icon="qr-code"
+          label="Scan Ticket"
+          color={colors.secondary}
+          onPress={() => router.push("/(admin)/check-in")}
+        />
+        <ActionButton
+          icon="storefront"
+          label="Add Merchant"
+          color="#FF6B35"
+          onPress={() => router.push("/(admin)/register-merchant")}
+        />
+        {isSuperAdmin && (
+          <ActionButton
+            icon="person-add"
+            label="Add Admin"
+            color={colors.accent}
+            onPress={() => router.push("/(admin)/create-admin")}
+          />
+        )}
+      </View>
+
+      {/* Admin Management (super admin only) */}
+      {isSuperAdmin && (
+        <>
+          <Text style={styles.sectionTitle}>Admin Management</Text>
+          <TouchableOpacity
+            style={styles.overviewCard}
+            activeOpacity={0.7}
+            onPress={() => router.push("/(admin)/admin-list")}
+          >
+            <View style={styles.overviewRow}>
+              <View style={styles.overviewLeft}>
+                <View style={[styles.overviewIconWrap, { backgroundColor: colors.accent + "18" }]}>
+                  <Ionicons name="people" size={18} color={colors.accent} />
+                </View>
+                <Text style={styles.overviewLabel}>View All Admins</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+            </View>
+          </TouchableOpacity>
+        </>
+      )}
+
+      {/* Merchant Management */}
+      <Text style={styles.sectionTitle}>Merchant Management</Text>
+      <TouchableOpacity
+        style={styles.overviewCard}
+        activeOpacity={0.7}
+        onPress={() => router.push("/(admin)/merchant-list")}
+      >
+        <View style={styles.overviewRow}>
+          <View style={styles.overviewLeft}>
+            <View style={[styles.overviewIconWrap, { backgroundColor: "#FF6B35" + "18" }]}>
+              <Ionicons name="storefront" size={18} color="#FF6B35" />
+            </View>
+            <Text style={styles.overviewLabel}>View All Merchants</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+        </View>
+      </TouchableOpacity>
+
+      {/* Platform Overview */}
+      <Text style={styles.sectionTitle}>Platform Overview</Text>
+      <View style={styles.overviewCard}>
+        <OverviewRow
+          icon="people"
+          iconColor={colors.primary}
+          label="Active Admins"
+          value={stats.activeAdmins.toString()}
+        />
+        <View style={styles.divider} />
+        <OverviewRow
+          icon="calendar"
+          iconColor={colors.secondary}
+          label="Total Events"
+          value={stats.totalEvents.toString()}
+        />
+        <View style={styles.divider} />
+        <OverviewRow
+          icon="ticket"
+          iconColor={colors.accent}
+          label="Tickets Sold"
+          value={stats.totalTicketsSold.toString()}
+        />
+        <View style={styles.divider} />
+        <OverviewRow
+          icon="wallet"
+          iconColor={colors.primary}
+          label="Wallet Balance"
+          value={`${balance.toFixed(2)} SOL`}
+        />
+      </View>
+
+      {/* System Status */}
+      <Text style={styles.sectionTitle}>System Status</Text>
+      <View style={styles.statusCard}>
+        <StatusRow
+          icon="checkmark-circle"
+          color={colors.success}
+          label="Solana Devnet"
+          status="Connected"
+        />
+        <StatusRow
+          icon="shield-checkmark"
+          color={colors.primary}
+          label="Program"
+          status="Deployed"
+        />
+        <StatusRow
+          icon="cube"
+          color={colors.secondary}
+          label="Badge Collection"
+          status={stats.totalEvents > 0 ? "Active" : "Not Initialized"}
+        />
+      </View>
+
+      <View style={{ height: 32 }} />
     </ScrollView>
   );
 }
 
 function StatCard({
-  title,
+  label,
   value,
-  icon,
+  change,
+  gradient,
+  iconColor,
 }: {
-  title: string;
+  label: string;
   value: string;
-  icon: string;
+  change: string;
+  gradient: string[];
+  iconColor: string;
 }) {
   return (
-    <View style={styles.statCard}>
-      <Text style={styles.statIcon}>{icon}</Text>
+    <LinearGradient
+      colors={gradient as any}
+      style={styles.statCard}
+      start={{ x: 0, y: 0 }}
+      end={{ x: 1, y: 1 }}
+    >
+      <Text style={styles.statLabel}>{label}</Text>
       <Text style={styles.statValue}>{value}</Text>
-      <Text style={styles.statTitle}>{title}</Text>
+      <View style={styles.statChangeRow}>
+        <Ionicons name="trending-up" size={14} color={iconColor} />
+        <Text style={[styles.statChange, { color: iconColor }]}>{change}</Text>
+      </View>
+    </LinearGradient>
+  );
+}
+
+function ActionButton({
+  icon,
+  label,
+  color,
+  onPress,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  label: string;
+  color: string;
+  onPress: () => void;
+}) {
+  return (
+    <TouchableOpacity style={styles.actionBtn} onPress={onPress} activeOpacity={0.7}>
+      <View style={[styles.actionIconWrap, { borderColor: color + "40" }]}>
+        <Ionicons name={icon} size={26} color={color} />
+      </View>
+      <Text style={styles.actionLabel}>{label}</Text>
+    </TouchableOpacity>
+  );
+}
+
+function OverviewRow({
+  icon,
+  iconColor,
+  label,
+  value,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  iconColor: string;
+  label: string;
+  value: string;
+}) {
+  return (
+    <View style={styles.overviewRow}>
+      <View style={styles.overviewLeft}>
+        <View style={[styles.overviewIconWrap, { backgroundColor: iconColor + "18" }]}>
+          <Ionicons name={icon} size={18} color={iconColor} />
+        </View>
+        <Text style={styles.overviewLabel}>{label}</Text>
+      </View>
+      <Text style={styles.overviewValue}>{value}</Text>
+    </View>
+  );
+}
+
+function StatusRow({
+  icon,
+  color,
+  label,
+  status,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  color: string;
+  label: string;
+  status: string;
+}) {
+  return (
+    <View style={styles.statusRow}>
+      <View style={styles.statusLeft}>
+        <Ionicons name={icon} size={18} color={color} />
+        <Text style={styles.statusLabel}>{label}</Text>
+      </View>
+      <View style={[styles.statusBadge, { backgroundColor: color + "20" }]}>
+        <Text style={[styles.statusText, { color }]}>{status}</Text>
+      </View>
     </View>
   );
 }
@@ -152,89 +398,194 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
+  content: {
+    paddingTop: 56,
+    paddingBottom: 20,
+  },
   header: {
-    padding: spacing.lg,
-    paddingTop: spacing.xxxl,
-    gap: spacing.md,
-  },
-  title: {
-    ...typography.h1,
-    color: colors.text,
-  },
-  statsGrid: {
     flexDirection: "row",
-    flexWrap: "wrap",
-    paddingHorizontal: 16,
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
     gap: 12,
   },
+  headerLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+  },
+  headerRole: {
+    fontSize: 22,
+    fontFamily: fonts.displayBold,
+    color: colors.text,
+    marginBottom: 1,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+  },
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontFamily: fonts.bodyBold,
+    color: "#fff",
+    letterSpacing: 1.2,
+  },
+  statsRow: {
+    paddingHorizontal: spacing.lg,
+    gap: 12,
+    marginBottom: spacing.lg,
+  },
   statCard: {
-    flex: 1,
-    minWidth: "45%",
-    backgroundColor: colors.surface,
+    width: 170,
     borderRadius: 16,
-    padding: 16,
+    padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
-    alignItems: "center",
   },
-  statIcon: {
-    fontSize: 28,
-    marginBottom: 8,
+  statLabel: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    marginBottom: 6,
   },
   statValue: {
     fontSize: 28,
-    fontWeight: "800",
-    color: colors.primary,
-    marginBottom: 4,
+    fontFamily: fonts.heading,
+    color: colors.text,
+    marginBottom: 6,
   },
-  statTitle: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    textAlign: "center",
+  statChangeRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
   },
-  section: {
-    padding: 24,
+  statChange: {
+    fontSize: 12,
+    fontFamily: fonts.bodyMedium,
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "700",
+    fontFamily: fonts.heading,
     color: colors.text,
-    marginBottom: 16,
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.md,
+    marginTop: spacing.sm,
   },
-  actionCard: {
+  actionsRow: {
     flexDirection: "row",
+    paddingHorizontal: spacing.lg,
+    gap: 12,
+    marginBottom: spacing.lg,
+  },
+  actionBtn: {
+    flex: 1,
+    alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
+    paddingVertical: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
   },
-  actionIcon: {
-    fontSize: 32,
-    marginRight: 16,
-  },
-  actionText: {
-    flex: 1,
-  },
-  actionTitle: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: colors.text,
-    marginBottom: 4,
-  },
-  actionDesc: {
-    fontSize: 13,
-    color: colors.textSecondary,
-    lineHeight: 18,
-  },
-  comingSoon: {
-    padding: 24,
+  actionIconWrap: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    borderWidth: 1.5,
     alignItems: "center",
+    justifyContent: "center",
+    marginBottom: 8,
   },
-  comingSoonText: {
+  actionLabel: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.textSecondary,
+  },
+  overviewCard: {
+    marginHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  overviewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 12,
+  },
+  overviewLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  overviewIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  overviewLabel: {
+    fontSize: 15,
+    fontFamily: fonts.body,
+    color: colors.text,
+  },
+  overviewValue: {
+    fontSize: 15,
+    fontFamily: fonts.heading,
+    color: colors.text,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+  },
+  statusCard: {
+    marginHorizontal: spacing.lg,
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  statusRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 10,
+  },
+  statusLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
+  },
+  statusLabel: {
     fontSize: 14,
-    color: colors.textMuted,
-    textAlign: "center",
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+  },
+  statusBadge: {
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  statusText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
   },
 });

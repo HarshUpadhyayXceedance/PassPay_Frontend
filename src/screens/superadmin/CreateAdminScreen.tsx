@@ -9,7 +9,8 @@ import {
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, Connection } from "@solana/web3.js";
+import { AnchorProvider } from "@coral-xyz/anchor";
 import { AppInput } from "../../components/ui/AppInput";
 import { AppButton } from "../../components/ui/AppButton";
 import { AppCard } from "../../components/ui/AppCard";
@@ -18,6 +19,9 @@ import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
 import { createAdmin } from "../../solana/actions/createAdmin";
+import { getProgram } from "../../solana/config/program";
+import { findAdminPda } from "../../solana/pda";
+import { DEVNET_RPC } from "../../solana/config/constants";
 
 export function CreateAdminScreen() {
   const router = useRouter();
@@ -65,6 +69,26 @@ export function CreateAdminScreen() {
       const adminPubkey = new PublicKey(adminWallet.trim());
       const superAdminPubkey = new PublicKey(publicKey);
 
+      // Check if admin PDA already exists
+      const connection = new Connection(DEVNET_RPC, "confirmed");
+      const provider = new AnchorProvider(
+        connection,
+        {} as any,
+        { commitment: "confirmed" }
+      );
+      const program = getProgram(provider);
+      const [adminPda] = findAdminPda(adminPubkey);
+
+      const existingAdmin = await program.account.admin.fetchNullable(adminPda);
+      if (existingAdmin) {
+        Alert.alert(
+          "Admin Already Exists",
+          `An admin account already exists for this wallet address.\n\nName: ${existingAdmin.name}\nStatus: ${existingAdmin.isActive ? "Active" : "Inactive"}`
+        );
+        setIsSubmitting(false);
+        return;
+      }
+
       console.log("🔧 Creating admin:", {
         name: adminName.trim(),
         wallet: adminPubkey.toBase58(),
@@ -97,10 +121,17 @@ export function CreateAdminScreen() {
       setAdminWallet("");
     } catch (error: any) {
       console.error("❌ Failed to create admin:", error);
-      Alert.alert(
-        "Failed to Create Admin",
-        error.message || "An unknown error occurred"
-      );
+      const msg = error.message || "An unknown error occurred";
+      if (msg.includes("already in use")) {
+        Alert.alert(
+          "Admin Already Exists",
+          "An admin account already exists for this wallet address."
+        );
+      } else if (msg.includes("Cancelled") || msg.includes("CancellationException")) {
+        Alert.alert("Cancelled", "Transaction was cancelled.");
+      } else {
+        Alert.alert("Failed to Create Admin", msg);
+      }
     } finally {
       setIsSubmitting(false);
     }
@@ -181,7 +212,7 @@ export function CreateAdminScreen() {
           <AppButton
             title={isSubmitting ? "Creating..." : "Create Admin"}
             onPress={handleCreateAdmin}
-            isLoading={isSubmitting}
+            loading={isSubmitting}
             style={styles.submitButton}
           />
         </View>

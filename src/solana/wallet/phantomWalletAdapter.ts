@@ -1,7 +1,6 @@
 import { Linking } from "react-native";
 import { PublicKey, Transaction } from "@solana/web3.js";
-import Constants from "expo-constants";
-import { mockWalletAdapter } from "./mockWalletAdapter";
+import { Buffer } from "buffer";
 
 export interface PhantomWalletAdapter {
   connect: () => Promise<PublicKey>;
@@ -16,74 +15,77 @@ export interface PhantomWalletAdapter {
   getPublicKey: () => PublicKey | null;
 }
 
+const MWA_IDENTITY = {
+  name: "PassPay",
+  uri: "https://passpay.app",
+  icon: "favicon.ico",
+};
+
 /**
- * Phantom Wallet Adapter with Development Mode Support
+ * Phantom Wallet Adapter using Solana Mobile Wallet Adapter (MWA)
  *
- * - In Expo Go / Development: Uses mock wallet adapter (no native modules required)
- * - In Production Build: Uses real Phantom Mobile Wallet Adapter (Solana Mobile Stack)
- *
- * This allows development in Expo Go while preserving production Phantom integration.
+ * Connects directly to Phantom wallet on the device.
+ * Requires: `npx expo run:android` (dev client build, NOT Expo Go)
+ * Requires: Phantom app installed on the same device/emulator
  */
 class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
-  private publicKey: PublicKey | null = null;
-  private isDevelopment: boolean;
+  private _publicKey: PublicKey | null = null;
+  private _authToken: string | null = null;
 
-  constructor() {
-    // Use real Phantom wallet (requires expo-dev-client or custom build)
-    // Set to true to use mock wallet for Expo Go testing
-    this.isDevelopment = true; // Set to true for Expo Go development
-
-    if (this.isDevelopment) {
-      console.log("🔧 Development Mode: Using Mock Wallet Adapter (Expo Go)");
-      console.log("💡 Mock wallet configured as SuperAdmin for testing");
-    } else {
-      console.log("🚀 Production Mode: Using Real Phantom Wallet");
-    }
+  private async getMWA() {
+    const mwa = await import(
+      "@solana-mobile/mobile-wallet-adapter-protocol-web3js"
+    ) as any;
+    return mwa.transact ?? mwa.default?.transact ?? mwa;
   }
 
   async connect(): Promise<PublicKey> {
-    if (this.isDevelopment) {
-      // Use mock adapter in development
-      this.publicKey = await mockWalletAdapter.connect();
-      return this.publicKey;
-    }
-
-    // Production: Use real Phantom Mobile Wallet Adapter
     try {
-      // Dynamic import to avoid loading native modules in Expo Go
-      const { transact, Web3MobileWallet } = await import(
-        "@solana-mobile/mobile-wallet-adapter-protocol-web3js"
-      );
+      const transact = await this.getMWA();
 
-      const authorizationResult = await transact(
-        async (wallet: typeof Web3MobileWallet) => {
-          const authorization = await wallet.authorize({
-            cluster: "devnet",
-            identity: {
-              name: "PassPay",
-              uri: "https://passpay.app",
-              icon: "favicon.ico",
-            },
-          });
-          return authorization;
-        }
-      );
+      const authResult = await transact(async (wallet: any) => {
+        const auth = await wallet.authorize({
+          cluster: "devnet",
+          identity: MWA_IDENTITY,
+        });
+        return auth;
+      });
 
-      if (!authorizationResult || !authorizationResult.accounts || authorizationResult.accounts.length === 0) {
-        throw new Error("No wallet found. Please install Phantom wallet.");
+      if (!authResult?.accounts?.length) {
+        throw new Error("No accounts returned. Please approve in Phantom.");
       }
 
-      // The publicKey is already a PublicKey object from the accounts array
-      this.publicKey = authorizationResult.accounts[0].publicKey;
-      console.log("✅ Connected to Phantom wallet:", this.publicKey.toBase58());
+      // MWA returns account address as base64-encoded bytes
+      const account = authResult.accounts[0];
+      const addressBytes = Buffer.from(account.address, "base64");
+      this._publicKey = new PublicKey(addressBytes);
+      this._authToken = authResult.auth_token ?? null;
 
-      return this.publicKey;
+      console.log("✅ Connected to Phantom:", this._publicKey.toBase58());
+      return this._publicKey;
     } catch (error: any) {
-      console.error("Failed to connect to Phantom:", error);
+      console.error("❌ Phantom connection failed:", error);
 
-      // If wallet not found, open Phantom website
-      if (error.message?.includes("No wallet")) {
+      if (
+        error.message?.includes("No installed wallet") ||
+        error.message?.includes("Found no installed")
+      ) {
         await Linking.openURL("https://phantom.app/download");
+        throw new Error(
+          "Phantom wallet not found. Install Phantom and try again."
+        );
+      }
+
+      // MWA native module missing → user is running in Expo Go
+      if (
+        error.message?.includes("native module") ||
+        error.message?.includes("Cannot read") ||
+        error.message?.includes("undefined is not") ||
+        error.message?.includes("null is not an object")
+      ) {
+        throw new Error(
+          "Phantom requires a dev client. Run: npx expo run:android"
+        );
       }
 
       throw error;
@@ -91,157 +93,70 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
   }
 
   async disconnect(): Promise<void> {
-    if (this.isDevelopment) {
-      await mockWalletAdapter.disconnect();
-      this.publicKey = null;
-      return;
-    }
-
-    // Production: Disconnect from Phantom
     try {
-      const { transact, Web3MobileWallet } = await import(
-        "@solana-mobile/mobile-wallet-adapter-protocol-web3js"
-      );
-
-      await transact(async (wallet: typeof Web3MobileWallet) => {
-        await wallet.deauthorize({
-          auth_token: "",
+      if (this._authToken) {
+        const transact = await this.getMWA();
+        await transact(async (wallet: any) => {
+          await wallet.deauthorize({ auth_token: this._authToken });
         });
-      });
-
-      this.publicKey = null;
-      console.log("✅ Disconnected from Phantom wallet");
+      }
     } catch (error) {
-      console.error("Failed to disconnect:", error);
-      this.publicKey = null;
+      console.warn("Disconnect warning:", error);
+    } finally {
+      this._publicKey = null;
+      this._authToken = null;
+      console.log("✅ Disconnected from Phantom");
     }
   }
 
   async signTransaction(transaction: Transaction): Promise<Transaction> {
-    if (this.isDevelopment) {
-      return await mockWalletAdapter.signTransaction(transaction);
-    }
+    if (!this._publicKey) throw new Error("Wallet not connected");
 
-    if (!this.publicKey) {
-      throw new Error("Wallet not connected");
-    }
+    const transact = await this.getMWA();
+    const signedTxs = await transact(async (wallet: any) => {
+      await wallet.authorize({ cluster: "devnet", identity: MWA_IDENTITY });
+      return await wallet.signTransactions({
+        transactions: [transaction],
+      });
+    });
 
-    // Production: Sign with Phantom
-    const { transact, Web3MobileWallet } = await import(
-      "@solana-mobile/mobile-wallet-adapter-protocol-web3js"
-    );
-
-    const signedTransactions = await transact(
-      async (wallet: typeof Web3MobileWallet) => {
-        // Re-authorize for signing (required by protocol)
-        await wallet.authorize({
-          cluster: "devnet",
-          identity: {
-            name: "PassPay",
-            uri: "https://passpay.app",
-            icon: "favicon.ico",
-          },
-        });
-
-        // Sign the transaction
-        const signedTxs = await wallet.signTransactions({
-          transactions: [transaction],
-        });
-
-        return signedTxs;
-      }
-    );
-
-    return signedTransactions[0];
+    return signedTxs[0];
   }
 
   async signAllTransactions(
     transactions: Transaction[]
   ): Promise<Transaction[]> {
-    if (this.isDevelopment) {
-      return await mockWalletAdapter.signAllTransactions(transactions);
-    }
+    if (!this._publicKey) throw new Error("Wallet not connected");
 
-    if (!this.publicKey) {
-      throw new Error("Wallet not connected");
-    }
+    const transact = await this.getMWA();
+    const signedTxs = await transact(async (wallet: any) => {
+      await wallet.authorize({ cluster: "devnet", identity: MWA_IDENTITY });
+      return await wallet.signTransactions({ transactions });
+    });
 
-    // Production: Sign with Phantom
-    const { transact, Web3MobileWallet } = await import(
-      "@solana-mobile/mobile-wallet-adapter-protocol-web3js"
-    );
-
-    const signedTransactions = await transact(
-      async (wallet: typeof Web3MobileWallet) => {
-        // Re-authorize for signing (required by protocol)
-        await wallet.authorize({
-          cluster: "devnet",
-          identity: {
-            name: "PassPay",
-            uri: "https://passpay.app",
-            icon: "favicon.ico",
-          },
-        });
-
-        // Sign all transactions
-        const signedTxs = await wallet.signTransactions({
-          transactions: transactions,
-        });
-
-        return signedTxs;
-      }
-    );
-
-    return signedTransactions;
+    return signedTxs;
   }
 
   async signAndSendTransaction(
     transaction: Transaction
   ): Promise<{ signature: string }> {
-    if (this.isDevelopment) {
-      return await mockWalletAdapter.signAndSendTransaction(transaction);
-    }
+    if (!this._publicKey) throw new Error("Wallet not connected");
 
-    if (!this.publicKey) {
-      throw new Error("Wallet not connected");
-    }
-
-    // Production: Sign and send with Phantom
-    const { transact, Web3MobileWallet } = await import(
-      "@solana-mobile/mobile-wallet-adapter-protocol-web3js"
-    );
-
-    const result = await transact(async (wallet: typeof Web3MobileWallet) => {
-      // Re-authorize for signing and sending (required by protocol)
-      await wallet.authorize({
-        cluster: "devnet",
-        identity: {
-          name: "PassPay",
-          uri: "https://passpay.app",
-          icon: "favicon.ico",
-        },
-      });
-
-      // Sign and send the transaction
-      const signedTxs = await wallet.signAndSendTransactions({
+    const transact = await this.getMWA();
+    const signatures = await transact(async (wallet: any) => {
+      await wallet.authorize({ cluster: "devnet", identity: MWA_IDENTITY });
+      return await wallet.signAndSendTransactions({
         transactions: [transaction],
       });
-
-      return signedTxs;
     });
 
-    // Extract signature from result
-    const signature = result[0];
-    console.log("✅ Transaction sent:", signature);
-
-    return { signature: Buffer.from(signature).toString('base64') };
+    const sig = signatures[0];
+    console.log("✅ Transaction sent:", sig);
+    return { signature: Buffer.from(sig).toString("base64") };
   }
 
   getPublicKey(): PublicKey | null {
-    if (this.isDevelopment) {
-      return mockWalletAdapter.getPublicKey();
-    }
-    return this.publicKey;
+    return this._publicKey;
   }
 }
 

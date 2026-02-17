@@ -1,35 +1,60 @@
-import React, { useState } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
   StyleSheet,
-  ScrollView,
   Alert,
   TouchableOpacity,
   ActivityIndicator,
+  Animated,
 } from "react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { useEvents } from "../../hooks/useEvents";
 import { useWallet } from "../../hooks/useWallet";
+import { useLoyalty } from "../../hooks/useLoyalty";
 import { apiBuyTicket } from "../../services/api/eventApi";
 import { formatSOL } from "../../utils/formatters";
-import { UserStackParamList } from "../../types/navigation";
-
-type Nav = NativeStackNavigationProp<UserStackParamList, "BuyTicket">;
-type Route = RouteProp<UserStackParamList, "BuyTicket">;
+import { PriceBreakdown } from "../../components/event/PriceBreakdown";
+import { EarlyAccessBadge } from "../../components/event/EarlyAccessBadge";
+import { TicketPurchaseSuccess } from "../../components/animations/TicketPurchaseSuccess";
+import { colors } from "../../theme/colors";
+import { fonts } from "../../theme/fonts";
 
 const NETWORK_FEE = 0.000005;
 
 export function BuyTicketScreen() {
-  const navigation = useNavigation<Nav>();
-  const route = useRoute<Route>();
+  const router = useRouter();
+  const { eventKey } = useLocalSearchParams<{ eventKey: string }>();
   const { getEvent } = useEvents();
   const { balance, refreshBalance } = useWallet();
+  const { loyaltyBenefits, fetchLoyaltyBenefits } = useLoyalty();
   const [buying, setBuying] = useState(false);
+  const [showSuccess, setShowSuccess] = useState(false);
+  const [purchasedMint, setPurchasedMint] = useState<string>("");
 
-  const event = getEvent(route.params.eventKey);
+  const fadeAnim = useRef(new Animated.Value(0)).current;
+  const slideAnim = useRef(new Animated.Value(30)).current;
+
+  const event = getEvent(eventKey as string);
+
+  useEffect(() => {
+    fetchLoyaltyBenefits();
+    // Entrance animation
+    Animated.parallel([
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+      Animated.timing(slideAnim, {
+        toValue: 0,
+        duration: 400,
+        useNativeDriver: true,
+      }),
+    ]).start();
+  }, []);
 
   if (!event) {
     return (
@@ -37,7 +62,7 @@ export function BuyTicketScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
           >
             <Text style={styles.backArrow}>{"\u2190"}</Text>
           </TouchableOpacity>
@@ -51,27 +76,38 @@ export function BuyTicketScreen() {
     );
   }
 
-  const subtotal = event.ticketPrice;
-  const total = subtotal + NETWORK_FEE;
+  // Calculate prices with loyalty discount
+  const basePrice = event.baseTicketPrice || event.ticketPrice;
+  const currentPrice = event.currentTicketPrice || event.ticketPrice;
+  const discountPercent = event.loyaltyDiscountsEnabled
+    ? loyaltyBenefits?.ticketDiscount || 0
+    : 0;
+  const discountAmount = currentPrice * (discountPercent / 100);
+  const finalPrice = currentPrice - discountAmount;
+  const total = finalPrice + NETWORK_FEE;
   const canAfford = balance >= total;
 
   const handleBuy = async () => {
     if (!canAfford) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Insufficient Funds", "You don't have enough SOL.");
       return;
     }
 
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
     setBuying(true);
+
     try {
       const metadataUri = `https://arweave.net/placeholder-${Date.now()}`;
       const result = await apiBuyTicket(event.publicKey, metadataUri);
       await refreshBalance();
-      Alert.alert("Success", `Ticket purchased! Mint: ${result.mint}`, [
-        { text: "View Ticket", onPress: () => navigation.goBack() },
-      ]);
+
+      // Success - show modal with confetti
+      setPurchasedMint(result.mint);
+      setShowSuccess(true);
     } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Error", error.message ?? "Failed to buy ticket");
-    } finally {
       setBuying(false);
     }
   };
@@ -82,7 +118,10 @@ export function BuyTicketScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => navigation.goBack()}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.back();
+          }}
         >
           <Text style={styles.backArrow}>{"\u2190"}</Text>
         </TouchableOpacity>
@@ -90,8 +129,14 @@ export function BuyTicketScreen() {
         <View style={styles.headerSpacer} />
       </View>
 
-      <ScrollView
-        style={styles.scrollView}
+      <Animated.ScrollView
+        style={[
+          styles.scrollView,
+          {
+            opacity: fadeAnim,
+            transform: [{ translateY: slideAnim }],
+          },
+        ]}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
@@ -110,12 +155,27 @@ export function BuyTicketScreen() {
                 <View style={styles.vipBadge}>
                   <Text style={styles.vipBadgeText}>VIP Access NFT</Text>
                 </View>
+                {event.earlyAccessDate && event.publicSaleDate && loyaltyBenefits && (
+                  <EarlyAccessBadge
+                    earlyAccessDate={
+                      typeof event.earlyAccessDate === 'number'
+                        ? event.earlyAccessDate
+                        : event.earlyAccessDate.getTime() / 1000
+                    }
+                    publicSaleDate={
+                      typeof event.publicSaleDate === 'number'
+                        ? event.publicSaleDate
+                        : event.publicSaleDate.getTime() / 1000
+                    }
+                    userTier={loyaltyBenefits.currentTier}
+                  />
+                )}
               </View>
               <Text style={styles.eventName} numberOfLines={2}>
                 {event.name}
               </Text>
               <Text style={styles.priceGreen}>
-                {formatSOL(event.ticketPrice)} SOL
+                {formatSOL(currentPrice)} SOL
               </Text>
             </View>
           </View>
@@ -140,13 +200,23 @@ export function BuyTicketScreen() {
           </View>
         </View>
 
-        {/* Order Summary */}
-        <Text style={styles.sectionLabel}>ORDER SUMMARY</Text>
+        {/* Price Breakdown */}
+        <Text style={styles.sectionLabel}>PRICE BREAKDOWN</Text>
+        <PriceBreakdown
+          basePrice={basePrice}
+          currentPrice={currentPrice}
+          discountPercent={discountPercent}
+          tier={loyaltyBenefits?.currentTier || 0}
+          showDynamic={event.dynamicPricingEnabled}
+        />
+
+        {/* Payment Summary */}
+        <Text style={styles.sectionLabel}>PAYMENT SUMMARY</Text>
         <View style={styles.card}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Subtotal</Text>
+            <Text style={styles.summaryLabel}>Ticket Price</Text>
             <Text style={styles.summaryValue}>
-              {formatSOL(subtotal)} SOL
+              {formatSOL(finalPrice)} SOL
             </Text>
           </View>
           <View style={styles.summaryRow}>
@@ -173,7 +243,7 @@ export function BuyTicketScreen() {
             SOL.
           </Text>
         )}
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* Bottom */}
       <View style={styles.footer}>
@@ -197,6 +267,15 @@ export function BuyTicketScreen() {
           <Text style={styles.securedText}>Secured by Solana Blockchain</Text>
         </View>
       </View>
+
+      {/* Success Modal with Confetti */}
+      <TicketPurchaseSuccess
+        visible={showSuccess}
+        mintAddress={purchasedMint}
+        eventName={event?.name || ""}
+        onComplete={() => router.push("/(user)/my-passes")}
+        duration={2500}
+      />
     </View>
   );
 }
@@ -204,7 +283,7 @@ export function BuyTicketScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#0A0E1A",
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: "row",
@@ -218,20 +297,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 12,
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   backArrow: {
     fontSize: 20,
-    color: "#FFFFFF",
+    color: colors.text,
   },
   headerTitle: {
     fontSize: 18,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily: fonts.heading,
+    color: colors.text,
   },
   headerSpacer: {
     width: 40,
@@ -250,21 +329,22 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 15,
-    color: "#8F95B2",
+    fontFamily: fonts.body,
+    color: colors.textMuted,
   },
   sectionLabel: {
     fontSize: 12,
-    fontWeight: "600",
-    color: "#8F95B2",
+    fontFamily: fonts.bodySemiBold,
+    color: colors.textMuted,
     letterSpacing: 1.2,
     marginTop: 20,
     marginBottom: 10,
   },
   card: {
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.border,
     padding: 16,
   },
   itemRow: {
@@ -285,26 +365,26 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   vipBadge: {
-    backgroundColor: "rgba(108, 92, 231, 0.2)",
+    backgroundColor: colors.primaryMuted,
     borderRadius: 6,
     paddingHorizontal: 8,
     paddingVertical: 3,
   },
   vipBadgeText: {
     fontSize: 11,
-    fontWeight: "700",
-    color: "#6C5CE7",
+    fontFamily: fonts.bodyBold,
+    color: colors.primary,
   },
   eventName: {
     fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
     marginBottom: 4,
   },
   priceGreen: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#00CEC9",
+    fontFamily: fonts.bodyBold,
+    color: colors.secondary,
   },
   paymentRow: {
     flexDirection: "row",
@@ -314,7 +394,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 12,
-    backgroundColor: "rgba(0, 206, 201, 0.12)",
+    backgroundColor: colors.secondaryMuted,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -327,26 +407,27 @@ const styles = StyleSheet.create({
   },
   paymentTitle: {
     fontSize: 15,
-    fontWeight: "600",
-    color: "#FFFFFF",
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
     marginBottom: 2,
   },
   paymentBalance: {
     fontSize: 13,
-    color: "#8F95B2",
+    fontFamily: fonts.body,
+    color: colors.textMuted,
   },
   checkmark: {
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: "#00CEC9",
+    backgroundColor: colors.secondary,
     alignItems: "center",
     justifyContent: "center",
   },
   checkmarkText: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily: fonts.bodyBold,
+    color: colors.text,
   },
   summaryRow: {
     flexDirection: "row",
@@ -356,11 +437,13 @@ const styles = StyleSheet.create({
   },
   summaryLabel: {
     fontSize: 14,
-    color: "#8F95B2",
+    fontFamily: fonts.body,
+    color: colors.textMuted,
   },
   summaryValue: {
     fontSize: 14,
-    color: "#FFFFFF",
+    fontFamily: fonts.bodyMedium,
+    color: colors.text,
   },
   networkFeeLabel: {
     flexDirection: "row",
@@ -368,34 +451,35 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   solanaBadge: {
-    backgroundColor: "rgba(0, 206, 201, 0.12)",
+    backgroundColor: colors.secondaryMuted,
     borderRadius: 4,
     paddingHorizontal: 6,
     paddingVertical: 2,
   },
   solanaBadgeText: {
     fontSize: 10,
-    fontWeight: "600",
-    color: "#00CEC9",
+    fontFamily: fonts.bodySemiBold,
+    color: colors.secondary,
   },
   summaryDivider: {
     height: 1,
-    backgroundColor: "#1E2235",
+    backgroundColor: colors.border,
     marginBottom: 12,
   },
   totalLabel: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily: fonts.heading,
+    color: colors.text,
   },
   totalValue: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#00CEC9",
+    fontFamily: fonts.heading,
+    color: colors.secondary,
   },
   warningText: {
     fontSize: 13,
-    color: "#FF6B6B",
+    fontFamily: fonts.body,
+    color: colors.error,
     textAlign: "center",
     marginTop: 16,
   },
@@ -404,10 +488,10 @@ const styles = StyleSheet.create({
     paddingTop: 12,
     paddingBottom: 32,
     borderTopWidth: 1,
-    borderTopColor: "#1E2235",
+    borderTopColor: colors.border,
   },
   confirmButton: {
-    backgroundColor: "#00CEC9",
+    backgroundColor: colors.secondary,
     borderRadius: 14,
     height: 54,
     alignItems: "center",
@@ -418,8 +502,8 @@ const styles = StyleSheet.create({
   },
   confirmButtonText: {
     fontSize: 16,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily: fonts.heading,
+    color: colors.text,
   },
   securedRow: {
     flexDirection: "row",
@@ -433,6 +517,7 @@ const styles = StyleSheet.create({
   },
   securedText: {
     fontSize: 12,
-    color: "#8F95B2",
+    fontFamily: fonts.body,
+    color: colors.textMuted,
   },
 });

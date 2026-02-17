@@ -6,21 +6,17 @@ import {
   StyleSheet,
   RefreshControl,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter } from "expo-router";
 import { EventCard } from "../../components/event/EventCard";
 import { AppLoader } from "../../components/ui/AppLoader";
 import { colors } from "../../theme/colors";
-import { typography } from "../../theme/typography";
+import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { useEvents } from "../../hooks/useEvents";
-import { UserStackParamList } from "../../types/navigation";
 import { EventDisplay } from "../../types/event";
 
-type Nav = NativeStackNavigationProp<UserStackParamList>;
-
 export function EventListScreen() {
-  const navigation = useNavigation<Nav>();
+  const router = useRouter();
   const { events, fetchEvents, isLoading } = useEvents();
 
   useEffect(() => {
@@ -31,7 +27,7 @@ export function EventListScreen() {
     <EventCard
       event={item}
       onPress={() =>
-        navigation.navigate("EventDetails", { eventKey: item.publicKey })
+        router.push({ pathname: "/(user)/event-details/[eventKey]", params: { eventKey: item.publicKey } })
       }
     />
   );
@@ -72,7 +68,8 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
   emptyText: {
-    ...typography.body,
+    fontFamily: fonts.body,
+    fontSize: 14,
     color: colors.textMuted,
     textAlign: "center",
     marginTop: spacing.xxl,

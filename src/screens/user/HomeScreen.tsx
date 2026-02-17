@@ -1,7 +1,8 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useRef, useCallback, useMemo } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   RefreshControl,
@@ -9,19 +10,25 @@ import {
   TouchableOpacity,
   Dimensions,
   TextInput,
+  Animated,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import * as Haptics from "expo-haptics";
+import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useWallet } from "../../hooks/useWallet";
 import { useEvents } from "../../hooks/useEvents";
 import { useTickets } from "../../hooks/useTickets";
-import { shortenAddress, formatSOL } from "../../utils/formatters";
-import { formatDate } from "../../utils/formatters";
-import { UserStackParamList } from "../../types/navigation";
+import { formatSOL } from "../../utils/formatters";
+import { DynamicPriceIndicator } from "../../components/event/DynamicPriceIndicator";
 import { EventDisplay } from "../../types/event";
-
-type Nav = NativeStackNavigationProp<UserStackParamList>;
+import {
+  FeaturedEventSkeleton,
+  UpcomingEventSkeleton,
+} from "../../components/ui/EventSkeletonLoader";
+import { EmptyStateView } from "../../components/ui/EmptyStateView";
+import { colors } from "../../theme/colors";
+import { fonts } from "../../theme/fonts";
+import { spacing } from "../../theme/spacing";
 
 const { width: SCREEN_WIDTH } = Dimensions.get("window");
 const FEATURED_CARD_WIDTH = SCREEN_WIDTH * 0.72;
@@ -41,41 +48,147 @@ const GRADIENT_PALETTES: [string, string, string][] = [
 const BADGE_LABELS = ["SELLING FAST", "NEW", "HOT", "LIMITED"];
 
 export function HomeScreen() {
-  const navigation = useNavigation<Nav>();
+  const router = useRouter();
   const { balance, refreshBalance } = useWallet();
-  const { events, fetchEvents, isLoading } = useEvents();
+  const { events, fetchEvents, isLoading, error } = useEvents();
   const { fetchMyTickets } = useTickets();
 
   const [searchQuery, setSearchQuery] = useState("");
+  const [debouncedSearch, setDebouncedSearch] = useState("");
   const [activeCategory, setActiveCategory] = useState<string>("All Events");
+  const [sortBy, setSortBy] = useState<"date" | "price" | "popularity">("date");
+  const [showFilters, setShowFilters] = useState(false);
+  const [featuredIndex, setFeaturedIndex] = useState(0);
+  const [showAllUpcoming, setShowAllUpcoming] = useState(false);
+
+  const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const carouselTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const flatListRef = useRef<FlatList>(null);
 
   useEffect(() => {
     fetchEvents();
     fetchMyTickets();
   }, []);
 
+  // Debounce search
+  useEffect(() => {
+    if (searchTimeoutRef.current) {
+      clearTimeout(searchTimeoutRef.current);
+    }
+    searchTimeoutRef.current = setTimeout(() => {
+      setDebouncedSearch(searchQuery);
+    }, 300);
+
+    return () => {
+      if (searchTimeoutRef.current) {
+        clearTimeout(searchTimeoutRef.current);
+      }
+    };
+  }, [searchQuery]);
+
   const onRefresh = async () => {
     await Promise.all([fetchEvents(), fetchMyTickets(), refreshBalance()]);
   };
 
-  const activeEvents = events.filter((e) => e.isActive);
+  const activeEvents = useMemo(() => {
+    return events.filter((e) => e.isActive);
+  }, [events]);
 
-  const filteredEvents = activeEvents.filter((e) => {
-    const matchesSearch =
-      searchQuery.length === 0 ||
-      e.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      e.venue.toLowerCase().includes(searchQuery.toLowerCase());
-    return matchesSearch;
-  });
+  const filteredEvents = useMemo(() => {
+    const CATEGORY_KEYWORDS: Record<string, string[]> = {
+      Music: ["music", "concert", "festival", "band", "dj", "live", "song", "singer", "acoustic", "jazz", "rock", "hip hop", "rap", "edm"],
+      Tech: ["tech", "conference", "hackathon", "developer", "coding", "software", "ai", "machine learning", "startup", "devcon"],
+      Crypto: ["crypto", "blockchain", "web3", "solana", "nft", "defi", "token", "dao", "ethereum", "bitcoin", "mint"],
+    };
 
-  const featuredEvents = filteredEvents
-    .filter((e) => e.eventDate > new Date())
-    .slice(0, 6);
+    return activeEvents
+      .filter((e) => {
+        const matchesSearch =
+          debouncedSearch.length === 0 ||
+          e.name.toLowerCase().includes(debouncedSearch.toLowerCase()) ||
+          e.venue.toLowerCase().includes(debouncedSearch.toLowerCase());
 
-  const upcomingEvents = filteredEvents
-    .filter((e) => e.eventDate > new Date())
-    .sort((a, b) => a.eventDate.getTime() - b.eventDate.getTime())
-    .slice(0, 8);
+        let matchesCategory = true;
+        if (activeCategory !== "All Events") {
+          const keywords = CATEGORY_KEYWORDS[activeCategory] ?? [];
+          const text = `${e.name} ${e.description} ${e.venue}`.toLowerCase();
+          matchesCategory = keywords.some((kw) => text.includes(kw));
+        }
+
+        return matchesSearch && matchesCategory;
+      })
+      .sort((a, b) => {
+        if (sortBy === "date") {
+          return a.eventDate.getTime() - b.eventDate.getTime();
+        } else if (sortBy === "price") {
+          const priceA = a.currentTicketPrice || a.ticketPrice;
+          const priceB = b.currentTicketPrice || b.ticketPrice;
+          return priceA - priceB;
+        } else {
+          // popularity = seats sold
+          const ratioA = a.ticketsSold / a.totalSeats;
+          const ratioB = b.ticketsSold / b.totalSeats;
+          return ratioB - ratioA;
+        }
+      });
+  }, [activeEvents, debouncedSearch, sortBy, activeCategory]);
+
+  const featuredEvents = useMemo(() => {
+    return filteredEvents
+      .filter((e) => e.eventDate > new Date())
+      .slice(0, 6);
+  }, [filteredEvents]);
+
+  // Auto-play featured carousel
+  useEffect(() => {
+    // Clear any existing interval first
+    if (carouselTimerRef.current) {
+      clearInterval(carouselTimerRef.current);
+      carouselTimerRef.current = null;
+    }
+
+    if (featuredEvents && featuredEvents.length > 1) {
+      carouselTimerRef.current = setInterval(() => {
+        setFeaturedIndex((prevIndex) => {
+          const length = featuredEvents.length;
+          if (!length) return prevIndex;
+
+          const nextIndex = (prevIndex + 1) % length;
+          flatListRef.current?.scrollToIndex({
+            index: nextIndex,
+            animated: true,
+          });
+          return nextIndex;
+        });
+      }, 5000); // 5 seconds
+    }
+
+    return () => {
+      if (carouselTimerRef.current) {
+        clearInterval(carouselTimerRef.current);
+      }
+    };
+  }, [featuredEvents]);
+
+  const allUpcomingEvents = useMemo(() => {
+    return filteredEvents
+      .filter((e) => e.eventDate > new Date())
+      .sort((a, b) => a.eventDate.getTime() - b.eventDate.getTime());
+  }, [filteredEvents]);
+
+  const upcomingEvents = useMemo(() => {
+    return showAllUpcoming ? allUpcomingEvents : allUpcomingEvents.slice(0, 8);
+  }, [allUpcomingEvents, showAllUpcoming]);
+
+  // Callback for carousel viewability tracking
+  const onViewableItemsChanged = useCallback(
+    ({ viewableItems }: any) => {
+      if (viewableItems.length > 0 && viewableItems[0].index !== null) {
+        setFeaturedIndex(viewableItems[0].index);
+      }
+    },
+    []
+  );
 
   const getGradient = (index: number): [string, string, string] =>
     GRADIENT_PALETTES[index % GRADIENT_PALETTES.length];
@@ -109,33 +222,44 @@ export function HomeScreen() {
     return (
       <TouchableOpacity
         activeOpacity={0.85}
-        onPress={() =>
-          navigation.navigate("EventDetails", { eventKey: item.publicKey })
-        }
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push({ pathname: "/(user)/event-details/[eventKey]", params: { eventKey: item.publicKey } });
+        }}
         style={styles.featuredCardWrapper}
       >
         <View style={styles.featuredCard}>
+          {item.imageUrl ? (
+            <Image source={{ uri: item.imageUrl }} style={styles.featuredImage} resizeMode="cover" />
+          ) : null}
           <LinearGradient
-            colors={gradient}
+            colors={item.imageUrl ? ["transparent", "rgba(0,0,0,0.7)"] : gradient}
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
             style={styles.featuredGradient}
           >
             {/* Decorative circles */}
-            <View style={styles.decoCircleTopRight} />
-            <View style={styles.decoCircleBottomLeft} />
+            {!item.imageUrl && <View style={styles.decoCircleTopRight} />}
+            {!item.imageUrl && <View style={styles.decoCircleBottomLeft} />}
 
-            {/* Badge */}
-            {badge && (
-              <View
-                style={[
-                  styles.badge,
-                  badge === "SOLD OUT" && styles.badgeSoldOut,
-                ]}
-              >
-                <Text style={styles.badgeText}>{badge}</Text>
-              </View>
-            )}
+            {/* Badge + Dynamic Pricing */}
+            <View style={styles.badgeRow}>
+              {badge && (
+                <View
+                  style={[
+                    styles.badge,
+                    badge === "SOLD OUT" && styles.badgeSoldOut,
+                  ]}
+                >
+                  <Text style={styles.badgeText}>{badge}</Text>
+                </View>
+              )}
+              <DynamicPriceIndicator
+                isEnabled={item.dynamicPricingEnabled}
+                basePrice={item.baseTicketPrice}
+                currentPrice={item.currentTicketPrice}
+              />
+            </View>
 
             {/* Bottom overlay */}
             <LinearGradient
@@ -151,7 +275,7 @@ export function HomeScreen() {
                 </Text>
                 <View style={styles.featuredPricePill}>
                   <Text style={styles.featuredPrice}>
-                    {formatSOL(item.ticketPrice)} SOL
+                    {formatSOL(item.currentTicketPrice || item.ticketPrice)} SOL
                   </Text>
                 </View>
               </View>
@@ -169,22 +293,31 @@ export function HomeScreen() {
       <TouchableOpacity
         key={event.publicKey}
         activeOpacity={0.8}
-        onPress={() =>
-          navigation.navigate("EventDetails", { eventKey: event.publicKey })
-        }
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+          router.push({ pathname: "/(user)/event-details/[eventKey]", params: { eventKey: event.publicKey } });
+        }}
         style={styles.upcomingCard}
       >
         {/* Thumbnail */}
-        <LinearGradient
-          colors={[gradient[0], gradient[1]]}
-          start={{ x: 0, y: 0 }}
-          end={{ x: 1, y: 1 }}
-          style={styles.upcomingThumb}
-        >
-          <Text style={styles.upcomingThumbInitial}>
-            {event.name.charAt(0).toUpperCase()}
-          </Text>
-        </LinearGradient>
+        {event.imageUrl ? (
+          <Image
+            source={{ uri: event.imageUrl }}
+            style={styles.upcomingThumb}
+            resizeMode="cover"
+          />
+        ) : (
+          <LinearGradient
+            colors={[gradient[0], gradient[1]]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles.upcomingThumb}
+          >
+            <Text style={styles.upcomingThumbInitial}>
+              {event.name.charAt(0).toUpperCase()}
+            </Text>
+          </LinearGradient>
+        )}
 
         {/* Info */}
         <View style={styles.upcomingInfo}>
@@ -199,19 +332,26 @@ export function HomeScreen() {
           </Text>
         </View>
 
-        {/* Right side: price + buy */}
+        {/* Right side: price + dynamic + buy */}
         <View style={styles.upcomingRight}>
+          <DynamicPriceIndicator
+            isEnabled={event.dynamicPricingEnabled}
+            basePrice={event.baseTicketPrice}
+            currentPrice={event.currentTicketPrice}
+          />
           <Text style={styles.upcomingPrice}>
-            {formatSOL(event.ticketPrice)} SOL
+            {formatSOL(event.currentTicketPrice || event.ticketPrice)} SOL
           </Text>
           <TouchableOpacity
             style={[
               styles.buyButton,
               event.isSoldOut && styles.buyButtonDisabled,
             ]}
-            onPress={() => {
+            onPress={(e) => {
+              e.stopPropagation();
               if (!event.isSoldOut) {
-                navigation.navigate("BuyTicket", { eventKey: event.publicKey });
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                router.push({ pathname: "/(user)/buy-ticket", params: { eventKey: event.publicKey } });
               }
             }}
             activeOpacity={0.7}
@@ -249,8 +389,14 @@ export function HomeScreen() {
         {/* ========== HEADER ========== */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
-            <Text style={styles.logoText}>Pass</Text>
-            <Text style={styles.logoAccent}>Pay</Text>
+            <Image
+              source={require("../../../assets/icon.png")}
+              style={styles.headerLogo}
+            />
+            <View>
+              <Text style={styles.headerRole}>Explorer</Text>
+              <Text style={styles.headerSub}>Discover Events</Text>
+            </View>
           </View>
           <View style={styles.balancePill}>
             <View style={styles.balanceDot} />
@@ -288,62 +434,170 @@ export function HomeScreen() {
             <View style={styles.sectionTitleBar} />
           </View>
 
-          {featuredEvents.length === 0 ? (
+          {isLoading ? (
+            <View style={styles.featuredList}>
+              <FeaturedEventSkeleton />
+              <FeaturedEventSkeleton />
+            </View>
+          ) : featuredEvents.length === 0 ? (
             <View style={styles.emptyFeatured}>
-              <Text style={styles.emptyText}>No featured events found</Text>
+              <EmptyStateView
+                icon="🎭"
+                title="No Events Found"
+                message={
+                  debouncedSearch
+                    ? `No events match "${debouncedSearch}". Try a different search.`
+                    : "There are no featured events at the moment. Check back soon!"
+                }
+              />
             </View>
           ) : (
-            <FlatList
-              data={featuredEvents}
-              renderItem={renderFeaturedCard}
-              keyExtractor={(item) => item.publicKey}
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.featuredList}
-              snapToInterval={FEATURED_CARD_WIDTH + 16}
-              decelerationRate="fast"
-            />
+            <>
+              <FlatList
+                ref={flatListRef}
+                data={featuredEvents}
+                renderItem={renderFeaturedCard}
+                keyExtractor={(item) => item.publicKey}
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.featuredList}
+                snapToInterval={FEATURED_CARD_WIDTH + 16}
+                decelerationRate="fast"
+                pagingEnabled={false}
+                onScrollToIndexFailed={(info) => {
+                  const wait = new Promise((resolve) => setTimeout(resolve, 500));
+                  wait.then(() => {
+                    flatListRef.current?.scrollToIndex({
+                      index: info.index,
+                      animated: true,
+                    });
+                  });
+                }}
+                onViewableItemsChanged={onViewableItemsChanged}
+                viewabilityConfig={{
+                  itemVisiblePercentThreshold: 50,
+                }}
+              />
+
+              {/* Pagination dots */}
+              {featuredEvents.length > 1 && (
+                <View style={styles.paginationDots}>
+                  {featuredEvents.map((_, index) => (
+                    <View
+                      key={index}
+                      style={[
+                        styles.dot,
+                        index === featuredIndex && styles.dotActive,
+                      ]}
+                    />
+                  ))}
+                </View>
+              )}
+            </>
           )}
         </View>
 
-        {/* ========== CATEGORY CHIPS ========== */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.chipRow}
-          style={styles.chipScrollView}
-        >
-          {CATEGORIES.map((cat) => {
-            const isActive = activeCategory === cat;
-            return (
-              <TouchableOpacity
-                key={cat}
-                style={[styles.chip, isActive && styles.chipActive]}
-                onPress={() => setActiveCategory(cat)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[styles.chipText, isActive && styles.chipTextActive]}
+        {/* ========== CATEGORY CHIPS & SORT ========== */}
+        <View style={styles.filterSection}>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.chipRow}
+            style={styles.chipScrollView}
+          >
+            {CATEGORIES.map((cat) => {
+              const isActive = activeCategory === cat;
+              return (
+                <TouchableOpacity
+                  key={cat}
+                  style={[styles.chip, isActive && styles.chipActive]}
+                  onPress={() => {
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    setActiveCategory(cat);
+                  }}
+                  activeOpacity={0.7}
                 >
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-        </ScrollView>
+                  <Text
+                    style={[styles.chipText, isActive && styles.chipTextActive]}
+                  >
+                    {cat}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })}
+          </ScrollView>
+
+          {/* Sort button */}
+          <TouchableOpacity
+            style={styles.sortButton}
+            onPress={() => {
+              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+              // Cycle through sort options
+              if (sortBy === "date") setSortBy("price");
+              else if (sortBy === "price") setSortBy("popularity");
+              else setSortBy("date");
+            }}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.sortIcon}>⬍</Text>
+            <Text style={styles.sortText}>
+              {sortBy === "date" ? "Date" : sortBy === "price" ? "Price" : "Popular"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* ========== NETWORK ERROR ========== */}
+        {error && !isLoading && (
+          <View style={styles.errorBanner}>
+            <Text style={styles.errorBannerIcon}>⚠️</Text>
+            <View style={styles.errorBannerContent}>
+              <Text style={styles.errorBannerTitle}>Connection Error</Text>
+              <Text style={styles.errorBannerMessage} numberOfLines={2}>
+                {error}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.retryButton}
+              onPress={onRefresh}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.retryButtonText}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* ========== UPCOMING SECTION ========== */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Upcoming</Text>
-            <TouchableOpacity activeOpacity={0.6}>
-              <Text style={styles.seeAllText}>See All</Text>
-            </TouchableOpacity>
+            {allUpcomingEvents.length > 8 && (
+              <TouchableOpacity
+                activeOpacity={0.6}
+                onPress={() => {
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                  setShowAllUpcoming((prev) => !prev);
+                }}
+              >
+                <Text style={styles.seeAllText}>
+                  {showAllUpcoming ? "Show Less" : `See All (${allUpcomingEvents.length})`}
+                </Text>
+              </TouchableOpacity>
+            )}
           </View>
 
-          {upcomingEvents.length === 0 ? (
+          {isLoading ? (
+            <>
+              <UpcomingEventSkeleton />
+              <UpcomingEventSkeleton />
+              <UpcomingEventSkeleton />
+            </>
+          ) : upcomingEvents.length === 0 ? (
             <View style={styles.emptyUpcoming}>
-              <Text style={styles.emptyText}>No upcoming events</Text>
+              <EmptyStateView
+                icon="📅"
+                title="No Upcoming Events"
+                message="There are no upcoming events scheduled. New events will appear here when they're added."
+              />
             </View>
           ) : (
             upcomingEvents.map((event, index) =>
@@ -362,7 +616,7 @@ export function HomeScreen() {
 const styles = StyleSheet.create({
   screen: {
     flex: 1,
-    backgroundColor: "#0A0E1A",
+    backgroundColor: colors.background,
   },
   container: {
     flex: 1,
@@ -382,18 +636,24 @@ const styles = StyleSheet.create({
   headerLeft: {
     flexDirection: "row",
     alignItems: "center",
+    gap: 12,
   },
-  logoText: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#FFFFFF",
+  headerLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+  },
+  headerRole: {
+    fontSize: 24,
+    fontFamily: fonts.heading,
+    color: colors.text,
+    marginBottom: 1,
     letterSpacing: -0.5,
   },
-  logoAccent: {
-    fontSize: 26,
-    fontWeight: "800",
-    color: "#00CEC9",
-    letterSpacing: -0.5,
+  headerSub: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
   },
   balancePill: {
     flexDirection: "row",
@@ -471,8 +731,8 @@ const styles = StyleSheet.create({
   },
   sectionTitle: {
     fontSize: 20,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily: fonts.heading,
+    color: colors.text,
     letterSpacing: -0.3,
   },
   sectionTitleBar: {
@@ -504,6 +764,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: "#1E2235",
   },
+  featuredImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
+  },
   featuredGradient: {
     flex: 1,
     justifyContent: "flex-end",
@@ -533,7 +798,7 @@ const styles = StyleSheet.create({
   },
   featuredEventName: {
     fontSize: 18,
-    fontWeight: "700",
+    fontFamily: fonts.heading,
     color: "#FFFFFF",
     marginBottom: 8,
     letterSpacing: -0.2,
@@ -560,11 +825,36 @@ const styles = StyleSheet.create({
     color: "#00CEC9",
   },
 
+  /* ---- Pagination Dots ---- */
+  paginationDots: {
+    flexDirection: "row",
+    justifyContent: "center",
+    alignItems: "center",
+    marginTop: 16,
+    gap: 8,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#1E2235",
+  },
+  dotActive: {
+    width: 20,
+    backgroundColor: "#00CEC9",
+  },
+
   /* ---- Badge ---- */
-  badge: {
+  badgeRow: {
     position: "absolute",
     top: 12,
     left: 12,
+    right: 12,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+  },
+  badge: {
     backgroundColor: "rgba(0, 206, 201, 0.9)",
     borderRadius: 8,
     paddingHorizontal: 10,
@@ -580,13 +870,41 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  /* ---- Category Chips ---- */
-  chipScrollView: {
+  /* ---- Filter Section ---- */
+  filterSection: {
     marginBottom: 24,
+    paddingRight: 20,
+  },
+  chipScrollView: {
+    marginBottom: 0,
   },
   chipRow: {
-    paddingHorizontal: 20,
+    paddingLeft: 20,
+    paddingRight: 10,
     gap: 10,
+  },
+  sortButton: {
+    position: "absolute",
+    right: 20,
+    top: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#141829",
+    borderWidth: 1,
+    borderColor: "#1E2235",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    gap: 6,
+  },
+  sortIcon: {
+    fontSize: 14,
+    color: "#00CEC9",
+  },
+  sortText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#8F95B2",
   },
   chip: {
     paddingHorizontal: 18,
@@ -640,8 +958,8 @@ const styles = StyleSheet.create({
   },
   upcomingName: {
     fontSize: 15,
-    fontWeight: "700",
-    color: "#FFFFFF",
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
     marginBottom: 3,
     letterSpacing: -0.1,
   },
@@ -664,8 +982,8 @@ const styles = StyleSheet.create({
   },
   upcomingPrice: {
     fontSize: 14,
-    fontWeight: "700",
-    color: "#00CEC9",
+    fontFamily: fonts.bodyBold,
+    color: colors.accent,
   },
   buyButton: {
     backgroundColor: "rgba(0, 206, 201, 0.12)",
@@ -713,5 +1031,49 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "500",
     color: "#555B74",
+  },
+
+  /* ---- Error Banner ---- */
+  errorBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(255,71,87,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,71,87,0.3)",
+    borderRadius: 14,
+    marginHorizontal: 20,
+    marginBottom: 20,
+    padding: 14,
+    gap: 10,
+  },
+  errorBannerIcon: {
+    fontSize: 20,
+  },
+  errorBannerContent: {
+    flex: 1,
+  },
+  errorBannerTitle: {
+    fontSize: 14,
+    fontWeight: "700",
+    color: "#FF4757",
+    marginBottom: 2,
+    fontFamily: fonts.bodySemiBold,
+  },
+  errorBannerMessage: {
+    fontSize: 12,
+    color: "rgba(255,71,87,0.8)",
+    fontFamily: fonts.body,
+  },
+  retryButton: {
+    backgroundColor: "rgba(255,71,87,0.2)",
+    paddingHorizontal: 14,
+    paddingVertical: 8,
+    borderRadius: 10,
+  },
+  retryButtonText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#FF4757",
+    fontFamily: fonts.bodySemiBold,
   },
 });

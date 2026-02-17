@@ -7,6 +7,8 @@ export interface RegisterMerchantParams {
   eventPda: PublicKey;
   merchantAuthority: PublicKey;
   name: string;
+  description: string;
+  imageUrl?: string;
 }
 
 export async function registerMerchant(
@@ -22,7 +24,7 @@ export async function registerMerchant(
   );
 
   const tx = await program.methods
-    .registerMerchant({ name: params.name })
+    .registerMerchant({ name: params.name, description: params.description, imageUrl: params.imageUrl ?? "" })
     .accounts({
       adminAuthority: adminKey,
       admin: adminPda,

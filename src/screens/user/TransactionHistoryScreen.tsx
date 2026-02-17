@@ -1,0 +1,443 @@
+import React, { useEffect, useMemo, useState, useCallback } from "react";
+import {
+  View,
+  Text,
+  StyleSheet,
+  FlatList,
+  TouchableOpacity,
+  RefreshControl,
+  Linking,
+} from "react-native";
+import { useRouter } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
+import { useTickets } from "../../hooks/useTickets";
+import { useWallet } from "../../hooks/useWallet";
+import { TicketDisplay } from "../../types/ticket";
+import { formatSOL, formatDate, shortenAddress } from "../../utils/formatters";
+import { getTokenUrl } from "../../solana/utils/explorer";
+import { colors } from "../../theme/colors";
+import { fonts } from "../../theme/fonts";
+import { spacing, borderRadius } from "../../theme/spacing";
+
+type FilterTab = "all" | "purchases" | "checked-in";
+
+interface TransactionItem {
+  id: string;
+  type: "purchase" | "check-in";
+  eventName: string;
+  eventVenue: string;
+  date: Date;
+  seatNumber: number;
+  mint: string;
+}
+
+export function TransactionHistoryScreen() {
+  const router = useRouter();
+  const { tickets, fetchMyTickets, isLoading } = useTickets();
+  const { balance } = useWallet();
+  const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+
+  useEffect(() => {
+    fetchMyTickets();
+  }, []);
+
+  const transactions: TransactionItem[] = useMemo(() => {
+    const items: TransactionItem[] = [];
+
+    tickets.forEach((ticket: TicketDisplay) => {
+      // Purchase transaction
+      items.push({
+        id: `purchase-${ticket.publicKey}`,
+        type: "purchase",
+        eventName: ticket.eventName || "Unknown Event",
+        eventVenue: ticket.eventVenue || "",
+        date: ticket.eventDate,
+        seatNumber: ticket.seatNumber,
+        mint: ticket.mint,
+      });
+
+      // Check-in transaction
+      if (ticket.isCheckedIn && ticket.checkedInAt) {
+        items.push({
+          id: `checkin-${ticket.publicKey}`,
+          type: "check-in",
+          eventName: ticket.eventName || "Unknown Event",
+          eventVenue: ticket.eventVenue || "",
+          date: ticket.checkedInAt,
+          seatNumber: ticket.seatNumber,
+          mint: ticket.mint,
+        });
+      }
+    });
+
+    // Sort by date, newest first
+    items.sort((a, b) => b.date.getTime() - a.date.getTime());
+    return items;
+  }, [tickets]);
+
+  const filtered = useMemo(() => {
+    switch (activeFilter) {
+      case "purchases":
+        return transactions.filter((t) => t.type === "purchase");
+      case "checked-in":
+        return transactions.filter((t) => t.type === "check-in");
+      default:
+        return transactions;
+    }
+  }, [transactions, activeFilter]);
+
+  const stats = useMemo(() => ({
+    totalTickets: tickets.length,
+    checkedIn: tickets.filter((t) => t.isCheckedIn).length,
+    upcoming: tickets.filter((t) => !t.isCheckedIn && t.eventDate > new Date()).length,
+  }), [tickets]);
+
+  const openExplorer = useCallback((mint: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openURL(getTokenUrl(mint));
+  }, []);
+
+  const FILTERS: { key: FilterTab; label: string }[] = [
+    { key: "all", label: "All" },
+    { key: "purchases", label: "Purchases" },
+    { key: "checked-in", label: "Checked In" },
+  ];
+
+  const renderTransaction = ({ item }: { item: TransactionItem }) => {
+    const isPurchase = item.type === "purchase";
+    const iconName = isPurchase ? "ticket" : "checkmark-circle";
+    const iconColor = isPurchase ? colors.primary : colors.success;
+
+    return (
+      <TouchableOpacity
+        style={styles.txRow}
+        activeOpacity={0.7}
+        onPress={() => openExplorer(item.mint)}
+      >
+        <View style={[styles.txIcon, { backgroundColor: iconColor + "18" }]}>
+          <Ionicons name={iconName} size={22} color={iconColor} />
+        </View>
+
+        <View style={styles.txInfo}>
+          <Text style={styles.txTitle} numberOfLines={1}>
+            {isPurchase ? "Ticket Purchase" : "Event Check-in"}
+          </Text>
+          <Text style={styles.txEvent} numberOfLines={1}>
+            {item.eventName}
+          </Text>
+          {item.eventVenue ? (
+            <Text style={styles.txVenue} numberOfLines={1}>
+              {item.eventVenue}
+            </Text>
+          ) : null}
+        </View>
+
+        <View style={styles.txRight}>
+          <Text style={styles.txSeat}>Seat #{item.seatNumber}</Text>
+          <Text style={styles.txDate}>{formatDate(item.date)}</Text>
+          <Text style={styles.txMint}>{shortenAddress(item.mint, 4)}</Text>
+        </View>
+      </TouchableOpacity>
+    );
+  };
+
+  const ListHeader = () => (
+    <View>
+      {/* Stats Card */}
+      <LinearGradient
+        colors={[colors.primary + "20", colors.secondary + "15"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.statsCard}
+      >
+        <View style={styles.statsAccent} />
+        <View style={styles.statsRow}>
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{stats.totalTickets}</Text>
+            <Text style={styles.statLabel}>Total</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{stats.checkedIn}</Text>
+            <Text style={styles.statLabel}>Attended</Text>
+          </View>
+          <View style={styles.statDivider} />
+          <View style={styles.statItem}>
+            <Text style={styles.statValue}>{stats.upcoming}</Text>
+            <Text style={styles.statLabel}>Upcoming</Text>
+          </View>
+        </View>
+      </LinearGradient>
+
+      {/* Filter Tabs */}
+      <View style={styles.filterRow}>
+        {FILTERS.map((f) => {
+          const isActive = activeFilter === f.key;
+          return (
+            <TouchableOpacity
+              key={f.key}
+              style={[styles.filterTab, isActive && styles.filterTabActive]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setActiveFilter(f.key);
+              }}
+              activeOpacity={0.7}
+            >
+              <Text
+                style={[styles.filterLabel, isActive && styles.filterLabelActive]}
+              >
+                {f.label}
+              </Text>
+            </TouchableOpacity>
+          );
+        })}
+      </View>
+    </View>
+  );
+
+  return (
+    <View style={styles.container}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            router.back();
+          }}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>Transaction History</Text>
+        <View style={styles.headerSpacer} />
+      </View>
+
+      <FlatList
+        data={filtered}
+        keyExtractor={(item) => item.id}
+        renderItem={renderTransaction}
+        ListHeaderComponent={ListHeader}
+        contentContainerStyle={styles.listContent}
+        ListEmptyComponent={
+          <View style={styles.emptyContainer}>
+            <Ionicons name="receipt-outline" size={48} color={colors.textMuted} />
+            <Text style={styles.emptyTitle}>No Transactions</Text>
+            <Text style={styles.emptyMessage}>
+              {activeFilter === "purchases"
+                ? "No ticket purchases yet. Browse events to get started."
+                : activeFilter === "checked-in"
+                  ? "No check-ins yet. Show your QR code at event entry."
+                  : "Your transaction history will appear here once you buy tickets."}
+            </Text>
+          </View>
+        }
+        refreshControl={
+          <RefreshControl
+            refreshing={isLoading}
+            onRefresh={fetchMyTickets}
+            tintColor={colors.primary}
+          />
+        }
+        showsVerticalScrollIndicator={false}
+        ItemSeparatorComponent={() => <View style={styles.separator} />}
+      />
+    </View>
+  );
+}
+
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.xl,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  headerTitle: {
+    flex: 1,
+    textAlign: "center",
+    fontSize: 18,
+    fontFamily: fonts.heading,
+    color: colors.text,
+  },
+  headerSpacer: { width: 36 },
+  listContent: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.xxl,
+    flexGrow: 1,
+  },
+
+  // Stats card
+  statsCard: {
+    borderRadius: borderRadius.lg,
+    padding: spacing.lg,
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+    borderWidth: 1,
+    borderColor: colors.primary + "30",
+    overflow: "hidden",
+  },
+  statsAccent: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    height: 3,
+    backgroundColor: colors.primary,
+  },
+  statsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  statItem: {
+    flex: 1,
+    alignItems: "center",
+  },
+  statValue: {
+    fontSize: 22,
+    fontFamily: fonts.heading,
+    color: colors.text,
+  },
+  statLabel: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    marginTop: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 36,
+    backgroundColor: colors.border,
+  },
+
+  // Filter tabs
+  filterRow: {
+    flexDirection: "row",
+    marginBottom: spacing.md,
+    gap: spacing.sm,
+  },
+  filterTab: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.full,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  filterTabActive: {
+    backgroundColor: colors.primaryMuted,
+    borderColor: colors.primary,
+  },
+  filterLabel: {
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.textSecondary,
+  },
+  filterLabelActive: {
+    color: colors.primary,
+  },
+
+  // Transaction row
+  txRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  txIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: borderRadius.full,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.sm,
+  },
+  txInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  txTitle: {
+    fontSize: 14,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  txEvent: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+  },
+  txVenue: {
+    fontSize: 11,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    marginTop: 1,
+  },
+  txRight: {
+    alignItems: "flex-end",
+  },
+  txSeat: {
+    fontSize: 13,
+    fontFamily: fonts.heading,
+    color: colors.primary,
+    marginBottom: 2,
+  },
+  txDate: {
+    fontSize: 11,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+  },
+  txMint: {
+    fontSize: 10,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    marginTop: 1,
+  },
+
+  // Separator
+  separator: {
+    height: spacing.sm,
+  },
+
+  // Empty state
+  emptyContainer: {
+    alignItems: "center",
+    paddingTop: spacing.xxl * 2,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: fonts.heading,
+    color: colors.text,
+    marginTop: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  emptyMessage: {
+    fontSize: 14,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    textAlign: "center",
+    lineHeight: 20,
+  },
+});

@@ -1,33 +1,27 @@
-import React from "react";
+import React, { useRef } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
   Dimensions,
+  Animated,
 } from "react-native";
-import { useNavigation, useRoute, RouteProp } from "@react-navigation/native";
-import { NativeStackNavigationProp } from "@react-navigation/native-stack";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
+import * as Haptics from "expo-haptics";
 import { useEvents } from "../../hooks/useEvents";
+import { useLoyalty } from "../../hooks/useLoyalty";
 import { formatDate, formatSOL } from "../../utils/formatters";
-import { UserStackParamList } from "../../types/navigation";
+import { DynamicPriceIndicator } from "../../components/event/DynamicPriceIndicator";
+import { colors } from "../../theme/colors";
+import { fonts } from "../../theme/fonts";
 
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
-const HERO_HEIGHT = 280;
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
+const HERO_HEIGHT = 320;
 
-const COLORS = {
-  background: "#0A0E1A",
-  card: "#141829",
-  border: "#1E2235",
-  green: "#00CEC9",
-  text: "#FFFFFF",
-  secondary: "#8F95B2",
-};
-
-type Nav = NativeStackNavigationProp<UserStackParamList, "EventDetails">;
-type Route = RouteProp<UserStackParamList, "EventDetails">;
 
 function shortenAddress(address: string, chars = 4): string {
   if (address.length <= chars * 2 + 3) return address;
@@ -35,11 +29,32 @@ function shortenAddress(address: string, chars = 4): string {
 }
 
 export function EventDetailsScreen() {
-  const navigation = useNavigation<Nav>();
-  const route = useRoute<Route>();
+  const router = useRouter();
+  const { eventKey } = useLocalSearchParams<{ eventKey: string }>();
   const { getEvent } = useEvents();
+  const { loyaltyBenefits } = useLoyalty();
 
-  const event = getEvent(route.params.eventKey);
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const event = getEvent(eventKey as string);
+
+  // Parallax effect for hero image
+  const heroTranslateY = scrollY.interpolate({
+    inputRange: [0, HERO_HEIGHT],
+    outputRange: [0, -HERO_HEIGHT / 2],
+    extrapolate: "clamp",
+  });
+
+  const heroOpacity = scrollY.interpolate({
+    inputRange: [0, HERO_HEIGHT / 2, HERO_HEIGHT],
+    outputRange: [1, 0.8, 0.3],
+    extrapolate: "clamp",
+  });
+
+  const headerOpacity = scrollY.interpolate({
+    inputRange: [HERO_HEIGHT - 100, HERO_HEIGHT],
+    outputRange: [0, 1],
+    extrapolate: "clamp",
+  });
 
   if (!event) {
     return (
@@ -48,7 +63,7 @@ export function EventDetailsScreen() {
           <Text style={styles.errorText}>Event not found</Text>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => navigation.goBack()}
+            onPress={() => router.back()}
           >
             <Text style={styles.backButtonText}>Go Back</Text>
           </TouchableOpacity>
@@ -60,36 +75,98 @@ export function EventDetailsScreen() {
   const seatsLeft = event.availableSeats;
   const isLowSeats = seatsLeft > 0 && seatsLeft < 50;
 
+  // Calculate loyalty discount
+  const discountPercent = event.loyaltyDiscountsEnabled && loyaltyBenefits
+    ? loyaltyBenefits.ticketDiscount
+    : 0;
+  const currentPrice = event.currentTicketPrice || event.ticketPrice;
+  const discountAmount = currentPrice * (discountPercent / 100);
+  const finalPrice = currentPrice - discountAmount;
+
+  const handleBuyTicket = () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    router.push({ pathname: "/(user)/buy-ticket", params: { eventKey: event.publicKey } });
+  };
+
   return (
     <View style={styles.container}>
-      <ScrollView
+      {/* Animated sticky header */}
+      <Animated.View style={[styles.stickyHeader, { opacity: headerOpacity }]}>
+        <LinearGradient
+          colors={[colors.surface, colors.background]}
+          style={styles.stickyHeaderGradient}
+        >
+          <TouchableOpacity
+            style={styles.stickyBackButton}
+            onPress={() => router.back()}
+            activeOpacity={0.7}
+          >
+            <Text style={styles.stickyBackIcon}>{"<"}</Text>
+          </TouchableOpacity>
+          <Text style={styles.stickyHeaderTitle} numberOfLines={1}>
+            {event.name}
+          </Text>
+          <View style={styles.stickyHeaderSpacer} />
+        </LinearGradient>
+      </Animated.View>
+
+      <Animated.ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
+        )}
       >
         {/* ============ HERO IMAGE AREA ============ */}
-        <View style={styles.heroContainer}>
-          <View style={styles.heroPlaceholder}>
-            <LinearGradient
-              colors={["transparent", "rgba(10,14,26,0.65)", COLORS.background]}
-              locations={[0.2, 0.65, 1]}
-              style={styles.heroGradient}
+        <Animated.View
+          style={[
+            styles.heroContainer,
+            {
+              transform: [{ translateY: heroTranslateY }],
+              opacity: heroOpacity,
+            },
+          ]}
+        >
+          {event.imageUrl ? (
+            <Image
+              source={{ uri: event.imageUrl }}
+              style={styles.heroImage}
+              resizeMode="cover"
             />
-          </View>
+          ) : (
+            <LinearGradient
+              colors={["#6C5CE7", "#00CEC9"]}
+              style={styles.heroPlaceholder}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 1 }}
+            />
+          )}
+          <LinearGradient
+            colors={["transparent", "rgba(10,14,26,0.65)", colors.background]}
+            locations={[0.2, 0.65, 1]}
+            style={styles.heroGradient}
+          />
 
           {/* Top overlay icons */}
           <View style={styles.heroOverlay}>
             <TouchableOpacity
               style={styles.iconCircle}
-              onPress={() => navigation.goBack()}
+              onPress={() => router.back()}
               activeOpacity={0.7}
             >
               <Text style={styles.iconText}>{"<"}</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={styles.iconCircle} activeOpacity={0.7}>
-              <Text style={styles.iconText}>{"^"}</Text>
-            </TouchableOpacity>
+            <View style={styles.iconCircle}>
+              <DynamicPriceIndicator
+                isEnabled={event.dynamicPricingEnabled}
+                basePrice={event.baseTicketPrice}
+                currentPrice={event.currentTicketPrice}
+              />
+            </View>
           </View>
 
           {/* Event name at bottom of hero */}
@@ -97,8 +174,13 @@ export function EventDetailsScreen() {
             <Text style={styles.eventName} numberOfLines={2}>
               {event.name}
             </Text>
+            {event.isSoldOut && (
+              <View style={styles.soldOutBadgeHero}>
+                <Text style={styles.soldOutBadgeText}>SOLD OUT</Text>
+              </View>
+            )}
           </View>
-        </View>
+        </Animated.View>
 
         {/* ============ INFO CHIPS ROW ============ */}
         <View style={styles.chipsRow}>
@@ -140,13 +222,7 @@ export function EventDetailsScreen() {
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About Event</Text>
           <Text style={styles.descriptionText}>
-            Join us for an unforgettable experience at {event.name}. This event
-            brings together enthusiasts and newcomers alike for a day of
-            discovery, connection, and inspiration. Immerse yourself in the
-            atmosphere, meet like-minded individuals, and create memories that
-            will last a lifetime. Every ticket is minted as a unique NFT on
-            Solana, giving you verifiable proof of attendance and exclusive
-            on-chain benefits.
+            {event.description || `Join us for an unforgettable experience at ${event.name}. Every ticket is minted as a unique NFT on Solana, giving you verifiable proof of attendance and exclusive on-chain benefits.`}
           </Text>
         </View>
 
@@ -161,7 +237,7 @@ export function EventDetailsScreen() {
 
         {/* Spacer for bottom bar */}
         <View style={{ height: 110 }} />
-      </ScrollView>
+      </Animated.ScrollView>
 
       {/* ============ BOTTOM STICKY BAR ============ */}
       <View style={styles.bottomBar}>
@@ -188,9 +264,21 @@ export function EventDetailsScreen() {
               <Text style={styles.soldOutText}>Sold Out</Text>
             </View>
           )}
+          {discountPercent > 0 && (
+            <View style={styles.discountBadge}>
+              <Text style={styles.discountText}>
+                🎖️ {discountPercent}% Loyalty Discount
+              </Text>
+            </View>
+          )}
           <Text style={styles.totalPriceLabel}>Total Price</Text>
+          {discountPercent > 0 && (
+            <Text style={styles.originalPrice}>
+              {formatSOL(currentPrice)} SOL
+            </Text>
+          )}
           <Text style={styles.totalPriceValue}>
-            {formatSOL(event.ticketPrice)} SOL
+            {formatSOL(finalPrice)} SOL
           </Text>
         </View>
 
@@ -201,11 +289,7 @@ export function EventDetailsScreen() {
           ]}
           activeOpacity={0.8}
           disabled={!event.isActive || event.isSoldOut}
-          onPress={() =>
-            navigation.navigate("BuyTicket", {
-              eventKey: event.publicKey,
-            })
-          }
+          onPress={handleBuyTicket}
         >
           <Text style={styles.buyButtonText}>Buy Ticket</Text>
         </TouchableOpacity>
@@ -217,7 +301,7 @@ export function EventDetailsScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: COLORS.background,
+    backgroundColor: colors.background,
   },
   scroll: {
     flex: 1,
@@ -233,19 +317,19 @@ const styles = StyleSheet.create({
   },
   errorText: {
     fontSize: 16,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     marginBottom: 16,
   },
   backButton: {
     paddingHorizontal: 20,
     paddingVertical: 10,
     borderRadius: 8,
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
   },
   backButtonText: {
-    color: COLORS.text,
+    color: colors.text,
     fontSize: 14,
     fontWeight: "600",
   },
@@ -255,6 +339,11 @@ const styles = StyleSheet.create({
     width: SCREEN_WIDTH,
     height: HERO_HEIGHT,
     position: "relative",
+  },
+  heroImage: {
+    ...StyleSheet.absoluteFillObject,
+    width: "100%",
+    height: "100%",
   },
   heroPlaceholder: {
     ...StyleSheet.absoluteFillObject,
@@ -278,12 +367,12 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     backgroundColor: "rgba(20,24,41,0.75)",
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     alignItems: "center",
     justifyContent: "center",
   },
   iconText: {
-    color: COLORS.text,
+    color: colors.text,
     fontSize: 18,
     fontWeight: "700",
   },
@@ -296,8 +385,9 @@ const styles = StyleSheet.create({
   eventName: {
     fontSize: 26,
     fontWeight: "800",
-    color: COLORS.text,
+    color: colors.text,
     lineHeight: 32,
+    fontFamily: fonts.heading,
   },
 
   /* ---- Chips ---- */
@@ -310,9 +400,9 @@ const styles = StyleSheet.create({
   chip: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -324,7 +414,7 @@ const styles = StyleSheet.create({
   },
   chipText: {
     fontSize: 13,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     fontWeight: "500",
     flexShrink: 1,
   },
@@ -335,9 +425,9 @@ const styles = StyleSheet.create({
     marginTop: 20,
   },
   organizedCard: {
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 14,
@@ -347,12 +437,12 @@ const styles = StyleSheet.create({
   },
   organizedLabel: {
     fontSize: 14,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     fontWeight: "500",
   },
   organizedAddress: {
     fontSize: 14,
-    color: COLORS.text,
+    color: colors.text,
     fontWeight: "600",
     fontFamily: "monospace",
   },
@@ -366,9 +456,9 @@ const styles = StyleSheet.create({
   },
   statCard: {
     flex: 1,
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 16,
@@ -376,7 +466,7 @@ const styles = StyleSheet.create({
   },
   statLabel: {
     fontSize: 12,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     fontWeight: "500",
     marginBottom: 6,
     textTransform: "uppercase",
@@ -384,20 +474,22 @@ const styles = StyleSheet.create({
   },
   statValue: {
     fontSize: 20,
-    color: COLORS.text,
+    color: colors.text,
     fontWeight: "700",
+    fontFamily: fonts.heading,
   },
 
   /* ---- About ---- */
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
-    color: COLORS.text,
+    color: colors.text,
     marginBottom: 10,
+    fontFamily: fonts.heading,
   },
   descriptionText: {
     fontSize: 14,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     lineHeight: 22,
     fontWeight: "400",
   },
@@ -406,9 +498,9 @@ const styles = StyleSheet.create({
   mapPlaceholder: {
     width: "100%",
     height: 170,
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: COLORS.border,
+    borderColor: colors.border,
     borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
@@ -419,7 +511,7 @@ const styles = StyleSheet.create({
   },
   mapPlaceholderText: {
     fontSize: 13,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     fontWeight: "500",
   },
 
@@ -432,9 +524,9 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    backgroundColor: COLORS.card,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
-    borderTopColor: COLORS.border,
+    borderTopColor: colors.border,
     paddingHorizontal: 20,
     paddingTop: 14,
     paddingBottom: 34, // safe area
@@ -456,11 +548,11 @@ const styles = StyleSheet.create({
   },
   seatsLeftText: {
     fontSize: 11,
-    color: COLORS.green,
+    color: colors.primary,
     fontWeight: "600",
   },
   seatsLeftTextLow: {
-    color: COLORS.green,
+    color: colors.primary,
   },
   soldOutBadge: {
     alignSelf: "flex-start",
@@ -470,24 +562,59 @@ const styles = StyleSheet.create({
     paddingVertical: 3,
     marginBottom: 6,
   },
+  soldOutBadgeHero: {
+    backgroundColor: "rgba(255,71,87,0.9)",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  soldOutBadgeText: {
+    fontSize: 12,
+    color: colors.text,
+    fontWeight: "700",
+    letterSpacing: 1,
+  },
   soldOutText: {
     fontSize: 11,
     color: "#FF4757",
     fontWeight: "600",
   },
+  discountBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(255,193,7,0.15)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 4,
+  },
+  discountText: {
+    fontSize: 11,
+    color: "#FFD700",
+    fontWeight: "600",
+  },
   totalPriceLabel: {
     fontSize: 11,
-    color: COLORS.secondary,
+    color: colors.textSecondary,
     fontWeight: "500",
     marginBottom: 2,
   },
   totalPriceValue: {
     fontSize: 20,
-    color: COLORS.green,
+    color: colors.primary,
     fontWeight: "800",
+    fontFamily: fonts.heading,
+  },
+  originalPrice: {
+    fontSize: 14,
+    color: colors.textMuted,
+    fontWeight: "500",
+    textDecorationLine: "line-through",
+    marginBottom: 2,
   },
   buyButton: {
-    backgroundColor: COLORS.green,
+    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 28,
     paddingVertical: 16,
@@ -499,7 +626,49 @@ const styles = StyleSheet.create({
   },
   buyButtonText: {
     fontSize: 15,
-    color: COLORS.background,
+    color: colors.background,
     fontWeight: "700",
+    fontFamily: fonts.bodySemiBold,
+  },
+  stickyHeader: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+  },
+  stickyHeaderGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingTop: 52,
+    paddingBottom: 12,
+  },
+  stickyBackButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: "rgba(20,24,41,0.8)",
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  stickyBackIcon: {
+    color: colors.text,
+    fontSize: 16,
+    fontWeight: "700",
+  },
+  stickyHeaderTitle: {
+    flex: 1,
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.text,
+    marginHorizontal: 12,
+    fontFamily: fonts.heading,
+  },
+  stickyHeaderSpacer: {
+    width: 36,
   },
 });

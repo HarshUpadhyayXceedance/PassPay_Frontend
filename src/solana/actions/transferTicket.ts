@@ -34,7 +34,7 @@ export async function transferTicket(
   const tx = await program.methods
     .transferTicket()
     .accounts({
-      sender,
+      currentHolder: sender,
       recipient: params.recipient,
       event: params.eventPda,
       ticket: ticketPda,

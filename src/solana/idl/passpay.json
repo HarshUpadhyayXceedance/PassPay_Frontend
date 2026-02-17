@@ -3073,151 +3073,166 @@
     },
     {
       "code": 6005,
+      "name": "EventDescriptionTooLong",
+      "msg": "Event description exceeds 256 characters"
+    },
+    {
+      "code": 6006,
       "name": "EventDateInPast",
       "msg": "Event date must be in the future"
     },
     {
-      "code": 6006,
+      "code": 6007,
       "name": "InvalidSeatCount",
       "msg": "Total seats must be at least 1"
     },
     {
-      "code": 6007,
+      "code": 6008,
       "name": "InvalidTicketPrice",
       "msg": "Ticket price must be greater than zero"
     },
     {
-      "code": 6008,
+      "code": 6009,
       "name": "EventNotActive",
       "msg": "Event is not active for ticket sales"
     },
     {
-      "code": 6009,
+      "code": 6010,
       "name": "SoldOut",
       "msg": "All tickets have been sold"
     },
     {
-      "code": 6010,
+      "code": 6011,
       "name": "Unauthorized",
       "msg": "You are not authorized to perform this action"
     },
     {
-      "code": 6011,
+      "code": 6012,
       "name": "AlreadyCheckedIn",
       "msg": "This ticket has already been checked in"
     },
     {
-      "code": 6012,
+      "code": 6013,
       "name": "NotTicketHolder",
       "msg": "Token account does not hold a valid ticket"
     },
     {
-      "code": 6013,
+      "code": 6014,
       "name": "TicketEventMismatch",
       "msg": "Ticket does not belong to this event"
     },
     {
-      "code": 6014,
+      "code": 6015,
       "name": "InvalidMint",
       "msg": "Invalid ticket mint"
     },
     {
-      "code": 6015,
+      "code": 6016,
       "name": "MerchantEventMismatch",
       "msg": "Merchant is not associated with this event"
     },
     {
-      "code": 6016,
+      "code": 6017,
       "name": "MerchantNotActive",
       "msg": "Merchant is not active"
     },
     {
-      "code": 6017,
+      "code": 6018,
       "name": "InvalidMerchantWallet",
       "msg": "Invalid merchant wallet"
     },
     {
-      "code": 6018,
+      "code": 6019,
       "name": "InvalidPaymentAmount",
       "msg": "Payment amount must be greater than zero"
     },
     {
-      "code": 6019,
+      "code": 6020,
       "name": "InsufficientTreasuryBalance",
       "msg": "Insufficient treasury balance"
     },
     {
-      "code": 6020,
+      "code": 6021,
       "name": "MerchantNameTooLong",
       "msg": "Merchant name exceeds 64 characters"
     },
     {
-      "code": 6021,
+      "code": 6022,
+      "name": "MerchantDescriptionTooLong",
+      "msg": "Merchant description exceeds 128 characters"
+    },
+    {
+      "code": 6023,
       "name": "MetadataUriTooLong",
       "msg": "Metadata URI exceeds 200 characters"
     },
     {
-      "code": 6022,
+      "code": 6024,
+      "name": "ImageUrlTooLong",
+      "msg": "Image URL exceeds 200 characters"
+    },
+    {
+      "code": 6025,
       "name": "Overflow",
       "msg": "Arithmetic overflow"
     },
     {
-      "code": 6023,
+      "code": 6026,
       "name": "SeatsBelowSold",
       "msg": "Cannot reduce total seats below tickets already sold"
     },
     {
-      "code": 6024,
+      "code": 6027,
       "name": "TicketAlreadyCheckedIn",
       "msg": "Ticket has already been checked in and cannot be refunded"
     },
     {
-      "code": 6025,
+      "code": 6028,
       "name": "EarlyAccessNotStarted",
       "msg": "Early access period is not yet active"
     },
     {
-      "code": 6026,
+      "code": 6029,
       "name": "EarlyAccessOnly",
       "msg": "This event is in early access period - only Silver+ members can purchase"
     },
     {
-      "code": 6027,
+      "code": 6030,
       "name": "BadgeNameTooLong",
       "msg": "Badge collection name exceeds maximum length"
     },
     {
-      "code": 6028,
+      "code": 6031,
       "name": "BadgeSymbolTooLong",
       "msg": "Badge collection symbol exceeds maximum length"
     },
     {
-      "code": 6029,
+      "code": 6032,
       "name": "BadgeUriTooLong",
       "msg": "Badge collection URI exceeds maximum length"
     },
     {
-      "code": 6030,
+      "code": 6033,
       "name": "DynamicPricingDisabled",
       "msg": "Dynamic pricing is not enabled for this event"
     },
     {
-      "code": 6031,
+      "code": 6034,
       "name": "PriceUpdateTooSoon",
       "msg": "Price update requested too soon - wait for interval to pass"
     },
     {
-      "code": 6032,
+      "code": 6035,
       "name": "InvalidPricingParams",
       "msg": "Invalid pricing parameters - ensure min < max and factors are within range"
     },
     {
-      "code": 6033,
+      "code": 6036,
       "name": "PriceExceedsMaximum",
       "msg": "Calculated price exceeds maximum allowed price"
     },
     {
-      "code": 6034,
+      "code": 6037,
       "name": "PriceBelowMinimum",
       "msg": "Calculated price is below minimum allowed price"
     }
@@ -3504,6 +3519,14 @@
             "type": "string"
           },
           {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "image_url",
+            "type": "string"
+          },
+          {
             "name": "event_date",
             "type": "i64"
           },
@@ -3589,6 +3612,14 @@
           },
           {
             "name": "venue",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "image_url",
             "type": "string"
           },
           {
@@ -3848,6 +3879,14 @@
             "type": "string"
           },
           {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "image_url",
+            "type": "string"
+          },
+          {
             "name": "is_active",
             "type": "bool"
           },
@@ -4026,6 +4065,14 @@
           {
             "name": "name",
             "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "image_url",
+            "type": "string"
           }
         ]
       }
@@ -4201,6 +4248,18 @@
         "fields": [
           {
             "name": "venue",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "image_url",
             "type": {
               "option": "string"
             }

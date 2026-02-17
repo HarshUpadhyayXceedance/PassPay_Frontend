@@ -1,3 +1,3 @@
-import { AdminDashboardScreen } from "../../src/screens/admin/AdminDashboardScreen";
+import { SuperAdminDashboardScreen } from "../../src/screens/superadmin/SuperAdminDashboardScreen";
 
-export default AdminDashboardScreen;
+export default SuperAdminDashboardScreen;

@@ -16,7 +16,7 @@ import { AppLoader } from "../../components/ui/AppLoader";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
-import { shortenAddress } from "../../utils/formatters";
+import { shortenAddress, decodeAccountString } from "../../utils/formatters";
 import { useWallet } from "../../hooks/useWallet";
 import { getProgram } from "../../solana/config/program";
 import { DEVNET_RPC } from "../../solana/config/constants";
@@ -25,9 +25,9 @@ import { deactivateAdmin } from "../../solana/actions/deactivateAdmin";
 interface AdminAccount {
   publicKey: string;
   name: string;
-  adminAuthority: string;
+  authority: string;
+  createdBy: string;
   isActive: boolean;
-  createdAt: number;
 }
 
 export function AdminListScreen() {
@@ -52,19 +52,21 @@ export function AdminListScreen() {
       // Fetch all Admin accounts
       const adminAccounts = await program.account.admin.all();
 
-      const adminsData: AdminAccount[] = adminAccounts.map((acc: any) => ({
-        publicKey: acc.publicKey.toBase58(),
-        name: acc.account.name,
-        adminAuthority: acc.account.adminAuthority.toBase58(),
-        isActive: acc.account.isActive,
-        createdAt: acc.account.createdAt.toNumber(),
-      }));
+      const adminsData: AdminAccount[] = adminAccounts
+        .filter((acc: any) => acc.account.isActive)
+        .map((acc: any) => ({
+          publicKey: acc.publicKey.toBase58(),
+          name: decodeAccountString(acc.account.name),
+          authority: acc.account.authority.toBase58(),
+          createdBy: acc.account.createdBy.toBase58(),
+          isActive: true,
+        }));
 
-      // Sort by creation date (newest first)
-      adminsData.sort((a, b) => b.createdAt - a.createdAt);
+      // Sort by name
+      adminsData.sort((a, b) => a.name.localeCompare(b.name));
 
       setAdmins(adminsData);
-      console.log(`✅ Loaded ${adminsData.length} admins`);
+      console.log(`✅ Loaded ${adminsData.length} active admins`);
     } catch (error: any) {
       console.error("❌ Failed to fetch admins:", error);
       Alert.alert("Error", "Failed to load admins. Please try again.");
@@ -101,7 +103,7 @@ export function AdminListScreen() {
             try {
               console.log("🔧 Deactivating admin:", admin.name);
               const superAdminPubkey = new PublicKey(publicKey);
-              const adminPubkey = new PublicKey(admin.adminAuthority);
+              const adminPubkey = new PublicKey(admin.authority);
 
               const signature = await deactivateAdmin(
                 superAdminPubkey,
@@ -132,7 +134,7 @@ export function AdminListScreen() {
         <View style={styles.adminInfo}>
           <Text style={styles.adminName}>{item.name}</Text>
           <Text style={styles.adminAddress}>
-            {shortenAddress(item.adminAuthority, 6)}
+            {shortenAddress(item.authority, 6)}
           </Text>
         </View>
         <View style={[styles.statusBadge, item.isActive && styles.activeBadge]}>
@@ -146,7 +148,7 @@ export function AdminListScreen() {
 
       <View style={styles.adminMeta}>
         <Text style={styles.metaText}>
-          Created: {new Date(item.createdAt * 1000).toLocaleDateString()}
+          Created by: {shortenAddress(item.createdBy, 4)}
         </Text>
       </View>
 
@@ -189,9 +191,9 @@ export function AdminListScreen() {
         }
         ListHeaderComponent={
           <View style={styles.header}>
-            <Text style={styles.title}>All Admins</Text>
+            <Text style={styles.title}>Active Admins</Text>
             <Text style={styles.subtitle}>
-              {admins.length} admin{admins.length !== 1 ? "s" : ""} in the system
+              {admins.length} active admin{admins.length !== 1 ? "s" : ""}
             </Text>
           </View>
         }

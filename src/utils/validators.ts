@@ -1,7 +1,9 @@
 import {
   MAX_EVENT_NAME_LEN,
   MAX_VENUE_LEN,
+  MAX_EVENT_DESCRIPTION_LEN,
   MAX_MERCHANT_NAME_LEN,
+  MAX_MERCHANT_DESCRIPTION_LEN,
   MAX_METADATA_URI_LEN,
 } from "../solana/config/constants";
 
@@ -23,6 +25,19 @@ export function validateMerchantName(name: string): string | null {
   if (!name.trim()) return "Merchant name is required";
   if (name.length > MAX_MERCHANT_NAME_LEN)
     return `Name must be ${MAX_MERCHANT_NAME_LEN} characters or less`;
+  return null;
+}
+
+export function validateEventDescription(description: string): string | null {
+  if (!description.trim()) return "Event description is required";
+  if (description.length > MAX_EVENT_DESCRIPTION_LEN)
+    return `Description must be ${MAX_EVENT_DESCRIPTION_LEN} characters or less`;
+  return null;
+}
+
+export function validateMerchantDescription(description: string): string | null {
+  if (description.length > MAX_MERCHANT_DESCRIPTION_LEN)
+    return `Description must be ${MAX_MERCHANT_DESCRIPTION_LEN} characters or less`;
   return null;
 }
 

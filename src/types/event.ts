@@ -4,11 +4,25 @@ export interface EventAccount {
   admin: PublicKey;
   name: string;
   venue: string;
+  description: string;
+  imageUrl: string;
   eventDate: number; // unix timestamp
-  ticketPrice: number; // lamports
+  baseTicketPrice: number; // lamports
+  currentTicketPrice: number; // lamports
   totalSeats: number;
   ticketsSold: number;
   isActive: boolean;
+  earlyAccessDate: number;
+  publicSaleDate: number;
+  loyaltyDiscountsEnabled: boolean;
+  dynamicPricingEnabled: boolean;
+  minTicketPrice: number;
+  maxTicketPrice: number;
+  lastPriceUpdate: number;
+  priceUpdateInterval: number;
+  demandFactor: number;
+  timeFactor: number;
+  scarcityPremium: number;
   bump: number;
 }
 
@@ -17,11 +31,26 @@ export interface EventDisplay {
   admin: string;
   name: string;
   venue: string;
+  description: string;
+  imageUrl: string;
   eventDate: Date;
-  ticketPrice: number; // in SOL
+  ticketPrice: number; // current price in SOL (for backward compat)
+  baseTicketPrice: number; // base price in SOL
+  currentTicketPrice: number; // current price in SOL
   totalSeats: number;
   ticketsSold: number;
   availableSeats: number;
   isActive: boolean;
   isSoldOut: boolean;
+  earlyAccessDate: Date;
+  publicSaleDate: Date;
+  loyaltyDiscountsEnabled: boolean;
+  dynamicPricingEnabled: boolean;
+  minTicketPrice: number; // in SOL
+  maxTicketPrice: number; // in SOL
+  lastPriceUpdate: number;
+  priceUpdateInterval: number;
+  demandFactor: number;
+  timeFactor: number;
+  scarcityPremium: number;
 }

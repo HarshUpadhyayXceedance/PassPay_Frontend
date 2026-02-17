@@ -31,7 +31,10 @@ export const BADGE_AUTHORITY_SEED = "badge_authority";
 export const MAX_EVENT_NAME_LEN = 64;
 export const MAX_VENUE_LEN = 128;
 export const MAX_MERCHANT_NAME_LEN = 64;
+export const MAX_EVENT_DESCRIPTION_LEN = 256;
+export const MAX_MERCHANT_DESCRIPTION_LEN = 128;
 export const MAX_METADATA_URI_LEN = 200;
+export const MAX_IMAGE_URL_LEN = 200;
 
 // SOL
 export const LAMPORTS_PER_SOL = 1_000_000_000;

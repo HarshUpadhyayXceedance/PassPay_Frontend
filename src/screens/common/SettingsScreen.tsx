@@ -5,8 +5,9 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
+  Alert,
 } from "react-native";
-import { useNavigation } from "@react-navigation/native";
+import { useRouter } from "expo-router";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
@@ -14,7 +15,7 @@ import { spacing, borderRadius } from "../../theme/spacing";
 import { getCurrentNetwork, setNetwork, NetworkType } from "../../solana/config/connection";
 
 export function SettingsScreen() {
-  const navigation = useNavigation();
+  const router = useRouter();
   const [currentNetwork, setCurrentNetwork] = React.useState<NetworkType>(
     getCurrentNetwork()
   );
@@ -28,7 +29,7 @@ export function SettingsScreen() {
 
   return (
     <View style={styles.container}>
-      <AppHeader title="Settings" onBack={() => navigation.goBack()} />
+      <AppHeader title="Settings" onBack={() => router.back()} />
 
       <ScrollView contentContainerStyle={styles.content}>
         <SettingRow
@@ -40,7 +41,7 @@ export function SettingsScreen() {
         <SettingRow
           label="About"
           value=""
-          onPress={() => (navigation as any).navigate("About")}
+          onPress={() => Alert.alert("Navigate", "Navigate to About screen")}
         />
       </ScrollView>
     </View>

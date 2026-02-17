@@ -2,13 +2,15 @@ import React, { useEffect } from "react";
 import {
   View,
   Text,
+  Image,
   StyleSheet,
   ScrollView,
   RefreshControl,
 } from "react-native";
-import { AppCard } from "../../components/ui/AppCard";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "../../theme/colors";
-import { typography } from "../../theme/typography";
+import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
 import { useMerchants } from "../../hooks/useMerchants";
@@ -46,27 +48,69 @@ export function MerchantDashboardScreen() {
         />
       }
     >
-      <View style={styles.walletCard}>
-        <Text style={styles.walletLabel}>Merchant Wallet</Text>
+      {/* Header */}
+      <View style={styles.header}>
+        <View style={styles.headerLeft}>
+          <Image
+            source={require("../../../assets/icon.png")}
+            style={styles.headerLogo}
+          />
+          <View>
+            <Text style={styles.headerRole}>Merchant</Text>
+            <Text style={styles.headerSubtitle}>
+              {publicKey ? shortenAddress(publicKey) : "Not connected"}
+            </Text>
+          </View>
+        </View>
+        <LinearGradient
+          colors={["rgba(108,92,231,0.2)", "rgba(108,92,231,0.05)"]}
+          start={{ x: 0, y: 0 }}
+          end={{ x: 1, y: 0 }}
+          style={styles.roleBadge}
+        >
+          <Ionicons name="storefront" size={14} color={colors.secondary} />
+          <Text style={styles.roleBadgeText}>MERCHANT</Text>
+        </LinearGradient>
+      </View>
+
+      {/* Wallet Balance Card */}
+      <LinearGradient
+        colors={["rgba(108,92,231,0.15)", "rgba(108,92,231,0.03)"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={styles.walletCard}
+      >
+        <Text style={styles.walletLabel}>Wallet Balance</Text>
         <Text style={styles.balance}>{formatSOL(balance)} SOL</Text>
         {publicKey && (
           <Text style={styles.address}>{shortenAddress(publicKey, 6)}</Text>
         )}
-      </View>
+      </LinearGradient>
 
+      {/* Stats Row */}
       <View style={styles.statsRow}>
-        <AppCard style={styles.statCard}>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconWrap, { backgroundColor: colors.primaryMuted }]}>
+            <Ionicons name="cash" size={18} color={colors.primary} />
+          </View>
           <Text style={styles.statValue}>{formatSOL(totalReceived)}</Text>
           <Text style={styles.statLabel}>Total Received (SOL)</Text>
-        </AppCard>
-        <AppCard style={styles.statCard}>
+        </View>
+        <View style={styles.statCard}>
+          <View style={[styles.statIconWrap, { backgroundColor: colors.secondaryMuted }]}>
+            <Ionicons name="calendar" size={18} color={colors.secondary} />
+          </View>
           <Text style={styles.statValue}>{myMerchants.length}</Text>
           <Text style={styles.statLabel}>Registered At</Text>
-        </AppCard>
+        </View>
       </View>
 
+      {/* Empty State */}
       {myMerchants.length === 0 && (
         <View style={styles.emptyContainer}>
+          <View style={styles.emptyIconWrap}>
+            <Ionicons name="storefront-outline" size={48} color={colors.textMuted} />
+          </View>
           <Text style={styles.emptyTitle}>Not Registered</Text>
           <Text style={styles.emptyText}>
             Ask an event organizer to register you as a merchant
@@ -83,47 +127,107 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
   content: {
-    padding: spacing.md,
+    paddingTop: 56,
     paddingBottom: spacing.xxl,
   },
+  header: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: spacing.lg,
+    marginBottom: spacing.lg,
+  },
+  headerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+  },
+  headerLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+  },
+  headerRole: {
+    fontSize: 22,
+    fontFamily: fonts.displayBold,
+    color: colors.text,
+    marginBottom: 1,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+  },
+  roleBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+  },
+  roleBadgeText: {
+    fontSize: 11,
+    fontFamily: fonts.bodyBold,
+    color: colors.secondary,
+    letterSpacing: 1.2,
+  },
   walletCard: {
-    backgroundColor: colors.secondary + "15",
+    marginHorizontal: spacing.lg,
     borderRadius: 16,
     padding: spacing.lg,
     alignItems: "center",
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: colors.secondary + "30",
+    borderColor: colors.border,
   },
   walletLabel: {
-    ...typography.small,
+    fontSize: 12,
+    fontFamily: fonts.body,
     color: colors.textSecondary,
   },
   balance: {
-    ...typography.h1,
+    fontSize: 32,
+    fontFamily: fonts.heading,
     color: colors.text,
     marginVertical: spacing.xs,
   },
   address: {
-    ...typography.small,
+    fontSize: 12,
+    fontFamily: fonts.body,
     color: colors.textMuted,
-    fontFamily: "monospace",
   },
   statsRow: {
     flexDirection: "row",
     gap: spacing.md,
+    paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
   },
   statCard: {
     flex: 1,
     alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+  },
+  statIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.sm,
   },
   statValue: {
-    ...typography.h2,
-    color: colors.secondary,
+    fontSize: 24,
+    fontFamily: fonts.heading,
+    color: colors.text,
   },
   statLabel: {
-    ...typography.small,
+    fontSize: 12,
+    fontFamily: fonts.body,
     color: colors.textSecondary,
     marginTop: 2,
     textAlign: "center",
@@ -131,15 +235,30 @@ const styles = StyleSheet.create({
   emptyContainer: {
     alignItems: "center",
     marginTop: spacing.xl,
+    paddingHorizontal: spacing.lg,
+  },
+  emptyIconWrap: {
+    width: 96,
+    height: 96,
+    borderRadius: 48,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
   },
   emptyTitle: {
-    ...typography.h3,
+    fontSize: 20,
+    fontFamily: fonts.heading,
     color: colors.text,
     marginBottom: spacing.xs,
   },
   emptyText: {
-    ...typography.body,
+    fontSize: 15,
+    fontFamily: fonts.body,
     color: colors.textMuted,
     textAlign: "center",
+    lineHeight: 22,
   },
 });

@@ -1,4 +1,5 @@
 import React from "react";
+import { Text } from "react-native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { colors } from "../theme/colors";
@@ -37,7 +38,7 @@ function SuperAdminTabs() {
         component={SuperAdminDashboardScreen}
         options={{
           title: "System",
-          tabBarIcon: ({ color }) => <span style={{ color }}>⚡</span>,
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⚡</Text>,
         }}
       />
       <Tab.Screen
@@ -45,7 +46,7 @@ function SuperAdminTabs() {
         component={AdminListScreen}
         options={{
           title: "Admins",
-          tabBarIcon: ({ color }) => <span style={{ color }}>👥</span>,
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👥</Text>,
         }}
       />
       <Tab.Screen
@@ -53,7 +54,7 @@ function SuperAdminTabs() {
         component={ManageEventsScreen}
         options={{
           title: "Events",
-          tabBarIcon: ({ color }) => <span style={{ color }}>🎫</span>,
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🎫</Text>,
         }}
       />
       <Tab.Screen
@@ -61,7 +62,7 @@ function SuperAdminTabs() {
         component={ProfileScreen}
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => <span style={{ color }}>👤</span>,
+          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👤</Text>,
         }}
       />
     </Tab.Navigator>

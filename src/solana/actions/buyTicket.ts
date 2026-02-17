@@ -4,9 +4,18 @@ import {
   Keypair,
   SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
+import {
+  TOKEN_PROGRAM_ID,
+  ASSOCIATED_TOKEN_PROGRAM_ID,
+} from "@solana/spl-token";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
-import { findEventPda, findTicketPda, findTreasuryPda } from "../pda";
+import {
+  findEventPda,
+  findTicketPda,
+  findTreasuryPda,
+  findUserAttendancePda,
+} from "../pda";
 import {
   findMintAuthorityPda,
   findCollectionMintPda,
@@ -42,23 +51,27 @@ export async function buyTicket(
   const [collectionMint] = findCollectionMintPda(params.eventPda);
   const [collectionMetadata] = findMetadataPda(collectionMint);
   const [collectionMasterEdition] = findMasterEditionPda(collectionMint);
+  const [userAttendanceRecord] = findUserAttendancePda(buyer);
 
   const tx = await program.methods
     .buyTicket({ metadataUri: params.metadataUri })
     .accounts({
       buyer,
       event: params.eventPda,
-      ticket: ticketPda,
-      ticketMint: ticketMint.publicKey,
-      ticketMetadata,
-      buyerTokenAccount,
       treasury: treasuryPda,
+      ticketMint: ticketMint.publicKey,
       mintAuthority,
+      buyerTokenAccount,
+      ticket: ticketPda,
+      metadataAccount: ticketMetadata,
       collectionMint,
       collectionMetadata,
       collectionMasterEdition,
-      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
+      userAttendanceRecord,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
+      tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       rent: SYSVAR_RENT_PUBKEY,
     })
     .signers([ticketMint])

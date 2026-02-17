@@ -3,7 +3,7 @@ import { PublicKey } from "@solana/web3.js";
 import { useTicketStore } from "../store/ticketStore";
 import { getProgram } from "../solana/config/program";
 import { createProvider } from "../solana/wallet/walletSession";
-import { getWalletAdapter } from "./useWallet";
+import { phantomWalletAdapter } from "../solana/wallet/phantomWalletAdapter";
 import { TicketDisplay } from "../types/ticket";
 import { fromUnixTimestamp } from "../utils/dateUtils";
 
@@ -14,8 +14,8 @@ export function useTickets() {
     store.setLoading(true);
     store.setError(null);
     try {
-      const wallet = getWalletAdapter();
-      if (!wallet) throw new Error("Wallet not connected");
+      const wallet = phantomWalletAdapter;
+      if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
 
       const provider = createProvider(wallet);
       const program = getProgram(provider);
@@ -23,7 +23,7 @@ export function useTickets() {
       const allTickets = await program.account.ticket.all();
       const myTickets = allTickets.filter(
         (t: any) =>
-          t.account.owner.toBase58() === wallet.publicKey.toBase58()
+          t.account.owner.toBase58() === wallet.getPublicKey()!.toBase58()
       );
 
       const tickets: TicketDisplay[] = await Promise.all(

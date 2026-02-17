@@ -5,22 +5,28 @@ import {
   VersionedTransaction,
 } from "@solana/web3.js";
 import { getConnection } from "../config/connection";
-import { LocalWalletAdapter } from "./walletAdapter";
+import { PhantomWalletAdapter } from "./phantomWalletAdapter";
 
 export function createProvider(
-  wallet: LocalWalletAdapter,
+  wallet: PhantomWalletAdapter,
   connection?: Connection
 ): AnchorProvider {
   const conn = connection ?? getConnection();
+  const pubKey = wallet.getPublicKey();
+  if (!pubKey) throw new Error("Wallet not connected");
 
   const anchorWallet = {
-    publicKey: wallet.publicKey,
-    signTransaction: <T extends Transaction | VersionedTransaction>(
+    publicKey: pubKey,
+    signTransaction: async <T extends Transaction | VersionedTransaction>(
       tx: T
-    ): Promise<T> => wallet.signTransaction(tx),
-    signAllTransactions: <T extends Transaction | VersionedTransaction>(
+    ): Promise<T> =>
+      (await wallet.signTransaction(tx as Transaction)) as unknown as T,
+    signAllTransactions: async <T extends Transaction | VersionedTransaction>(
       txs: T[]
-    ): Promise<T[]> => wallet.signAllTransactions(txs),
+    ): Promise<T[]> =>
+      (await wallet.signAllTransactions(
+        txs as Transaction[]
+      )) as unknown as T[],
   };
 
   return new AnchorProvider(conn, anchorWallet, {
