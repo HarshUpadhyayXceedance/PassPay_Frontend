@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useCallback, useEffect } from "react";
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useWallet } from "../../hooks/useWallet";
 import { useAuthStore } from "../../store/authStore";
 import { useLoyalty } from "../../hooks/useLoyalty";
+import { useTickets } from "../../hooks/useTickets";
 import { shortenAddress, formatSOL, lamportsToSOL } from "../../utils/formatters";
 import { TierBadge } from "../../components/loyalty/TierBadge";
 import { TierProgressBar } from "../../components/loyalty/TierProgressBar";
@@ -26,9 +27,17 @@ import { spacing } from "../../theme/spacing";
 
 export function ProfileScreen() {
   const router = useRouter();
-  const { publicKey, balance, disconnect } = useWallet();
+  const { publicKey, balance, disconnect, refreshBalance } = useWallet();
   const role = useAuthStore((s) => s.role);
-  const { loyaltyBenefits, userAttendance } = useLoyalty();
+  const { loyaltyBenefits, userAttendance, fetchLoyaltyBenefits } = useLoyalty();
+  const { tickets, fetchMyTickets } = useTickets();
+
+  // Refresh data when screen mounts
+  useEffect(() => {
+    fetchLoyaltyBenefits();
+    fetchMyTickets();
+    refreshBalance();
+  }, []);
 
   const displayAddress = publicKey ? shortenAddress(publicKey, 6) : "Not connected";
   const isUserRole = role === "user";
@@ -36,6 +45,7 @@ export function ProfileScreen() {
   const totalEvents = loyaltyBenefits?.totalEvents ?? 0;
   const lifetimeSpend = loyaltyBenefits?.lifetimeSpend ?? 0;
   const currentStreak = loyaltyBenefits?.currentStreak ?? 0;
+  const ticketCount = tickets.length;
 
   const copyAddress = async () => {
     if (publicKey) {
@@ -103,22 +113,35 @@ export function ProfileScreen() {
               </Text>
             </LinearGradient>
           </View>
-          <Text style={styles.displayName}>PassPay User</Text>
+          <Text style={styles.displayName}>
+            {role === "super_admin"
+              ? "Super Admin"
+              : role === "admin"
+              ? "Event Admin"
+              : role === "merchant"
+              ? "Merchant"
+              : "PassPay User"}
+          </Text>
           {isUserRole && <TierBadge tier={tier} size="medium" />}
           <Text style={styles.addressSubtitle}>{displayAddress}</Text>
         </View>
 
-        {/* ---- Loyalty Stats Row (user only) ---- */}
+        {/* ---- Stats Row (user only) ---- */}
         {isUserRole && (
           <View style={styles.loyaltyStats}>
             <View style={styles.loyaltyStat}>
+              <Text style={styles.loyaltyValue}>{ticketCount}</Text>
+              <Text style={styles.loyaltyLabel}>Tickets</Text>
+            </View>
+            <View style={styles.loyaltyDivider} />
+            <View style={styles.loyaltyStat}>
               <Text style={styles.loyaltyValue}>{totalEvents}</Text>
-              <Text style={styles.loyaltyLabel}>Events</Text>
+              <Text style={styles.loyaltyLabel}>Check-ins</Text>
             </View>
             <View style={styles.loyaltyDivider} />
             <View style={styles.loyaltyStat}>
               <Text style={styles.loyaltyValue}>
-                {lamportsToSOL(lifetimeSpend).toFixed(1)}
+                {lamportsToSOL(lifetimeSpend).toFixed(2)}
               </Text>
               <Text style={styles.loyaltyLabel}>SOL Spent</Text>
             </View>
@@ -326,7 +349,7 @@ const styles = StyleSheet.create({
   },
   headerRole: {
     fontSize: 22,
-    fontFamily: fonts.displayBold,
+    fontFamily: fonts.heading,
     color: colors.text,
     marginBottom: 1,
   },

@@ -194,7 +194,7 @@ export function EventDetailsAdminScreen({
         <AppButton
           title="Edit Event"
           variant="outline"
-          onPress={() => router.push({ pathname: "/(admin)/update-event/[eventKey]", params: { eventKey: event.publicKey } })}
+          onPress={() => router.push({ pathname: "/(admin)/update-event", params: { eventKey: event.publicKey } })}
         />
         {!event.dynamicPricingEnabled && (
           <AppButton

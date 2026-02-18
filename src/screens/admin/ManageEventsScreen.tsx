@@ -41,7 +41,7 @@ export function ManageEventsScreen() {
 
   const handleEventPress = useCallback(
     (item: EventDisplay) => {
-      router.push({ pathname: "/(admin)/event-details/[eventKey]", params: { eventKey: item.publicKey } });
+      router.push({ pathname: "/(admin)/event-details", params: { eventKey: item.publicKey } });
     },
     [router]
   );

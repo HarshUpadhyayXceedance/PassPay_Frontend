@@ -224,7 +224,7 @@ export function HomeScreen() {
         activeOpacity={0.85}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push({ pathname: "/(user)/event-details/[eventKey]", params: { eventKey: item.publicKey } });
+          router.push({ pathname: "/(user)/event-details", params: { eventKey: item.publicKey } });
         }}
         style={styles.featuredCardWrapper}
       >
@@ -295,7 +295,7 @@ export function HomeScreen() {
         activeOpacity={0.8}
         onPress={() => {
           Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-          router.push({ pathname: "/(user)/event-details/[eventKey]", params: { eventKey: event.publicKey } });
+          router.push({ pathname: "/(user)/event-details", params: { eventKey: event.publicKey } });
         }}
         style={styles.upcomingCard}
       >

@@ -27,7 +27,7 @@ export function EventListScreen() {
     <EventCard
       event={item}
       onPress={() =>
-        router.push({ pathname: "/(user)/event-details/[eventKey]", params: { eventKey: item.publicKey } })
+        router.push({ pathname: "/(user)/event-details", params: { eventKey: item.publicKey } })
       }
     />
   );

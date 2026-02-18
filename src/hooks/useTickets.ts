@@ -6,6 +6,7 @@ import { createProvider } from "../solana/wallet/walletSession";
 import { phantomWalletAdapter } from "../solana/wallet/phantomWalletAdapter";
 import { TicketDisplay } from "../types/ticket";
 import { fromUnixTimestamp } from "../utils/dateUtils";
+import { decodeAccountString } from "../utils/formatters";
 
 export function useTickets() {
   const store = useTicketStore();
@@ -36,8 +37,8 @@ export function useTickets() {
           try {
             const eventAcc = await program.account.event.fetch(data.event);
             const eventData = eventAcc as any;
-            eventName = eventData.name;
-            eventVenue = eventData.venue;
+            eventName = decodeAccountString(eventData.name);
+            eventVenue = decodeAccountString(eventData.venue);
             eventDate = fromUnixTimestamp(eventData.eventDate.toNumber());
           } catch {
             // event might not exist

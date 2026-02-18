@@ -8,21 +8,11 @@ import {
   Alert,
   ActivityIndicator,
 } from "react-native";
+import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
-
-// Lazy-load expo-image-picker to avoid crash when native module is missing
-// (requires dev client rebuild after install)
-let ImagePicker: typeof import("expo-image-picker") | null = null;
-try {
-  ImagePicker = require("expo-image-picker");
-} catch {
-  console.warn(
-    "expo-image-picker native module not available. Rebuild dev client to enable image picking."
-  );
-}
 
 interface ImagePickerButtonProps {
   imageUri?: string | null;
@@ -39,63 +29,51 @@ export function ImagePickerButton({
   error,
   uploading,
 }: ImagePickerButtonProps) {
-  const handlePress = () => {
-    if (!ImagePicker) {
+  const handlePickerCamera = async () => {
+    const { status } = await ImagePicker.requestCameraPermissionsAsync();
+    if (status !== "granted") {
       Alert.alert(
-        "Rebuild Required",
-        "Image picker requires a dev client rebuild. Run: npx expo prebuild && npx expo run:android"
+        "Permission needed",
+        "Camera permission is required to take photos."
       );
       return;
     }
+    const result = await ImagePicker.launchCameraAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      onImageSelected(result.assets[0].uri);
+    }
+  };
 
-    const picker = ImagePicker;
+  const handlePickerGallery = async () => {
+    const { status } =
+      await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (status !== "granted") {
+      Alert.alert(
+        "Permission needed",
+        "Gallery permission is required to pick photos."
+      );
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ["images"],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      onImageSelected(result.assets[0].uri);
+    }
+  };
 
+  const handlePress = () => {
     Alert.alert("Select Image", "Choose a source", [
-      {
-        text: "Camera",
-        onPress: async () => {
-          const { status } = await picker.requestCameraPermissionsAsync();
-          if (status !== "granted") {
-            Alert.alert(
-              "Permission needed",
-              "Camera permission is required to take photos."
-            );
-            return;
-          }
-          const result = await picker.launchCameraAsync({
-            mediaTypes: ["images"],
-            allowsEditing: true,
-            aspect: [16, 9],
-            quality: 0.8,
-          });
-          if (!result.canceled && result.assets[0]) {
-            onImageSelected(result.assets[0].uri);
-          }
-        },
-      },
-      {
-        text: "Gallery",
-        onPress: async () => {
-          const { status } =
-            await picker.requestMediaLibraryPermissionsAsync();
-          if (status !== "granted") {
-            Alert.alert(
-              "Permission needed",
-              "Gallery permission is required to pick photos."
-            );
-            return;
-          }
-          const result = await picker.launchImageLibraryAsync({
-            mediaTypes: ["images"],
-            allowsEditing: true,
-            aspect: [16, 9],
-            quality: 0.8,
-          });
-          if (!result.canceled && result.assets[0]) {
-            onImageSelected(result.assets[0].uri);
-          }
-        },
-      },
+      { text: "Camera", onPress: handlePickerCamera },
+      { text: "Gallery", onPress: handlePickerGallery },
       { text: "Cancel", style: "cancel" },
     ]);
   };

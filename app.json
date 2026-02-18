@@ -57,7 +57,20 @@
     "plugins": [
       "expo-secure-store",
       "expo-router",
-      "expo-font"
+      "expo-font",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "PassPay needs access to your photos to add event images.",
+          "cameraPermission": "PassPay needs access to your camera to take event photos."
+        }
+      ],
+      [
+        "expo-camera",
+        {
+          "cameraPermission": "PassPay needs access to your camera to scan QR codes."
+        }
+      ]
     ],
     "extra": {
       "router": {},

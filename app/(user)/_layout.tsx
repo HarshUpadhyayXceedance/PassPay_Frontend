@@ -74,7 +74,7 @@ export default function UserLayout() {
         }}
       />
       {/* Hidden routes - not shown in tab bar */}
-      <Tabs.Screen name="event-details.[eventKey]" options={{ href: null }} />
+      <Tabs.Screen name="event-details" options={{ href: null }} />
       <Tabs.Screen name="transfer-ticket" options={{ href: null }} />
       <Tabs.Screen name="accept-transfer" options={{ href: null }} />
       <Tabs.Screen name="refund" options={{ href: null }} />

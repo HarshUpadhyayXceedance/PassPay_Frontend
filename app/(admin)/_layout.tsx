@@ -68,8 +68,8 @@ export default function AdminLayout() {
       <Tabs.Screen name="create-event" options={{ href: null }} />
       <Tabs.Screen name="create-admin" options={{ href: null }} />
       <Tabs.Screen name="admin-list" options={{ href: null }} />
-      <Tabs.Screen name="event-details.[eventKey]" options={{ href: null }} />
-      <Tabs.Screen name="update-event.[eventKey]" options={{ href: null }} />
+      <Tabs.Screen name="event-details" options={{ href: null }} />
+      <Tabs.Screen name="update-event" options={{ href: null }} />
       <Tabs.Screen name="refund-management" options={{ href: null }} />
       <Tabs.Screen name="withdraw-funds" options={{ href: null }} />
       <Tabs.Screen name="register-merchant" options={{ href: null }} />

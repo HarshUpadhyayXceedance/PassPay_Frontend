@@ -116,9 +116,9 @@ export function TicketDetailsScreen() {
     );
   };
 
-  const handleViewOnSolscan = () => {
+  const handleViewOnExplorer = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    const url = `https://solscan.io/tx/${ticket.mint}?cluster=devnet`;
+    const url = `https://explorer.solana.com/address/${ticket.mint}?cluster=devnet`;
     Linking.openURL(url);
   };
 
@@ -269,11 +269,11 @@ export function TicketDetailsScreen() {
 
           <TouchableOpacity
             style={styles.solscanButton}
-            onPress={handleViewOnSolscan}
+            onPress={handleViewOnExplorer}
             activeOpacity={0.8}
           >
             <Text style={styles.solscanButtonText}>
-              View on Solscan →
+              View on Solana Explorer →
             </Text>
           </TouchableOpacity>
         </View>

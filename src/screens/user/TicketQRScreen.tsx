@@ -9,7 +9,6 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
-import * as Brightness from "expo-brightness";
 import QRCode from "react-native-qrcode-svg";
 import { useTickets } from "../../hooks/useTickets";
 import { formatDate } from "../../utils/formatters";
@@ -33,15 +32,6 @@ export function TicketQRScreen() {
   useEffect(() => {
     // Success haptic on load
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-    // Boost brightness for QR scanning
-    let previousBrightness: number | null = null;
-    (async () => {
-      try {
-        previousBrightness = await Brightness.getBrightnessAsync();
-        await Brightness.setBrightnessAsync(1);
-      } catch {}
-    })();
 
     // Entrance animation
     Animated.parallel([
@@ -77,10 +67,6 @@ export function TicketQRScreen() {
 
     return () => {
       pulse.stop();
-      // Restore previous brightness
-      if (previousBrightness !== null) {
-        Brightness.setBrightnessAsync(previousBrightness).catch(() => {});
-      }
     };
   }, []);
 
