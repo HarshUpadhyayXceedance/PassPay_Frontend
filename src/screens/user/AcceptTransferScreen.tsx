@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -11,9 +11,12 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import { useTickets } from "../../hooks/useTickets";
+import { PublicKey } from "@solana/web3.js";
 import { useEvents } from "../../hooks/useEvents";
 import { useWallet } from "../../hooks/useWallet";
+import { useTickets } from "../../hooks/useTickets";
+import { getConnection } from "../../solana/config/connection";
+import { getAssociatedTokenAddress } from "../../solana/utils/tokenUtils";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
@@ -28,9 +31,49 @@ export function AcceptTransferScreen() {
   }>();
   const { publicKey, refreshBalance } = useWallet();
   const { getEvent } = useEvents();
+  const { fetchMyTickets } = useTickets();
+  const [verifying, setVerifying] = useState(true);
+  const [verified, setVerified] = useState(false);
   const [accepting, setAccepting] = useState(false);
 
   const event = getEvent(eventKey as string);
+
+  // Verify on-chain that the ticket token exists in recipient's wallet
+  const verifyTransfer = useCallback(async () => {
+    if (!publicKey || !ticketMint) {
+      setVerifying(false);
+      return;
+    }
+    try {
+      const connection = getConnection();
+      const mintPubkey = new PublicKey(ticketMint as string);
+      const ownerPubkey = new PublicKey(publicKey);
+      const ata = getAssociatedTokenAddress(mintPubkey, ownerPubkey);
+
+      const accountInfo = await connection.getAccountInfo(ata);
+      if (accountInfo && accountInfo.data.length > 0) {
+        // Parse token account balance (offset 64, 8 bytes LE)
+        const data = accountInfo.data;
+        const amount =
+          data[64] +
+          data[65] * 256 +
+          data[66] * 65536 +
+          data[67] * 16777216;
+        setVerified(amount >= 1);
+      } else {
+        setVerified(false);
+      }
+    } catch (error) {
+      console.error("Failed to verify transfer:", error);
+      setVerified(false);
+    } finally {
+      setVerifying(false);
+    }
+  }, [publicKey, ticketMint]);
+
+  useEffect(() => {
+    verifyTransfer();
+  }, [verifyTransfer]);
 
   if (!ticketMint || !eventKey || !from) {
     return (
@@ -59,12 +102,15 @@ export function AcceptTransferScreen() {
   const handleAccept = async () => {
     setAccepting(true);
     try {
-      // In a real implementation, this would verify the transfer on-chain
-      // and confirm the token has been received
+      // Re-verify on-chain before confirming
+      await verifyTransfer();
       await refreshBalance();
+      await fetchMyTickets();
       Alert.alert(
-        "Transfer Accepted!",
-        "The ticket has been added to your wallet. You can view it in My Passes.",
+        "Transfer Confirmed!",
+        verified
+          ? "The ticket is in your wallet. View it in My Passes."
+          : "The transfer may still be processing. Check My Passes shortly.",
         [
           {
             text: "View My Passes",
@@ -73,7 +119,7 @@ export function AcceptTransferScreen() {
         ]
       );
     } catch (error: any) {
-      Alert.alert("Error", error.message ?? "Failed to accept transfer");
+      Alert.alert("Error", error.message ?? "Failed to verify transfer");
     } finally {
       setAccepting(false);
     }
@@ -124,6 +170,28 @@ export function AcceptTransferScreen() {
             <Ionicons name="gift-outline" size={48} color="#FFFFFF" />
           </LinearGradient>
           <Text style={styles.transferTitle}>You've received a ticket!</Text>
+
+          {/* Verification status */}
+          {verifying ? (
+            <View style={styles.statusRow}>
+              <ActivityIndicator size="small" color={colors.primary} />
+              <Text style={styles.statusText}>Verifying on-chain...</Text>
+            </View>
+          ) : verified ? (
+            <View style={styles.statusRow}>
+              <Ionicons name="shield-checkmark" size={16} color={colors.success} />
+              <Text style={[styles.statusText, { color: colors.success }]}>
+                Verified on-chain
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.statusRow}>
+              <Ionicons name="time-outline" size={16} color={colors.warning} />
+              <Text style={[styles.statusText, { color: colors.warning }]}>
+                Pending verification
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Sender Info */}
@@ -294,6 +362,23 @@ const styles = StyleSheet.create({
     fontFamily: fonts.displayBold,
     color: colors.text,
     textAlign: "center",
+  },
+  statusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginTop: spacing.sm,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statusText: {
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.textSecondary,
   },
   sectionLabel: {
     fontSize: 12,

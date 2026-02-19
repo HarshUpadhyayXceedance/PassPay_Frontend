@@ -1,5 +1,7 @@
 export { createAdmin } from "./createAdmin";
+export { deactivateAdmin } from "./deactivateAdmin";
 export { createEvent } from "./createEvent";
+export { closeEvent } from "./closeEvent";
 export { buyTicket } from "./buyTicket";
 export { checkIn } from "./checkIn";
 export { registerMerchant } from "./registerMerchant";
@@ -8,6 +10,9 @@ export { deactivateMerchant } from "./deactivateMerchant";
 export { payMerchant } from "./payMerchant";
 export { withdrawFunds } from "./withdrawFunds";
 export { transferTicket } from "./transferTicket";
+export { updateDynamicPrice } from "./updateDynamicPrice";
 export { initializeBadgeCollection } from "./initializeBadgeCollection";
 export { apiIssueAttendanceBadge } from "./issueAttendanceBadge";
+export { checkLoyaltyBenefits } from "./checkLoyaltyBenefits";
 export { refundTicket } from "./refundTicket";
+export { updateEvent } from "./updateEvent";

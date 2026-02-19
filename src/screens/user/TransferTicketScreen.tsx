@@ -8,11 +8,13 @@ import {
   Alert,
   TouchableOpacity,
   ActivityIndicator,
+  Share,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useTickets } from "../../hooks/useTickets";
+import { useWallet } from "../../hooks/useWallet";
 import { apiTransferTicket } from "../../services/api/eventApi";
 import { formatSOL, shortenAddress } from "../../utils/formatters";
 import { colors } from "../../theme/colors";
@@ -30,6 +32,7 @@ export function TransferTicketScreen() {
   const router = useRouter();
   const { ticketKey } = useLocalSearchParams<{ ticketKey: string }>();
   const { tickets } = useTickets();
+  const { publicKey } = useWallet();
 
   const [recipientAddress, setRecipientAddress] = useState("");
   const [transferring, setTransferring] = useState(false);
@@ -78,10 +81,26 @@ export function TransferTicketScreen() {
                 ticketMint: ticket.mint,
                 recipient: recipientAddress,
               });
+
+              const deepLink = `passpay://accept-transfer?ticketMint=${ticket.mint}&eventKey=${ticket.eventKey}&from=${publicKey}`;
+
               Alert.alert(
                 "Transfer Successful",
                 `Your ticket has been transferred to ${shortenAddress(recipientAddress, 6)}.`,
-                [{ text: "OK", onPress: () => router.back() }]
+                [
+                  {
+                    text: "Share Link",
+                    onPress: async () => {
+                      try {
+                        await Share.share({
+                          message: `I've sent you a ticket for ${ticket.eventName || "an event"} on PassPay! Open this link to view it:\n\n${deepLink}`,
+                        });
+                      } catch {}
+                      router.back();
+                    },
+                  },
+                  { text: "Done", onPress: () => router.back() },
+                ]
               );
             } catch (error: any) {
               Alert.alert(

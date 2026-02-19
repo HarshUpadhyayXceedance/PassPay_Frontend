@@ -91,15 +91,12 @@ export function TicketQRScreen() {
     );
   }
 
-  // Create QR payload
+  // Create QR payload (matches TicketQRPayload interface)
   const qrPayload = JSON.stringify({
     type: "ticket",
-    ticketKey: ticket.publicKey,
-    mintAddress: ticket.mint,
+    mint: ticket.mint,
     owner: ticket.owner,
-    eventKey: ticket.eventKey,
-    seatNumber: ticket.seatNumber,
-    timestamp: Date.now(),
+    event: ticket.eventKey,
   });
 
   return (

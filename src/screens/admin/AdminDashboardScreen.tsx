@@ -5,7 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { AppCard } from "../../components/ui/AppCard";
@@ -71,12 +70,7 @@ export function AdminDashboardScreen() {
 
       <AppButton
         title="Create New Event"
-        onPress={() =>
-          Alert.alert(
-            "Coming Soon",
-            "Event creation screen will be implemented in the next phase"
-          )
-        }
+        onPress={() => router.push("/(admin)/create-event")}
         size="lg"
       />
     </ScrollView>

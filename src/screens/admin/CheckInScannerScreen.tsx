@@ -16,6 +16,7 @@ import { spacing } from "../../theme/spacing";
 import { useScanner } from "../../hooks/useScanner";
 import { apiCheckIn } from "../../services/api/eventApi";
 import { apiIssueAttendanceBadge } from "../../solana/actions";
+import { uploadMetadata } from "../../services/api/uploadApi";
 import { TicketQRPayload } from "../../utils/qrPayload";
 import { getAssociatedTokenAddress } from "../../solana/utils/tokenUtils";
 import { PublicKey } from "@solana/web3.js";
@@ -83,7 +84,16 @@ export function CheckInScannerScreen() {
 
     setIssuingBadge(true);
     try {
-      const metadataUri = `https://arweave.net/badge-${Date.now()}`;
+      const metadataUri = await uploadMetadata({
+        name: "PassPay Attendance Badge",
+        symbol: "BADGE",
+        description: "Attendance badge for event check-in via PassPay",
+        image: "",
+        attributes: [
+          { trait_type: "Type", value: "Attendance Badge" },
+          { trait_type: "Event", value: eventKey as string },
+        ],
+      });
       const result = await apiIssueAttendanceBadge({
         eventPda: eventKey as string,
         attendee: ticket.owner,

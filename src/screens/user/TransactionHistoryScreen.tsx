@@ -11,37 +11,136 @@ import {
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
+import { PublicKey } from "@solana/web3.js";
 import * as Haptics from "expo-haptics";
 import { useTickets } from "../../hooks/useTickets";
 import { useWallet } from "../../hooks/useWallet";
+import { useMerchants } from "../../hooks/useMerchants";
 import { TicketDisplay } from "../../types/ticket";
-import { formatSOL, formatDate, shortenAddress } from "../../utils/formatters";
-import { getTokenUrl } from "../../solana/utils/explorer";
+import { formatSOL, formatDate, shortenAddress, lamportsToSOL } from "../../utils/formatters";
+import { getTokenUrl, getTxUrl } from "../../solana/utils/explorer";
+import { getConnection } from "../../solana/config/connection";
+import { PROGRAM_ID } from "../../solana/config/constants";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
 
-type FilterTab = "all" | "purchases" | "checked-in";
+type FilterTab = "all" | "purchases" | "checked-in" | "payments";
 
 interface TransactionItem {
   id: string;
-  type: "purchase" | "check-in";
+  type: "purchase" | "check-in" | "payment";
   eventName: string;
   eventVenue: string;
   date: Date;
   seatNumber: number;
   mint: string;
+  // payment-specific
+  amount?: number;
+  merchantName?: string;
+  signature?: string;
 }
 
 export function TransactionHistoryScreen() {
   const router = useRouter();
   const { tickets, fetchMyTickets, isLoading } = useTickets();
-  const { balance } = useWallet();
+  const { balance, publicKey } = useWallet();
+  const { merchants } = useMerchants();
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+  const [payments, setPayments] = useState<TransactionItem[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
 
   useEffect(() => {
     fetchMyTickets();
+    if (publicKey) fetchPaymentHistory();
   }, []);
+
+  const fetchPaymentHistory = useCallback(async () => {
+    if (!publicKey) return;
+    setLoadingPayments(true);
+    try {
+      const connection = getConnection();
+      const walletPubkey = new PublicKey(publicKey);
+
+      // Fetch recent signatures for the user's wallet
+      const sigs = await connection.getSignaturesForAddress(walletPubkey, {
+        limit: 50,
+      });
+
+      // Batch fetch parsed transactions (3 at a time to avoid 429)
+      const paymentItems: TransactionItem[] = [];
+      const chunks: typeof sigs[] = [];
+      for (let i = 0; i < sigs.length; i += 3) {
+        chunks.push(sigs.slice(i, i + 3));
+      }
+
+      for (const chunk of chunks) {
+        const txs = await connection.getParsedTransactions(
+          chunk.map((s) => s.signature),
+          { maxSupportedTransactionVersion: 0 }
+        );
+
+        for (let j = 0; j < txs.length; j++) {
+          const tx = txs[j];
+          if (!tx || tx.meta?.err) continue;
+
+          // Check if this transaction interacts with our program
+          const programInvoked = tx.transaction.message.accountKeys.some(
+            (key) => key.pubkey.equals(PROGRAM_ID)
+          );
+          if (!programInvoked) continue;
+
+          // Check if user's balance decreased (they paid something)
+          const walletIndex = tx.transaction.message.accountKeys.findIndex(
+            (key) => key.pubkey.equals(walletPubkey)
+          );
+          if (walletIndex === -1) continue;
+
+          const preBal = tx.meta?.preBalances[walletIndex] ?? 0;
+          const postBal = tx.meta?.postBalances[walletIndex] ?? 0;
+          const diff = preBal - postBal;
+
+          // Filter: only SOL outflows > 0.001 SOL (skip tiny fees / ticket buys handled separately)
+          // Merchant payments are typically > rent-exempt min but less than ticket purchases
+          if (diff <= 1_000_000) continue;
+
+          // Check if any merchant PDA received funds
+          const merchantMatch = merchants.find((m) =>
+            tx.transaction.message.accountKeys.some(
+              (key) => key.pubkey.toBase58() === m.authority
+            )
+          );
+
+          // If no merchant matched, skip (could be a ticket purchase)
+          if (!merchantMatch) continue;
+
+          paymentItems.push({
+            id: `payment-${chunk[j].signature}`,
+            type: "payment",
+            eventName: "",
+            eventVenue: "",
+            date: new Date((chunk[j].blockTime ?? 0) * 1000),
+            seatNumber: 0,
+            mint: "",
+            amount: diff,
+            merchantName: merchantMatch.name,
+            signature: chunk[j].signature,
+          });
+        }
+
+        // Rate limit between chunks
+        if (chunks.indexOf(chunk) < chunks.length - 1) {
+          await new Promise((r) => setTimeout(r, 300));
+        }
+      }
+
+      setPayments(paymentItems);
+    } catch (error) {
+      console.error("Failed to fetch payment history:", error);
+    } finally {
+      setLoadingPayments(false);
+    }
+  }, [publicKey, merchants]);
 
   const transactions: TransactionItem[] = useMemo(() => {
     const items: TransactionItem[] = [];
@@ -72,10 +171,13 @@ export function TransactionHistoryScreen() {
       }
     });
 
+    // Add merchant payments
+    items.push(...payments);
+
     // Sort by date, newest first
     items.sort((a, b) => b.date.getTime() - a.date.getTime());
     return items;
-  }, [tickets]);
+  }, [tickets, payments]);
 
   const filtered = useMemo(() => {
     switch (activeFilter) {
@@ -83,6 +185,8 @@ export function TransactionHistoryScreen() {
         return transactions.filter((t) => t.type === "purchase");
       case "checked-in":
         return transactions.filter((t) => t.type === "check-in");
+      case "payments":
+        return transactions.filter((t) => t.type === "payment");
       default:
         return transactions;
     }
@@ -92,29 +196,54 @@ export function TransactionHistoryScreen() {
     totalTickets: tickets.length,
     checkedIn: tickets.filter((t) => t.isCheckedIn).length,
     upcoming: tickets.filter((t) => !t.isCheckedIn && t.eventDate > new Date()).length,
-  }), [tickets]);
+    paymentsCount: payments.length,
+  }), [tickets, payments]);
 
-  const openExplorer = useCallback((mint: string) => {
+  const openExplorer = useCallback((item: TransactionItem) => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Linking.openURL(getTokenUrl(mint));
+    if (item.signature) {
+      Linking.openURL(getTxUrl(item.signature));
+    } else if (item.mint) {
+      Linking.openURL(getTokenUrl(item.mint));
+    }
   }, []);
+
+  const onRefresh = useCallback(async () => {
+    await Promise.all([fetchMyTickets(), fetchPaymentHistory()]);
+  }, [fetchMyTickets, fetchPaymentHistory]);
 
   const FILTERS: { key: FilterTab; label: string }[] = [
     { key: "all", label: "All" },
-    { key: "purchases", label: "Purchases" },
-    { key: "checked-in", label: "Checked In" },
+    { key: "purchases", label: "Tickets" },
+    { key: "payments", label: "Payments" },
+    { key: "checked-in", label: "Check-ins" },
   ];
 
   const renderTransaction = ({ item }: { item: TransactionItem }) => {
+    const isPayment = item.type === "payment";
     const isPurchase = item.type === "purchase";
-    const iconName = isPurchase ? "ticket" : "checkmark-circle";
-    const iconColor = isPurchase ? colors.primary : colors.success;
+    const iconName = isPayment
+      ? "storefront"
+      : isPurchase
+        ? "ticket"
+        : "checkmark-circle";
+    const iconColor = isPayment
+      ? colors.secondary
+      : isPurchase
+        ? colors.primary
+        : colors.success;
 
     return (
       <TouchableOpacity
         style={styles.txRow}
         activeOpacity={0.7}
-        onPress={() => openExplorer(item.mint)}
+        onPress={() => openExplorer(item)}
+        accessibilityRole="button"
+        accessibilityLabel={
+          isPayment
+            ? `Payment to ${item.merchantName}, ${lamportsToSOL(item.amount ?? 0).toFixed(4)} SOL`
+            : `${item.type === "purchase" ? "Ticket purchase" : "Check-in"} for ${item.eventName}`
+        }
       >
         <View style={[styles.txIcon, { backgroundColor: iconColor + "18" }]}>
           <Ionicons name={iconName} size={22} color={iconColor} />
@@ -122,12 +251,16 @@ export function TransactionHistoryScreen() {
 
         <View style={styles.txInfo}>
           <Text style={styles.txTitle} numberOfLines={1}>
-            {isPurchase ? "Ticket Purchase" : "Event Check-in"}
+            {isPayment
+              ? "Merchant Payment"
+              : isPurchase
+                ? "Ticket Purchase"
+                : "Event Check-in"}
           </Text>
           <Text style={styles.txEvent} numberOfLines={1}>
-            {item.eventName}
+            {isPayment ? item.merchantName : item.eventName}
           </Text>
-          {item.eventVenue ? (
+          {!isPayment && item.eventVenue ? (
             <Text style={styles.txVenue} numberOfLines={1}>
               {item.eventVenue}
             </Text>
@@ -135,9 +268,17 @@ export function TransactionHistoryScreen() {
         </View>
 
         <View style={styles.txRight}>
-          <Text style={styles.txSeat}>Seat #{item.seatNumber}</Text>
+          {isPayment ? (
+            <Text style={styles.txAmount}>
+              -{lamportsToSOL(item.amount ?? 0).toFixed(4)} SOL
+            </Text>
+          ) : (
+            <Text style={styles.txSeat}>Seat #{item.seatNumber}</Text>
+          )}
           <Text style={styles.txDate}>{formatDate(item.date)}</Text>
-          <Text style={styles.txMint}>{shortenAddress(item.mint, 4)}</Text>
+          {!isPayment && item.mint ? (
+            <Text style={styles.txMint}>{shortenAddress(item.mint, 4)}</Text>
+          ) : null}
         </View>
       </TouchableOpacity>
     );
@@ -156,7 +297,7 @@ export function TransactionHistoryScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statItem}>
             <Text style={styles.statValue}>{stats.totalTickets}</Text>
-            <Text style={styles.statLabel}>Total</Text>
+            <Text style={styles.statLabel}>Tickets</Text>
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
@@ -165,8 +306,8 @@ export function TransactionHistoryScreen() {
           </View>
           <View style={styles.statDivider} />
           <View style={styles.statItem}>
-            <Text style={styles.statValue}>{stats.upcoming}</Text>
-            <Text style={styles.statLabel}>Upcoming</Text>
+            <Text style={styles.statValue}>{stats.paymentsCount}</Text>
+            <Text style={styles.statLabel}>Payments</Text>
           </View>
         </View>
       </LinearGradient>
@@ -184,6 +325,9 @@ export function TransactionHistoryScreen() {
                 setActiveFilter(f.key);
               }}
               activeOpacity={0.7}
+              accessibilityRole="tab"
+              accessibilityState={{ selected: isActive }}
+              accessibilityLabel={`Filter by ${f.label}`}
             >
               <Text
                 style={[styles.filterLabel, isActive && styles.filterLabelActive]}
@@ -207,6 +351,8 @@ export function TransactionHistoryScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.back();
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Ionicons name="arrow-back" size={20} color={colors.text} />
         </TouchableOpacity>
@@ -229,14 +375,16 @@ export function TransactionHistoryScreen() {
                 ? "No ticket purchases yet. Browse events to get started."
                 : activeFilter === "checked-in"
                   ? "No check-ins yet. Show your QR code at event entry."
-                  : "Your transaction history will appear here once you buy tickets."}
+                  : activeFilter === "payments"
+                    ? "No merchant payments yet. Pay at event vendors with your wallet."
+                    : "Your transaction history will appear here."}
             </Text>
           </View>
         }
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
-            onRefresh={fetchMyTickets}
+            refreshing={isLoading || loadingPayments}
+            onRefresh={onRefresh}
             tintColor={colors.primary}
           />
         }
@@ -401,6 +549,12 @@ const styles = StyleSheet.create({
     fontSize: 13,
     fontFamily: fonts.heading,
     color: colors.primary,
+    marginBottom: 2,
+  },
+  txAmount: {
+    fontSize: 13,
+    fontFamily: fonts.heading,
+    color: colors.secondary,
     marginBottom: 2,
   },
   txDate: {

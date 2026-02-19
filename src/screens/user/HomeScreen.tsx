@@ -227,6 +227,8 @@ export function HomeScreen() {
           router.push({ pathname: "/(user)/event-details", params: { eventKey: item.publicKey } });
         }}
         style={styles.featuredCardWrapper}
+        accessibilityRole="button"
+        accessibilityLabel={`${item.name}, ${formatShortDate(item.eventDate)}, ${formatSOL(item.currentTicketPrice || item.ticketPrice)} SOL`}
       >
         <View style={styles.featuredCard}>
           {item.imageUrl ? (
@@ -298,6 +300,8 @@ export function HomeScreen() {
           router.push({ pathname: "/(user)/event-details", params: { eventKey: event.publicKey } });
         }}
         style={styles.upcomingCard}
+        accessibilityRole="button"
+        accessibilityLabel={`${event.name} at ${event.venue}, ${formatShortDate(event.eventDate)}`}
       >
         {/* Thumbnail */}
         {event.imageUrl ? (
@@ -356,6 +360,9 @@ export function HomeScreen() {
             }}
             activeOpacity={0.7}
             disabled={event.isSoldOut}
+            accessibilityRole="button"
+            accessibilityLabel={event.isSoldOut ? "Sold out" : `Buy ticket for ${event.name}`}
+            accessibilityState={{ disabled: event.isSoldOut }}
           >
             <Text
               style={[
@@ -416,6 +423,8 @@ export function HomeScreen() {
             value={searchQuery}
             onChangeText={setSearchQuery}
             selectionColor="#00CEC9"
+            accessibilityLabel="Search events"
+            accessibilityHint="Type to filter events by name or venue"
           />
           {searchQuery.length > 0 && (
             <TouchableOpacity
@@ -516,6 +525,9 @@ export function HomeScreen() {
                     setActiveCategory(cat);
                   }}
                   activeOpacity={0.7}
+                  accessibilityRole="tab"
+                  accessibilityState={{ selected: isActive }}
+                  accessibilityLabel={`Filter by ${cat}`}
                 >
                   <Text
                     style={[styles.chipText, isActive && styles.chipTextActive]}
@@ -538,6 +550,9 @@ export function HomeScreen() {
               else setSortBy("date");
             }}
             activeOpacity={0.7}
+            accessibilityRole="button"
+            accessibilityLabel={`Sort by ${sortBy === "date" ? "date" : sortBy === "price" ? "price" : "popularity"}`}
+            accessibilityHint="Tap to change sort order"
           >
             <Text style={styles.sortIcon}>⬍</Text>
             <Text style={styles.sortText}>

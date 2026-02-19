@@ -136,7 +136,7 @@ export function SuperAdminDashboardScreen() {
         <StatCard
           label="Wallet Balance"
           value={`${balance.toFixed(1)} SOL`}
-          change="+12% this week"
+          change="available"
           gradient={["rgba(0,255,163,0.15)", "rgba(0,255,163,0.03)"]}
           iconColor={colors.primary}
         />

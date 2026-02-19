@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo } from "react";
+import React, { useState, useCallback, useMemo, useEffect } from "react";
 import {
   View,
   Text,
@@ -7,61 +7,43 @@ import {
   TouchableOpacity,
   RefreshControl,
   Alert,
+  Linking,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
+import { PublicKey, ParsedTransactionWithMeta } from "@solana/web3.js";
+import * as Haptics from "expo-haptics";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { EmptyState } from "../../components/ui/EmptyState";
-import { formatSOL, shortenAddress } from "../../utils/formatters";
+import { formatSOL, shortenAddress, lamportsToSOL } from "../../utils/formatters";
+import { getConnection } from "../../solana/config/connection";
+import { getTxUrl } from "../../solana/utils/explorer";
+import { useWallet } from "../../hooks/useWallet";
+import { useMerchants } from "../../hooks/useMerchants";
 
 // ---------------------------------------------------------------------------
 // Types
 // ---------------------------------------------------------------------------
 
-type TransactionStatus = "completed" | "pending" | "failed";
 type FilterTab = "all" | "today" | "week";
 
-interface Transaction {
-  id: string;
-  type: "payment";
+interface MerchantTransaction {
+  signature: string;
   customerAddress: string;
   amount: number; // SOL
-  eventName: string;
+  merchantName: string;
   timestamp: Date;
-  status: TransactionStatus;
+  status: "confirmed" | "failed";
 }
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const STATUS_COLOR: Record<TransactionStatus, string> = {
-  completed: colors.success,
-  pending: colors.warning,
-  failed: colors.error,
-};
-
-const STATUS_LABEL: Record<TransactionStatus, string> = {
-  completed: "Completed",
-  pending: "Pending",
-  failed: "Failed",
-};
-
-function hoursAgo(h: number): Date {
-  const d = new Date();
-  d.setHours(d.getHours() - h);
-  return d;
-}
-
-function daysAgo(days: number): Date {
-  const d = new Date();
-  d.setDate(d.getDate() - days);
-  return d;
-}
 
 function timeAgo(date: Date): string {
   const now = Date.now();
@@ -90,75 +72,64 @@ function isWithinLastWeek(date: Date): boolean {
   return date >= oneWeekAgo;
 }
 
-// ---------------------------------------------------------------------------
-// Mock data
-// ---------------------------------------------------------------------------
+/** Delay helper for rate-limiting RPC calls */
+function delay(ms: number): Promise<void> {
+  return new Promise((r) => setTimeout(r, ms));
+}
 
-const MOCK_TRANSACTIONS: Transaction[] = [
-  {
-    id: "tx_001",
-    type: "payment",
-    customerAddress: "7xKXtg2CW87d97TXJSDpbD5jBkheTqA83TZRuJosgAsU",
-    amount: 0.15,
-    eventName: "Solana Hacker House NYC",
-    timestamp: hoursAgo(1),
-    status: "completed",
-  },
-  {
-    id: "tx_002",
-    type: "payment",
-    customerAddress: "9WzDXwBbmkg8ZTbNMqUxvQRAyrZzDsGYdLVL9zYtAWWM",
-    amount: 0.5,
-    eventName: "Solana Hacker House NYC",
-    timestamp: hoursAgo(3),
-    status: "completed",
-  },
-  {
-    id: "tx_003",
-    type: "payment",
-    customerAddress: "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
-    amount: 0.08,
-    eventName: "ETH Denver After-Party",
-    timestamp: hoursAgo(5),
-    status: "pending",
-  },
-  {
-    id: "tx_004",
-    type: "payment",
-    customerAddress: "HN7cABqLq46Es1jh92dQQisAq662SmxELLLsHHe4YWrH",
-    amount: 1.2,
-    eventName: "Solana Hacker House NYC",
-    timestamp: hoursAgo(18),
-    status: "completed",
-  },
-  {
-    id: "tx_005",
-    type: "payment",
-    customerAddress: "3Kgx3sWRmPQYgMAxqA6NrPjbcCAr1VRcrMKqz8LRcFAP",
-    amount: 0.05,
-    eventName: "Breakpoint 2025 Merch Booth",
-    timestamp: daysAgo(2),
-    status: "failed",
-  },
-  {
-    id: "tx_006",
-    type: "payment",
-    customerAddress: "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
-    amount: 2.0,
-    eventName: "Breakpoint 2025 Merch Booth",
-    timestamp: daysAgo(3),
-    status: "completed",
-  },
-  {
-    id: "tx_007",
-    type: "payment",
-    customerAddress: "BPFLoaderUpgradeab1e11111111111111111111111",
-    amount: 0.35,
-    eventName: "Solana Hacker House NYC",
-    timestamp: daysAgo(5),
-    status: "completed",
-  },
-];
+/**
+ * Parse a confirmed transaction to extract pay_merchant details.
+ * Returns null if the transaction isn't a pay_merchant call or can't be parsed.
+ */
+function parseMerchantPayment(
+  tx: ParsedTransactionWithMeta,
+  signature: string,
+  merchantWallet: string,
+  merchantName: string
+): MerchantTransaction | null {
+  if (!tx || !tx.meta) return null;
+  if (tx.meta.err) {
+    // Failed transaction — still show it
+    const ts = tx.blockTime ? new Date(tx.blockTime * 1000) : new Date();
+    return {
+      signature,
+      customerAddress: tx.transaction.message.accountKeys[0]?.pubkey?.toBase58() ?? "Unknown",
+      amount: 0,
+      merchantName,
+      timestamp: ts,
+      status: "failed",
+    };
+  }
+
+  // Determine the merchant wallet index in the account keys
+  const accountKeys = tx.transaction.message.accountKeys;
+  const merchantIdx = accountKeys.findIndex(
+    (k) => k.pubkey.toBase58() === merchantWallet
+  );
+
+  if (merchantIdx < 0) return null;
+
+  // Calculate amount from balance change on the merchant wallet
+  const preBalance = tx.meta.preBalances[merchantIdx] ?? 0;
+  const postBalance = tx.meta.postBalances[merchantIdx] ?? 0;
+  const balanceChange = postBalance - preBalance;
+
+  // Only show inbound payments (positive balance change)
+  if (balanceChange <= 0) return null;
+
+  // The payer is always the first account (fee payer / signer)
+  const customer = accountKeys[0]?.pubkey?.toBase58() ?? "Unknown";
+  const ts = tx.blockTime ? new Date(tx.blockTime * 1000) : new Date();
+
+  return {
+    signature,
+    customerAddress: customer,
+    amount: lamportsToSOL(balanceChange),
+    merchantName,
+    timestamp: ts,
+    status: "confirmed",
+  };
+}
 
 // ---------------------------------------------------------------------------
 // Component
@@ -166,9 +137,110 @@ const MOCK_TRANSACTIONS: Transaction[] = [
 
 export function TransactionHistoryScreen() {
   const router = useRouter();
-  const [transactions] = useState<Transaction[]>(MOCK_TRANSACTIONS);
+  const { publicKey } = useWallet();
+  const { merchants, fetchMerchants } = useMerchants();
+  const [transactions, setTransactions] = useState<MerchantTransaction[]>([]);
   const [activeFilter, setActiveFilter] = useState<FilterTab>("all");
+  const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
+
+  const myMerchants = useMemo(
+    () => merchants.filter((m) => m.authority === publicKey),
+    [merchants, publicKey]
+  );
+
+  // ----- Fetch on-chain transactions for all merchant PDAs -----
+
+  const fetchTransactions = useCallback(async () => {
+    if (!publicKey || myMerchants.length === 0) {
+      setTransactions([]);
+      return;
+    }
+
+    const connection = getConnection();
+    const allTxns: MerchantTransaction[] = [];
+
+    for (const merchant of myMerchants) {
+      try {
+        const merchantPda = new PublicKey(merchant.publicKey);
+
+        // Get recent transaction signatures for this merchant PDA
+        const signatures = await connection.getSignaturesForAddress(
+          merchantPda,
+          { limit: 50 }
+        );
+
+        if (signatures.length === 0) continue;
+
+        // Batch fetch parsed transactions (3 at a time to avoid 429)
+        const BATCH_SIZE = 3;
+        for (let i = 0; i < signatures.length; i += BATCH_SIZE) {
+          const batch = signatures.slice(i, i + BATCH_SIZE);
+          const sigs = batch.map((s) => s.signature);
+
+          try {
+            const parsedTxns = await connection.getParsedTransactions(sigs, {
+              maxSupportedTransactionVersion: 0,
+            });
+
+            for (let j = 0; j < parsedTxns.length; j++) {
+              const parsed = parsedTxns[j];
+              if (!parsed) continue;
+
+              const result = parseMerchantPayment(
+                parsed,
+                sigs[j],
+                merchant.authority,
+                merchant.name
+              );
+              if (result) {
+                allTxns.push(result);
+              }
+            }
+          } catch (e: any) {
+            console.warn("Failed to parse transaction batch:", e.message);
+          }
+
+          // Delay between batches to avoid rate limiting
+          if (i + BATCH_SIZE < signatures.length) {
+            await delay(300);
+          }
+        }
+      } catch (e: any) {
+        console.warn(
+          `Failed to fetch signatures for merchant ${merchant.name}:`,
+          e.message
+        );
+      }
+    }
+
+    // Sort by timestamp, newest first
+    allTxns.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+    // Deduplicate by signature (in case multiple merchant PDAs overlap)
+    const seen = new Set<string>();
+    const unique = allTxns.filter((tx) => {
+      if (seen.has(tx.signature)) return false;
+      seen.add(tx.signature);
+      return true;
+    });
+
+    setTransactions(unique);
+  }, [publicKey, myMerchants]);
+
+  // Initial load
+  useEffect(() => {
+    if (merchants.length === 0) {
+      fetchMerchants();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (myMerchants.length > 0) {
+      setLoading(true);
+      fetchTransactions().finally(() => setLoading(false));
+    }
+  }, [myMerchants.length]);
 
   // ----- Filtering -----
 
@@ -188,7 +260,7 @@ export function TransactionHistoryScreen() {
   const todayEarnings = useMemo(
     () =>
       transactions
-        .filter((tx) => isToday(tx.timestamp) && tx.status === "completed")
+        .filter((tx) => isToday(tx.timestamp) && tx.status === "confirmed")
         .reduce((sum, tx) => sum + tx.amount, 0),
     [transactions]
   );
@@ -197,7 +269,7 @@ export function TransactionHistoryScreen() {
     () =>
       transactions
         .filter(
-          (tx) => isWithinLastWeek(tx.timestamp) && tx.status === "completed"
+          (tx) => isWithinLastWeek(tx.timestamp) && tx.status === "confirmed"
         )
         .reduce((sum, tx) => sum + tx.amount, 0),
     [transactions]
@@ -207,16 +279,26 @@ export function TransactionHistoryScreen() {
 
   // ----- Refresh -----
 
-  const onRefresh = useCallback(() => {
+  const onRefresh = useCallback(async () => {
     setRefreshing(true);
-    setTimeout(() => {
+    try {
+      await fetchMerchants();
+      await fetchTransactions();
+    } finally {
       setRefreshing(false);
-    }, 1000);
+    }
+  }, [fetchMerchants, fetchTransactions]);
+
+  // ----- Open in Explorer -----
+
+  const openExplorer = useCallback((signature: string) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+    Linking.openURL(getTxUrl(signature));
   }, []);
 
   // ----- Transaction detail alert -----
 
-  const showDetail = useCallback((tx: Transaction) => {
+  const showDetail = useCallback((tx: MerchantTransaction) => {
     const dateStr = tx.timestamp.toLocaleString("en-US", {
       month: "short",
       day: "numeric",
@@ -228,16 +310,19 @@ export function TransactionHistoryScreen() {
     Alert.alert(
       "Transaction Details",
       [
-        `ID: ${tx.id}`,
         `Customer: ${shortenAddress(tx.customerAddress, 6)}`,
         `Amount: ${formatSOL(tx.amount)} SOL`,
-        `Event: ${tx.eventName}`,
+        `Merchant: ${tx.merchantName}`,
         `Date: ${dateStr}`,
-        `Status: ${STATUS_LABEL[tx.status]}`,
+        `Status: ${tx.status === "confirmed" ? "Confirmed" : "Failed"}`,
+        `Signature: ${shortenAddress(tx.signature, 8)}`,
       ].join("\n"),
-      [{ text: "Close", style: "cancel" }]
+      [
+        { text: "View on Explorer", onPress: () => openExplorer(tx.signature) },
+        { text: "Close", style: "cancel" },
+      ]
     );
-  }, []);
+  }, [openExplorer]);
 
   // ----- Filter tabs -----
 
@@ -249,14 +334,9 @@ export function TransactionHistoryScreen() {
 
   // ----- Render helpers -----
 
-  const renderTransaction = ({ item }: { item: Transaction }) => {
-    const statusColor = STATUS_COLOR[item.status];
-    const amountColor =
-      item.status === "completed"
-        ? colors.success
-        : item.status === "pending"
-          ? colors.warning
-          : colors.error;
+  const renderTransaction = ({ item }: { item: MerchantTransaction }) => {
+    const isConfirmed = item.status === "confirmed";
+    const amountColor = isConfirmed ? colors.success : colors.error;
 
     return (
       <TouchableOpacity
@@ -267,25 +347,19 @@ export function TransactionHistoryScreen() {
         {/* Left icon */}
         <View style={[styles.txIcon, { backgroundColor: amountColor + "18" }]}>
           <Ionicons
-            name={
-              item.status === "completed"
-                ? "checkmark-circle"
-                : item.status === "pending"
-                  ? "time"
-                  : "close-circle"
-            }
+            name={isConfirmed ? "checkmark-circle" : "close-circle"}
             size={22}
             color={amountColor}
           />
         </View>
 
-        {/* Middle: customer + event */}
+        {/* Middle: customer + merchant */}
         <View style={styles.txInfo}>
           <Text style={styles.txCustomer} numberOfLines={1}>
             {shortenAddress(item.customerAddress)}
           </Text>
           <Text style={styles.txEvent} numberOfLines={1}>
-            {item.eventName}
+            {item.merchantName}
           </Text>
         </View>
 
@@ -295,7 +369,9 @@ export function TransactionHistoryScreen() {
             +{formatSOL(item.amount)} SOL
           </Text>
           <View style={styles.txMeta}>
-            <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+            <View
+              style={[styles.statusDot, { backgroundColor: amountColor }]}
+            />
             <Text style={styles.txTime}>{timeAgo(item.timestamp)}</Text>
           </View>
         </View>
@@ -343,7 +419,10 @@ export function TransactionHistoryScreen() {
             <TouchableOpacity
               key={f.key}
               style={[styles.filterTab, isActive && styles.filterTabActive]}
-              onPress={() => setActiveFilter(f.key)}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setActiveFilter(f.key);
+              }}
               activeOpacity={0.7}
             >
               <Text
@@ -363,6 +442,18 @@ export function TransactionHistoryScreen() {
 
   // ----- Main render -----
 
+  if (loading && transactions.length === 0) {
+    return (
+      <View style={styles.container}>
+        <AppHeader title="Transaction History" onBack={() => router.back()} />
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.primary} />
+          <Text style={styles.loadingText}>Loading transactions...</Text>
+        </View>
+      </View>
+    );
+  }
+
   return (
     <View style={styles.container}>
       <AppHeader
@@ -377,7 +468,7 @@ export function TransactionHistoryScreen() {
 
       <FlatList
         data={filtered}
-        keyExtractor={(item) => item.id}
+        keyExtractor={(item) => item.signature}
         renderItem={renderTransaction}
         ListHeaderComponent={ListHeader}
         contentContainerStyle={styles.listContent}
@@ -555,5 +646,18 @@ const styles = StyleSheet.create({
   // Separator
   separator: {
     height: spacing.sm,
+  },
+
+  // Loading state
+  loadingContainer: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.md,
+  },
+  loadingText: {
+    fontSize: 14,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
   },
 });

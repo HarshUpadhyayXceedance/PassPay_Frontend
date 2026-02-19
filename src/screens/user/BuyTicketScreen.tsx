@@ -15,6 +15,11 @@ import { useEvents } from "../../hooks/useEvents";
 import { useWallet } from "../../hooks/useWallet";
 import { useLoyalty } from "../../hooks/useLoyalty";
 import { apiBuyTicket } from "../../services/api/eventApi";
+import { uploadMetadata } from "../../services/api/uploadApi";
+import {
+  scheduleLocalNotification,
+  scheduleNotificationAt,
+} from "../../services/notifications/pushNotifications";
 import { formatSOL } from "../../utils/formatters";
 import { PriceBreakdown } from "../../components/event/PriceBreakdown";
 import { EarlyAccessBadge } from "../../components/event/EarlyAccessBadge";
@@ -98,9 +103,38 @@ export function BuyTicketScreen() {
     setBuying(true);
 
     try {
-      const metadataUri = `https://arweave.net/placeholder-${Date.now()}`;
+      const metadataUri = await uploadMetadata({
+        name: `${event.name} - Ticket`,
+        symbol: "PASS",
+        description: `Event ticket for ${event.name} at ${event.venue}`,
+        image: event.imageUrl || "",
+        attributes: [
+          { trait_type: "Event", value: event.name },
+          { trait_type: "Venue", value: event.venue },
+          { trait_type: "Price (SOL)", value: formatSOL(currentPrice) },
+        ],
+      });
       const result = await apiBuyTicket(event.publicKey, metadataUri);
       await refreshBalance();
+
+      // Send purchase confirmation notification
+      scheduleLocalNotification(
+        "Ticket Purchased!",
+        `You got a ticket for ${event.name}. See you there!`
+      );
+
+      // Schedule event reminder 1 hour before
+      if (event.eventDate) {
+        const reminderDate = new Date(event.eventDate);
+        reminderDate.setHours(reminderDate.getHours() - 1);
+        if (reminderDate > new Date()) {
+          scheduleNotificationAt(
+            "Event Starting Soon",
+            `${event.name} starts in 1 hour at ${event.venue}`,
+            reminderDate
+          );
+        }
+      }
 
       // Success - show modal with confetti
       setPurchasedMint(result.mint);
@@ -122,6 +156,8 @@ export function BuyTicketScreen() {
             Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
             router.back();
           }}
+          accessibilityRole="button"
+          accessibilityLabel="Go back"
         >
           <Text style={styles.backArrow}>{"\u2190"}</Text>
         </TouchableOpacity>
@@ -255,6 +291,9 @@ export function BuyTicketScreen() {
           onPress={handleBuy}
           disabled={buying || !canAfford}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={buying ? "Processing payment" : `Confirm payment of ${formatSOL(total)} SOL`}
+          accessibilityState={{ disabled: buying || !canAfford, busy: buying }}
         >
           {buying ? (
             <ActivityIndicator color="#FFFFFF" size="small" />

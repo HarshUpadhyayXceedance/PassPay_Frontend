@@ -21,6 +21,9 @@ import { spacing } from "../../theme/spacing";
 import { formatSOL, formatDate } from "../../utils/formatters";
 import { useWallet } from "../../hooks/useWallet";
 import { updateDynamicPrice } from "../../solana/actions/updateDynamicPrice";
+import { closeEvent } from "../../solana/actions/closeEvent";
+import { createProvider } from "../../solana/wallet/walletSession";
+import { phantomWalletAdapter } from "../../solana/wallet/phantomWalletAdapter";
 import { EventDisplay } from "../../types/event";
 
 interface EventDetailsAdminScreenProps {
@@ -35,6 +38,7 @@ export function EventDetailsAdminScreen({
   const { publicKey } = useWallet();
   const router = useRouter();
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
+  const [isClosingEvent, setIsClosingEvent] = useState(false);
 
   const revenue = event.ticketsSold * event.currentTicketPrice;
   const fillRate =
@@ -58,6 +62,35 @@ export function EventDetailsAdminScreen({
     } finally {
       setIsUpdatingPrice(false);
     }
+  };
+
+  const handleCloseEvent = () => {
+    Alert.alert(
+      "Close Event",
+      `Are you sure you want to close "${event.name}"?\n\nThis will deactivate the event and prevent further ticket sales.`,
+      [
+        { text: "Cancel", style: "cancel" },
+        {
+          text: "Close Event",
+          style: "destructive",
+          onPress: async () => {
+            if (!publicKey) return;
+            setIsClosingEvent(true);
+            try {
+              const provider = createProvider(phantomWalletAdapter);
+              const eventPubkey = new PublicKey(event.publicKey);
+              const sig = await closeEvent(provider, eventPubkey);
+              Alert.alert("Event Closed", `"${event.name}" has been closed.\n\nSig: ${sig.slice(0, 8)}...`);
+              onRefresh?.();
+            } catch (error: any) {
+              Alert.alert("Error", error.message || "Failed to close event");
+            } finally {
+              setIsClosingEvent(false);
+            }
+          },
+        },
+      ]
+    );
   };
 
   return (
@@ -223,6 +256,15 @@ export function EventDetailsAdminScreen({
             router.push({ pathname: "/(admin)/withdraw-funds", params: { eventKey: event.publicKey } })
           }
         />
+        {event.isActive && (
+          <AppButton
+            title={isClosingEvent ? "Closing..." : "Close Event"}
+            variant="outline"
+            onPress={handleCloseEvent}
+            loading={isClosingEvent}
+            style={styles.closeEventButton}
+          />
+        )}
       </View>
     </ScrollView>
   );
@@ -420,5 +462,8 @@ const styles = StyleSheet.create({
   actions: {
     gap: spacing.sm,
     marginTop: spacing.md,
+  },
+  closeEventButton: {
+    borderColor: colors.error,
   },
 });

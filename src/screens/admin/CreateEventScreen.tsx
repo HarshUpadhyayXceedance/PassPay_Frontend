@@ -18,6 +18,7 @@ import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
 import { fonts } from "../../theme/fonts";
 import { apiCreateEvent } from "../../services/api/eventApi";
+import { uploadMetadata } from "../../services/api/uploadApi";
 import { uploadImageToCloudinary } from "../../services/cloudinary/uploadImage";
 import {
   validateEventName,
@@ -145,7 +146,17 @@ export function CreateEventScreen() {
         eventDate,
         ticketPrice: parseFloat(ticketPrice),
         totalSeats: parseInt(totalSeats, 10),
-        metadataUri: `https://arweave.net/placeholder-${Date.now()}`,
+        metadataUri: await uploadMetadata({
+          name: `${name} - Event Collection`,
+          symbol: "PASS",
+          description: description || `Event: ${name} at ${venue}`,
+          image: imageUrl,
+          attributes: [
+            { trait_type: "Event", value: name },
+            { trait_type: "Venue", value: venue },
+            { trait_type: "Total Seats", value: parseInt(totalSeats, 10) },
+          ],
+        }),
       });
 
       Alert.alert("Success", "Event created successfully!", [

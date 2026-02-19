@@ -156,6 +156,8 @@ export function EventDetailsScreen() {
               style={styles.iconCircle}
               onPress={() => router.back()}
               activeOpacity={0.7}
+              accessibilityRole="button"
+              accessibilityLabel="Go back"
             >
               <Text style={styles.iconText}>{"<"}</Text>
             </TouchableOpacity>
@@ -290,6 +292,9 @@ export function EventDetailsScreen() {
           activeOpacity={0.8}
           disabled={!event.isActive || event.isSoldOut}
           onPress={handleBuyTicket}
+          accessibilityRole="button"
+          accessibilityLabel={event.isSoldOut ? "Sold out" : `Buy ticket for ${formatSOL(finalPrice)} SOL`}
+          accessibilityState={{ disabled: !event.isActive || event.isSoldOut }}
         >
           <Text style={styles.buyButtonText}>Buy Ticket</Text>
         </TouchableOpacity>

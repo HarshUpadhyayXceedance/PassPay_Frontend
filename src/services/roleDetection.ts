@@ -77,7 +77,7 @@ export async function detectUserRole(
       const merchantAccounts = await (program.account as any).merchant.all([
         {
           memcmp: {
-            offset: 8 + 32, // Skip discriminator (8) + event pubkey (32) to get to authority field
+            offset: 8, // Skip discriminator (8) to get to authority field (first field in Merchant struct)
             bytes: walletPublicKey.toBase58(),
           },
         },

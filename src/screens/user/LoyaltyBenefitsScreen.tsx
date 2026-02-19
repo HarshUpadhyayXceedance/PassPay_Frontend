@@ -1,9 +1,14 @@
-import React from "react";
+import React, { useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { TierBadge } from "../../components/loyalty/TierBadge";
 import { TierProgressBar } from "../../components/loyalty/TierProgressBar";
 import { StreakDisplay } from "../../components/loyalty/StreakDisplay";
+import { StreakCalendar } from "../../components/loyalty/StreakCalendar";
+import {
+  AchievementCard,
+  getAchievements,
+} from "../../components/loyalty/AchievementCard";
 import { AppCard } from "../../components/ui/AppCard";
 import { useLoyalty } from "../../hooks/useLoyalty";
 import { AppLoader } from "../../components/ui/AppLoader";
@@ -26,6 +31,12 @@ export function LoyaltyBenefitsScreen() {
   const currentStreak = loyaltyBenefits?.currentStreak ?? 0;
   const longestStreak = userAttendance?.longestStreak ?? 0;
   const multiplier = loyaltyBenefits?.streakBonusMultiplier ?? 100;
+
+  const achievements = useMemo(
+    () => getAchievements(totalEvents, currentStreak, longestStreak, lifetimeSpend),
+    [totalEvents, currentStreak, longestStreak, lifetimeSpend]
+  );
+  const unlockedCount = achievements.filter((a) => a.unlocked).length;
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -52,6 +63,14 @@ export function LoyaltyBenefitsScreen() {
           currentStreak={currentStreak}
           longestStreak={longestStreak}
           multiplier={multiplier}
+        />
+      </AppCard>
+
+      {/* Attendance Calendar */}
+      <AppCard style={styles.section}>
+        <StreakCalendar
+          currentStreak={currentStreak}
+          lastAttendanceDate={userAttendance?.lastAttendanceDate ?? 0}
         />
       </AppCard>
 
@@ -113,6 +132,16 @@ export function LoyaltyBenefitsScreen() {
           last
         />
       </AppCard>
+
+      {/* Achievements */}
+      <View style={styles.achievementsSection}>
+        <Text style={styles.sectionTitlePadded}>
+          Achievements ({unlockedCount}/{achievements.length})
+        </Text>
+        {achievements.map((a) => (
+          <AchievementCard key={a.id} achievement={a} />
+        ))}
+      </View>
     </ScrollView>
   );
 }
@@ -248,5 +277,15 @@ const styles = StyleSheet.create({
   },
   lockIcon: {
     fontSize: 14,
+  },
+  achievementsSection: {
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+  },
+  sectionTitlePadded: {
+    fontSize: 18,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
+    marginBottom: spacing.md,
   },
 });

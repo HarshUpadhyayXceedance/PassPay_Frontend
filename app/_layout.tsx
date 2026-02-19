@@ -1,14 +1,18 @@
-import { Redirect, Slot, SplashScreen, useSegments } from "expo-router";
+import { Redirect, Slot, SplashScreen, useSegments, useRouter } from "expo-router";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useFonts } from "expo-font";
+import * as Linking from "expo-linking";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useAuthStore } from "../src/store/authStore";
 import { useWalletStore } from "../src/store/walletStore";
 import { SplashScreenView } from "../src/components/ui/SplashScreenView";
 import { OnboardingCarousel } from "../src/components/ui/OnboardingCarousel";
 import { fontAssets } from "../src/theme/fonts";
+import { ErrorBoundary } from "../src/components/ui/ErrorBoundary";
+import { OfflineBanner } from "../src/components/ui/OfflineBanner";
+import { registerForPushNotifications } from "../src/services/notifications/pushNotifications";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -21,8 +25,58 @@ export default function RootLayout() {
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [onboardingChecked, setOnboardingChecked] = useState(false);
   const segments = useSegments();
+  const router = useRouter();
+  const pendingDeepLink = useRef<string | null>(null);
 
   const [fontsLoaded] = useFonts(fontAssets);
+
+  // Handle deep links: store pending URL if not authenticated
+  useEffect(() => {
+    const handleUrl = (event: { url: string }) => {
+      const parsed = Linking.parse(event.url);
+      if (parsed.path === "accept-transfer" && parsed.queryParams) {
+        const { ticketMint, eventKey, from } = parsed.queryParams;
+        if (ticketMint && eventKey && from) {
+          if (isAuthenticated && isConnected && role) {
+            router.push({
+              pathname: "/(user)/accept-transfer",
+              params: { ticketMint: String(ticketMint), eventKey: String(eventKey), from: String(from) },
+            });
+          } else {
+            pendingDeepLink.current = event.url;
+          }
+        }
+      }
+    };
+
+    // Check initial URL (cold start)
+    Linking.getInitialURL().then((url) => {
+      if (url) handleUrl({ url });
+    });
+
+    // Listen for URLs while app is open
+    const sub = Linking.addEventListener("url", handleUrl);
+    return () => sub.remove();
+  }, [isAuthenticated, isConnected, role]);
+
+  // Process pending deep link after authentication
+  useEffect(() => {
+    if (isAuthenticated && isConnected && role && pendingDeepLink.current) {
+      const parsed = Linking.parse(pendingDeepLink.current);
+      pendingDeepLink.current = null;
+      if (parsed.path === "accept-transfer" && parsed.queryParams) {
+        const { ticketMint, eventKey, from } = parsed.queryParams;
+        if (ticketMint && eventKey && from) {
+          setTimeout(() => {
+            router.push({
+              pathname: "/(user)/accept-transfer",
+              params: { ticketMint: String(ticketMint), eventKey: String(eventKey), from: String(from) },
+            });
+          }, 500);
+        }
+      }
+    }
+  }, [isAuthenticated, isConnected, role]);
 
   useEffect(() => {
     if (fontsLoaded) {
@@ -44,6 +98,9 @@ export default function RootLayout() {
           }
 
           setOnboardingChecked(true);
+
+          // Register for push notifications (non-blocking)
+          registerForPushNotifications().catch(() => {});
         } catch (error) {
           console.error("Failed to initialize app:", error);
           setOnboardingChecked(true);
@@ -100,9 +157,12 @@ export default function RootLayout() {
   }
 
   return (
-    <SafeAreaProvider>
-      <StatusBar style="light" />
-      <Slot />
-    </SafeAreaProvider>
+    <ErrorBoundary>
+      <SafeAreaProvider>
+        <StatusBar style="light" />
+        <OfflineBanner />
+        <Slot />
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }
