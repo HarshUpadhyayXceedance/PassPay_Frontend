@@ -14,19 +14,21 @@ import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
 import { useEvents } from "../../hooks/useEvents";
+import { useLoyalty } from "../../hooks/useLoyalty";
 import { shortenAddress, formatSOL } from "../../utils/formatters";
 
 export function AdminDashboardScreen() {
   const router = useRouter();
   const { publicKey, balance, refreshBalance } = useWallet();
   const { events, fetchEvents, isLoading } = useEvents();
+  const { badgeCollection, fetchBadgeCollection } = useLoyalty();
 
   useEffect(() => {
     fetchEvents();
   }, []);
 
   const onRefresh = async () => {
-    await Promise.all([fetchEvents(), refreshBalance()]);
+    await Promise.all([fetchEvents(), refreshBalance(), fetchBadgeCollection()]);
   };
 
   const myEvents = events.filter(
@@ -73,6 +75,35 @@ export function AdminDashboardScreen() {
         onPress={() => router.push("/(admin)/create-event")}
         size="lg"
       />
+
+      <View style={styles.badgeSection}>
+        <View style={styles.badgeStatusRow}>
+          <Text style={styles.badgeLabel}>Badge Collection</Text>
+          <View
+            style={[
+              styles.badgeStatusPill,
+              badgeCollection ? styles.badgeActive : styles.badgeInactive,
+            ]}
+          >
+            <Text
+              style={[
+                styles.badgeStatusText,
+                badgeCollection
+                  ? styles.badgeActiveText
+                  : styles.badgeInactiveText,
+              ]}
+            >
+              {badgeCollection ? "Active" : "Not Set Up"}
+            </Text>
+          </View>
+        </View>
+        <AppButton
+          title={badgeCollection ? "View Badge Collection" : "Setup Badges"}
+          onPress={() => router.push("/(admin)/setup-badges")}
+          variant="outline"
+          size="md"
+        />
+      </View>
     </ScrollView>
   );
 }
@@ -126,5 +157,38 @@ const styles = StyleSheet.create({
     ...typography.small,
     color: colors.textSecondary,
     marginTop: 2,
+  },
+  badgeSection: {
+    marginTop: spacing.lg,
+  },
+  badgeStatusRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    marginBottom: spacing.sm,
+  },
+  badgeLabel: {
+    ...typography.body,
+    color: colors.text,
+  },
+  badgeStatusPill: {
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+  },
+  badgeActive: {
+    backgroundColor: colors.primary + "20",
+  },
+  badgeInactive: {
+    backgroundColor: colors.textMuted + "20",
+  },
+  badgeStatusText: {
+    fontSize: 12,
+  },
+  badgeActiveText: {
+    color: colors.primary,
+  },
+  badgeInactiveText: {
+    color: colors.textMuted,
   },
 });

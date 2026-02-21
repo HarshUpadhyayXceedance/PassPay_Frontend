@@ -1,5 +1,5 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { BadgeTier, TIER_NAMES, TIER_THRESHOLDS } from "../../types/loyalty";
 import { colors } from "../../theme/colors";
@@ -10,6 +10,9 @@ interface BadgeCardProps {
   tier: BadgeTier;
   isEarned: boolean;
   totalEvents: number;
+  isClaimed?: boolean;
+  onClaim?: () => void;
+  isClaiming?: boolean;
 }
 
 const TIER_ICON: Record<BadgeTier, string> = {
@@ -28,7 +31,14 @@ const TIER_GRADIENTS: Record<BadgeTier, readonly [string, string, ...string[]]> 
   [BadgeTier.Platinum]: ["#E5E4E2", "#9DB2BF"],
 };
 
-export function BadgeCard({ tier, isEarned, totalEvents }: BadgeCardProps) {
+export function BadgeCard({
+  tier,
+  isEarned,
+  totalEvents,
+  isClaimed,
+  onClaim,
+  isClaiming,
+}: BadgeCardProps) {
   const threshold = TIER_THRESHOLDS[tier];
   const progress = Math.min(totalEvents / threshold, 1);
 
@@ -54,7 +64,26 @@ export function BadgeCard({ tier, isEarned, totalEvents }: BadgeCardProps) {
       </Text>
 
       {isEarned ? (
-        <Text style={styles.earnedText}>Earned</Text>
+        isClaimed ? (
+          <View style={styles.claimedBadge}>
+            <Text style={styles.claimedText}>Claimed</Text>
+          </View>
+        ) : onClaim ? (
+          <TouchableOpacity
+            style={styles.claimButton}
+            onPress={onClaim}
+            disabled={isClaiming}
+            activeOpacity={0.7}
+          >
+            {isClaiming ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.claimButtonText}>Claim NFT</Text>
+            )}
+          </TouchableOpacity>
+        ) : (
+          <Text style={styles.earnedText}>Earned</Text>
+        )
       ) : (
         <View style={styles.progressSection}>
           <View style={styles.progressBar}>
@@ -104,6 +133,30 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
   earnedText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.primary,
+  },
+  claimButton: {
+    backgroundColor: colors.secondary,
+    borderRadius: 8,
+    paddingHorizontal: 14,
+    paddingVertical: 6,
+    minWidth: 80,
+    alignItems: "center",
+  },
+  claimButtonText: {
+    fontSize: 12,
+    fontFamily: fonts.bodyBold,
+    color: "#fff",
+  },
+  claimedBadge: {
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 4,
+  },
+  claimedText: {
     fontSize: 12,
     fontFamily: fonts.bodySemiBold,
     color: colors.primary,

@@ -1,4 +1,5 @@
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID, ASSOCIATED_TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
 import { findTicketPda } from "../pda";
@@ -42,6 +43,9 @@ export async function transferTicket(
       senderTokenAccount,
       recipientTokenAccount,
       mintAuthority,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      systemProgram: SystemProgram.programId,
     })
     .rpc();
 

@@ -9,8 +9,11 @@ import { transferTicket } from "../../solana/actions/transferTicket";
 import { refundTicket } from "../../solana/actions/refundTicket";
 import { withdrawFunds } from "../../solana/actions/withdrawFunds";
 import { createAdmin } from "../../solana/actions/createAdmin";
+import { claimBadge } from "../../solana/actions/issueAttendanceBadge";
+import { createBadgeMints, initializeBadgeCollection } from "../../solana/actions/initializeBadgeCollection";
 import { findAdminPda } from "../../solana/pda";
 import { SUPER_ADMIN_PUBKEY } from "../../solana/config/constants";
+import { BadgeTier } from "../../types/loyalty";
 
 // Dev SuperAdmin public key (must match roleDetection.ts)
 const DEV_SUPER_ADMIN_PUBKEY = new PublicKey(
@@ -78,6 +81,7 @@ export async function apiCheckIn(params: {
   eventPda: string;
   ticketMint: string;
   holderTokenAccount: string;
+  ticketHolder: string;
 }): Promise<string> {
   const wallet = phantomWalletAdapter;
   if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
@@ -86,6 +90,7 @@ export async function apiCheckIn(params: {
     eventPda: new PublicKey(params.eventPda),
     ticketMint: new PublicKey(params.ticketMint),
     holderTokenAccount: new PublicKey(params.holderTokenAccount),
+    ticketHolder: new PublicKey(params.ticketHolder),
   });
 }
 
@@ -128,4 +133,42 @@ export async function apiWithdrawFunds(params: {
     eventPda: new PublicKey(params.eventPda),
     amount: params.amount,
   });
+}
+
+/**
+ * User claims their soulbound badge NFT based on current attendance tier.
+ */
+export async function apiClaimBadge(): Promise<{
+  signature: string;
+  badgeMint: string;
+  tier: BadgeTier;
+}> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  return claimBadge();
+}
+
+/**
+ * Admin one-time setup: create 4 tier mints and initialize badge collection.
+ */
+export async function apiSetupBadgeCollection(): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+
+  // Step 1: Create 4 SPL mints with badge_authority PDA as authority
+  const mints = await createBadgeMints(provider);
+
+  // Step 2: Initialize badge collection on-chain
+  const tx = await initializeBadgeCollection(provider, {
+    collectionName: "PassPay Badges",
+    collectionSymbol: "PPBADGE",
+    collectionUri: "https://passpay.dev/badges/collection.json",
+    bronzeBadgeMint: mints.bronzeMint,
+    silverBadgeMint: mints.silverMint,
+    goldBadgeMint: mints.goldMint,
+    platinumBadgeMint: mints.platinumMint,
+  });
+
+  return tx;
 }

@@ -1,13 +1,11 @@
 import React, { useState } from "react";
 import { View, Text, StyleSheet, Alert } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
-import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { QRScanner } from "../../components/qr/QRScanner";
 import { AppCard } from "../../components/ui/AppCard";
 import { AppButton } from "../../components/ui/AppButton";
-import { TierBadge } from "../../components/loyalty/TierBadge";
 import { Confetti } from "../../components/animations/Confetti";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
@@ -15,58 +13,72 @@ import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { useScanner } from "../../hooks/useScanner";
 import { apiCheckIn } from "../../services/api/eventApi";
-import { apiIssueAttendanceBadge } from "../../solana/actions";
-import { uploadMetadata } from "../../services/api/uploadApi";
 import { TicketQRPayload } from "../../utils/qrPayload";
 import { getAssociatedTokenAddress } from "../../solana/utils/tokenUtils";
 import { PublicKey } from "@solana/web3.js";
 import { shortenAddress } from "../../utils/formatters";
-import { BadgeTier, TIER_NAMES } from "../../types/loyalty";
 
 export function CheckInScannerScreen() {
   const router = useRouter();
   const { eventKey } = useLocalSearchParams<{ eventKey: string }>();
   const { handleScan, lastScan, error: scanError, reset } = useScanner();
   const [checkingIn, setCheckingIn] = useState(false);
-  const [issuingBadge, setIssuingBadge] = useState(false);
-  const [badgeIssued, setBadgeIssued] = useState(false);
-  const [newBadgeTier, setNewBadgeTier] = useState<BadgeTier | null>(null);
   const [showConfetti, setShowConfetti] = useState(false);
 
   const ticket =
     lastScan?.type === "ticket" ? (lastScan as TicketQRPayload) : null;
 
+  // Use eventKey from nav params OR from the scanned ticket QR payload
+  const resolvedEventKey = eventKey || ticket?.event;
+
   const handleCheckIn = async () => {
     if (!ticket) return;
 
+    // Validate required fields before creating PublicKey objects
+    if (!ticket.mint || !ticket.owner) {
+      Alert.alert(
+        "Invalid Ticket QR",
+        "This QR code is missing required data. Please ask the attendee to regenerate their QR code."
+      );
+      return;
+    }
+
+    if (!resolvedEventKey) {
+      Alert.alert("Error", "No event found. The ticket QR is missing event data.");
+      return;
+    }
+
     setCheckingIn(true);
     try {
+      const mintPubkey = new PublicKey(ticket.mint);
+      const ownerPubkey = new PublicKey(ticket.owner);
       const holderTokenAccount = getAssociatedTokenAddress(
-        new PublicKey(ticket.mint),
-        new PublicKey(ticket.owner)
+        mintPubkey,
+        ownerPubkey
       );
 
       await apiCheckIn({
-        eventPda: eventKey as string,
+        eventPda: resolvedEventKey,
         ticketMint: ticket.mint,
         holderTokenAccount: holderTokenAccount.toBase58(),
+        ticketHolder: ticket.owner,
       });
 
-      // Prompt for badge issuance
+      // Check-in success — attendance record, streak, and tier are
+      // updated on-chain by the check_in instruction itself.
+      // Badge NFT minting (issue_attendance_badge) requires a separate
+      // initialize_badge_collection setup, so skip it for MVP.
+      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      setShowConfetti(true);
+
       Alert.alert(
-        "Check-in Successful",
-        "Would you like to issue an attendance badge to this user?",
+        "Check-in Successful!",
+        `Attendee ${shortenAddress(ticket.owner, 4)} has been checked in. Attendance and loyalty tier updated on-chain.`,
         [
           {
-            text: "Issue Badge",
-            onPress: () => handleIssueBadge(),
-          },
-          {
-            text: "Skip",
+            text: "Scan Next",
             onPress: () => {
               reset();
-              setBadgeIssued(false);
-              setNewBadgeTier(null);
               setShowConfetti(false);
             },
           },
@@ -76,57 +88,6 @@ export function CheckInScannerScreen() {
       Alert.alert("Check-in Failed", error.message ?? "Unknown error");
     } finally {
       setCheckingIn(false);
-    }
-  };
-
-  const handleIssueBadge = async () => {
-    if (!ticket) return;
-
-    setIssuingBadge(true);
-    try {
-      const metadataUri = await uploadMetadata({
-        name: "PassPay Attendance Badge",
-        symbol: "BADGE",
-        description: "Attendance badge for event check-in via PassPay",
-        image: "",
-        attributes: [
-          { trait_type: "Type", value: "Attendance Badge" },
-          { trait_type: "Event", value: eventKey as string },
-        ],
-      });
-      const result = await apiIssueAttendanceBadge({
-        eventPda: eventKey as string,
-        attendee: ticket.owner,
-        metadataUri,
-      });
-
-      // For demo, assume Bronze tier (tier 1)
-      setNewBadgeTier(BadgeTier.Bronze);
-      setBadgeIssued(true);
-      setShowConfetti(true);
-
-      // Haptic feedback
-      await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-
-      Alert.alert(
-        "Badge Issued!",
-        `Attendance badge has been minted for ${shortenAddress(ticket.owner, 4)}`,
-        [
-          {
-            text: "Scan Next",
-            onPress: () => {
-              reset();
-              setBadgeIssued(false);
-              setNewBadgeTier(null);
-              setShowConfetti(false);
-            },
-          },
-        ]
-      );
-    } catch (error: any) {
-      Alert.alert("Badge Issue Failed", error.message ?? "Unknown error");
-    } finally {
-      setIssuingBadge(false);
     }
   };
 
@@ -143,66 +104,28 @@ export function CheckInScannerScreen() {
         ) : (
           <View style={styles.ticketView}>
             <AppCard style={styles.ticketCard}>
-              <Text style={styles.ticketTitle}>
-                {badgeIssued ? "Badge Issued!" : "Ticket Found"}
+              <Text style={styles.ticketTitle}>Ticket Found</Text>
+              <Text style={styles.ticketMint}>
+                Mint: {shortenAddress(ticket.mint, 6)}
               </Text>
-
-              {badgeIssued && newBadgeTier !== null ? (
-                <View style={styles.badgePreview}>
-                  <LinearGradient
-                    colors={["#6C5CE7", "#00CEC9"]}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 1 }}
-                    style={styles.badgeGlow}
-                  >
-                    <TierBadge tier={newBadgeTier} size="large" showLabel />
-                  </LinearGradient>
-                  <Text style={styles.badgeMessage}>
-                    {TIER_NAMES[newBadgeTier]} Badge Earned!
-                  </Text>
-                </View>
-              ) : (
-                <>
-                  <Text style={styles.ticketMint}>
-                    Mint: {shortenAddress(ticket.mint, 6)}
-                  </Text>
-                  <Text style={styles.ticketOwner}>
-                    Owner: {shortenAddress(ticket.owner, 6)}
-                  </Text>
-                </>
-              )}
+              <Text style={styles.ticketOwner}>
+                Owner: {shortenAddress(ticket.owner, 6)}
+              </Text>
             </AppCard>
 
-            {!badgeIssued && (
-              <View style={styles.actions}>
-                <AppButton
-                  title="Check In"
-                  onPress={handleCheckIn}
-                  loading={checkingIn}
-                  size="lg"
-                />
-                <AppButton
-                  title="Cancel"
-                  onPress={() => reset()}
-                  variant="outline"
-                />
-              </View>
-            )}
-
-            {badgeIssued && (
-              <View style={styles.actions}>
-                <AppButton
-                  title="Scan Next"
-                  onPress={() => {
-                    reset();
-                    setBadgeIssued(false);
-                    setNewBadgeTier(null);
-                    setShowConfetti(false);
-                  }}
-                  size="lg"
-                />
-              </View>
-            )}
+            <View style={styles.actions}>
+              <AppButton
+                title="Check In"
+                onPress={handleCheckIn}
+                loading={checkingIn}
+                size="lg"
+              />
+              <AppButton
+                title="Cancel"
+                onPress={() => reset()}
+                variant="outline"
+              />
+            </View>
           </View>
         )}
 
@@ -253,21 +176,6 @@ const styles = StyleSheet.create({
     ...typography.caption,
     fontFamily: fonts.body,
     color: colors.textSecondary,
-  },
-  badgePreview: {
-    alignItems: "center",
-    paddingVertical: spacing.xl,
-  },
-  badgeGlow: {
-    padding: spacing.lg,
-    borderRadius: 100,
-    marginBottom: spacing.md,
-  },
-  badgeMessage: {
-    fontSize: 18,
-    fontFamily: fonts.headingSemiBold,
-    color: colors.primary,
-    textAlign: "center",
   },
   actions: {
     gap: spacing.md,

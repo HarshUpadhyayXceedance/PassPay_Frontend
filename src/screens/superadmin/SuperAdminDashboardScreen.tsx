@@ -18,6 +18,7 @@ import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
 import { useAuthStore } from "../../store/authStore";
+import { useLoyalty } from "../../hooks/useLoyalty";
 import { getProgram } from "../../solana/config/program";
 import { DEVNET_RPC } from "../../solana/config/constants";
 import { shortenAddress } from "../../utils/formatters";
@@ -26,6 +27,7 @@ import { safeFetchAll } from "../../solana/utils/safeFetchAll";
 export function SuperAdminDashboardScreen() {
   const { publicKey, balance } = useWallet();
   const { role } = useAuthStore();
+  const { badgeCollection, fetchBadgeCollection } = useLoyalty();
   const router = useRouter();
   const [refreshing, setRefreshing] = useState(false);
   const [stats, setStats] = useState({
@@ -80,7 +82,7 @@ export function SuperAdminDashboardScreen() {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await fetchStats();
+    await Promise.all([fetchStats(), fetchBadgeCollection()]);
     setRefreshing(false);
   };
 
@@ -192,6 +194,14 @@ export function SuperAdminDashboardScreen() {
             onPress={() => router.push("/(admin)/create-admin")}
           />
         )}
+        {isSuperAdmin && (
+          <ActionButton
+            icon="ribbon"
+            label="Setup Badges"
+            color="#E91E63"
+            onPress={() => router.push("/(admin)/setup-badges")}
+          />
+        )}
       </View>
 
       {/* Admin Management (super admin only) */}
@@ -283,9 +293,9 @@ export function SuperAdminDashboardScreen() {
         />
         <StatusRow
           icon="cube"
-          color={colors.secondary}
+          color={badgeCollection ? colors.success : colors.warning}
           label="Badge Collection"
-          status={stats.totalEvents > 0 ? "Active" : "Not Initialized"}
+          status={badgeCollection ? `Active (${badgeCollection.totalIssued} issued)` : "Not Initialized"}
         />
       </View>
 
@@ -487,12 +497,15 @@ const styles = StyleSheet.create({
   },
   actionsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     paddingHorizontal: spacing.lg,
     gap: 12,
     marginBottom: spacing.lg,
   },
   actionBtn: {
+    minWidth: 80,
     flex: 1,
+    maxWidth: 120,
     alignItems: "center",
     backgroundColor: colors.surface,
     borderRadius: 16,

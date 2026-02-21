@@ -16,8 +16,8 @@ export function useWallet() {
     try {
       await walletStore.connectPhantom();
 
-      // After connecting, detect role
-      const publicKey = walletStore.publicKey;
+      // Read latest publicKey from store state (not the stale closure snapshot)
+      const publicKey = useWalletStore.getState().publicKey;
       if (publicKey) {
         await authStore.detectRole(publicKey);
       }

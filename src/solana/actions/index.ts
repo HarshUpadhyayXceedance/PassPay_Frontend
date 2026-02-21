@@ -12,7 +12,7 @@ export { withdrawFunds } from "./withdrawFunds";
 export { transferTicket } from "./transferTicket";
 export { updateDynamicPrice } from "./updateDynamicPrice";
 export { initializeBadgeCollection } from "./initializeBadgeCollection";
-export { apiIssueAttendanceBadge } from "./issueAttendanceBadge";
+export { claimBadge } from "./issueAttendanceBadge";
 export { checkLoyaltyBenefits } from "./checkLoyaltyBenefits";
 export { refundTicket } from "./refundTicket";
 export { updateEvent } from "./updateEvent";

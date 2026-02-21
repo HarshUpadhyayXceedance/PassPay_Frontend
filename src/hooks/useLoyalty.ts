@@ -8,6 +8,7 @@ import { getProgram } from "../solana/config/program";
 import { findBadgeCollectionPda } from "../solana/pda";
 import { DEVNET_RPC } from "../solana/config/constants";
 import { BadgeCollectionData, parseBadgeTier } from "../types/loyalty";
+import { decodeAccountString } from "../utils/formatters";
 
 export function useLoyalty() {
   const { publicKey } = useWalletStore();
@@ -55,9 +56,9 @@ export function useLoyalty() {
         silverBadgeMint: account.silverBadgeMint,
         goldBadgeMint: account.goldBadgeMint,
         platinumBadgeMint: account.platinumBadgeMint,
-        collectionName: account.collectionName,
-        collectionSymbol: account.collectionSymbol,
-        collectionUri: account.collectionUri,
+        collectionName: decodeAccountString(account.collectionName),
+        collectionSymbol: decodeAccountString(account.collectionSymbol),
+        collectionUri: decodeAccountString(account.collectionUri),
         bump: account.bump,
       };
 

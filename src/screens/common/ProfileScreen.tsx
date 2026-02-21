@@ -204,7 +204,7 @@ export function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRow}
                 activeOpacity={0.6}
-                onPress={() => router.push("loyalty" as any)}
+                onPress={() => router.push("/(user)/loyalty")}
               >
                 <View style={styles.menuRowLeft}>
                   <View
@@ -229,7 +229,7 @@ export function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRow}
                 activeOpacity={0.6}
-                onPress={() => router.push("badges" as any)}
+                onPress={() => router.push("/(user)/badges")}
               >
                 <View style={styles.menuRowLeft}>
                   <View
@@ -260,7 +260,7 @@ export function ProfileScreen() {
               <TouchableOpacity
                 style={styles.menuRow}
                 activeOpacity={0.6}
-                onPress={() => router.push("my-passes" as any)}
+                onPress={() => router.push("/(user)/my-passes")}
               >
                 <View style={styles.menuRowLeft}>
                   <View

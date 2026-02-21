@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   ActivityIndicator,
   Animated,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useEvents } from "../../hooks/useEvents";
@@ -43,6 +43,15 @@ export function BuyTicketScreen() {
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   const event = getEvent(eventKey as string);
+
+  // Reset stale state when screen re-focuses (expo-router doesn't unmount screens)
+  useFocusEffect(
+    useCallback(() => {
+      setShowSuccess(false);
+      setPurchasedMint("");
+      setBuying(false);
+    }, [])
+  );
 
   useEffect(() => {
     fetchLoyaltyBenefits();
@@ -138,6 +147,7 @@ export function BuyTicketScreen() {
 
       // Success - show modal with confetti
       setPurchasedMint(result.mint);
+      setBuying(false);
       setShowSuccess(true);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);

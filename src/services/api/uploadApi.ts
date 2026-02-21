@@ -37,9 +37,8 @@ export async function uploadMetadata(
     return uploadToPinata(metadata);
   }
 
-  // Fallback: encode metadata as a base64 data URI.
-  // This is a valid URI that Metaplex can read, suitable for devnet.
-  return encodeMetadataAsDataUri(metadata);
+  // Fallback: short placeholder URI for devnet (keeps tx under 1232 bytes)
+  return generateDevnetUri(metadata);
 }
 
 async function uploadToPinata(metadata: TicketMetadata): Promise<string> {
@@ -70,15 +69,25 @@ async function uploadToPinata(metadata: TicketMetadata): Promise<string> {
 }
 
 /**
- * Encode metadata as a data URI.
- * This produces a deterministic, self-contained URI that works without
- * any external service — perfect for devnet / hackathon demos.
+ * Generate a short placeholder URI for devnet / hackathon demos.
+ *
+ * Solana transactions have a 1232-byte limit. With 17 accounts + 2 signatures
+ * the buyTicket instruction has very little room for instruction data.
+ * A full base64 data-URI (~300+ bytes) pushes it over the limit.
+ *
+ * The Metaplex Token Metadata program stores the URI on-chain but never
+ * fetches it, so a short placeholder works fine for devnet testing.
  */
-function encodeMetadataAsDataUri(metadata: TicketMetadata): string {
-  const json = JSON.stringify(metadata);
-  // btoa is available in React Native's Hermes engine
-  const base64 = btoa(unescape(encodeURIComponent(json)));
-  return `data:application/json;base64,${base64}`;
+function generateDevnetUri(metadata: TicketMetadata): string {
+  // Create a short deterministic hash from the metadata name
+  // This keeps the URI well under 80 bytes
+  let hash = 0;
+  const str = metadata.name + metadata.symbol;
+  for (let i = 0; i < str.length; i++) {
+    hash = (hash * 31 + str.charCodeAt(i)) | 0;
+  }
+  const id = Math.abs(hash).toString(36);
+  return `https://passpay.dev/meta/${id}`;
 }
 
 /**

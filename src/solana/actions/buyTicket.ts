@@ -53,6 +53,10 @@ export async function buyTicket(
   const [collectionMasterEdition] = findMasterEditionPda(collectionMint);
   const [userAttendanceRecord] = findUserAttendancePda(buyer);
 
+  // Build transaction without sending — Anchor's .signers([ticketMint]).rpc()
+  // partial-signs with ticketMint BEFORE sending to MWA, and Phantom silently
+  // fails to show the sign dialog for partially-signed transactions.
+  // Fix: send UNSIGNED tx to Phantom first, then add ticketMint sig locally.
   const tx = await program.methods
     .buyTicket({ metadataUri: params.metadataUri })
     .accounts({
@@ -74,8 +78,33 @@ export async function buyTicket(
       tokenMetadataProgram: TOKEN_METADATA_PROGRAM_ID,
       rent: SYSVAR_RENT_PUBKEY,
     })
-    .signers([ticketMint])
-    .rpc();
+    .transaction();
 
-  return { signature: tx, mint: ticketMint.publicKey };
+  // Set transaction properties
+  tx.feePayer = buyer;
+  const { blockhash, lastValidBlockHeight } =
+    await provider.connection.getLatestBlockhash("confirmed");
+  tx.recentBlockhash = blockhash;
+
+  // Step 1: Send UNSIGNED tx to Phantom via MWA signTransactions.
+  // Phantom signs as feePayer (same path as createEvent — which works).
+  const signedTx = await provider.wallet.signTransaction(tx);
+
+  // Step 2: Add ticketMint's signature locally AFTER Phantom has signed.
+  // partialSign only adds ticketMint's sig — preserves Phantom's feePayer sig.
+  signedTx.partialSign(ticketMint);
+
+  // Step 3: Send the fully-signed transaction ourselves
+  const signature = await provider.connection.sendRawTransaction(
+    signedTx.serialize(),
+    { skipPreflight: false, preflightCommitment: "confirmed" }
+  );
+
+  // Wait for confirmation
+  await provider.connection.confirmTransaction(
+    { signature, blockhash, lastValidBlockHeight },
+    "confirmed"
+  );
+
+  return { signature, mint: ticketMint.publicKey };
 }

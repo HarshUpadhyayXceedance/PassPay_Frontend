@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { AppInput } from "../../components/ui/AppInput";
 import { AppButton } from "../../components/ui/AppButton";
@@ -13,7 +13,11 @@ import { validateAmount } from "../../utils/validators";
 
 export function GenerateInvoiceQRScreen() {
   const publicKey = useWalletStore((s) => s.publicKey);
-  const { merchants } = useMerchants();
+  const { merchants, fetchMerchants } = useMerchants();
+
+  useEffect(() => {
+    fetchMerchants();
+  }, []);
   const [amount, setAmount] = useState("");
   const [qrData, setQrData] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);

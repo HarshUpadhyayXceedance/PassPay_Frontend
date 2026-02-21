@@ -21,8 +21,17 @@ export function encodeQRPayload(payload: QRPayload): string {
 export function decodeQRPayload(data: string): QRPayload | null {
   try {
     const parsed = JSON.parse(data);
-    if (parsed.type === "ticket" || parsed.type === "payment") {
-      return parsed as QRPayload;
+    if (parsed.type === "ticket") {
+      // Normalize old QR format (mintAddress/eventKey) to new format (mint/event)
+      return {
+        type: "ticket",
+        mint: parsed.mint ?? parsed.mintAddress,
+        owner: parsed.owner,
+        event: parsed.event ?? parsed.eventKey,
+      } as TicketQRPayload;
+    }
+    if (parsed.type === "payment") {
+      return parsed as PaymentQRPayload;
     }
     return null;
   } catch {

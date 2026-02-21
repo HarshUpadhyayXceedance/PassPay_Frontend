@@ -1,4 +1,5 @@
 import { PublicKey, SystemProgram } from "@solana/web3.js";
+import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
 import { findTicketPda, findTreasuryPda } from "../pda";
@@ -30,6 +31,7 @@ export async function refundTicket(
       ticketMint: params.ticketMint,
       mintAuthority,
       holderTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,
     })
     .rpc();

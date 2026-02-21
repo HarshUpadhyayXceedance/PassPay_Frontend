@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React, { useEffect, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
 import { TierBadge } from "../../components/loyalty/TierBadge";
@@ -19,11 +19,12 @@ import { spacing } from "../../theme/spacing";
 import { lamportsToSOL } from "../../utils/formatters";
 
 export function LoyaltyBenefitsScreen() {
-  const { loyaltyBenefits, userAttendance, isLoading } = useLoyalty();
+  const { loyaltyBenefits, userAttendance, isLoading, error, fetchLoyaltyBenefits } = useLoyalty();
 
-  if (isLoading) {
-    return <AppLoader fullScreen message="Loading loyalty data..." />;
-  }
+  // Explicitly fetch on mount
+  useEffect(() => {
+    fetchLoyaltyBenefits();
+  }, []);
 
   const tier = loyaltyBenefits?.currentTier ?? BadgeTier.None;
   const totalEvents = loyaltyBenefits?.totalEvents ?? 0;
@@ -37,6 +38,10 @@ export function LoyaltyBenefitsScreen() {
     [totalEvents, currentStreak, longestStreak, lifetimeSpend]
   );
   const unlockedCount = achievements.filter((a) => a.unlocked).length;
+
+  if (isLoading) {
+    return <AppLoader fullScreen message="Loading loyalty data..." />;
+  }
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -56,6 +61,15 @@ export function LoyaltyBenefitsScreen() {
           <StatItem value={currentStreak.toString()} label="Streak" />
         </View>
       </LinearGradient>
+
+      {/* Error banner */}
+      {error && (
+        <View style={styles.errorBox}>
+          <Text style={styles.errorText}>
+            Failed to load loyalty data: {error}
+          </Text>
+        </View>
+      )}
 
       {/* Streak */}
       <AppCard style={styles.section}>
@@ -230,6 +244,21 @@ const styles = StyleSheet.create({
     width: 1,
     height: 30,
     backgroundColor: colors.border,
+  },
+  errorBox: {
+    backgroundColor: colors.errorLight,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginHorizontal: spacing.lg,
+    marginTop: spacing.md,
+    borderWidth: 1,
+    borderColor: "rgba(255, 59, 48, 0.25)",
+  },
+  errorText: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.error,
+    lineHeight: 18,
   },
   section: {
     marginHorizontal: spacing.lg,

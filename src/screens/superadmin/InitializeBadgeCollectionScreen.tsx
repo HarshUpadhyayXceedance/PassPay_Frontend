@@ -96,7 +96,7 @@ export function InitializeBadgeCollectionScreen() {
               console.log("🔧 Initializing badge collection...");
 
               const signature = await initializeBadgeCollection(
-                superAdminPubkey,
+                superAdminPubkey as any,
                 {
                   collectionName: collectionName.trim(),
                   collectionSymbol: collectionSymbol.trim(),

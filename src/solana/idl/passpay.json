@@ -1,5 +1,5 @@
 {
-  "address": "68Gg9YhnUanWyybvvq6XMBcPHFubVsaLpzzBDzbb9qZv",
+  "address": "3MPrG9z4ixZdsVKiWE64g2UZLSZggQTXWXz2UffeLcpS",
   "metadata": {
     "name": "passpay",
     "version": "0.1.0",
@@ -1327,14 +1327,10 @@
           "signer": true
         },
         {
-          "name": "event"
-        },
-        {
-          "name": "ticket"
-        },
-        {
           "name": "user_attendance_record",
-          "writable": true,
+          "docs": [
+            "User's attendance record — must already exist from check_in"
+          ],
           "pda": {
             "seeds": [
               {
@@ -1390,7 +1386,7 @@
         {
           "name": "badge_mint",
           "docs": [
-            "The badge mint for the tier being issued (if applicable)"
+            "The badge mint for the tier being claimed"
           ],
           "writable": true
         },
@@ -3065,6 +3061,21 @@
       "code": 6037,
       "name": "PriceBelowMinimum",
       "msg": "Calculated price is below minimum allowed price"
+    },
+    {
+      "code": 6038,
+      "name": "NoAttendanceRecord",
+      "msg": "No attendance record found - check in to an event first"
+    },
+    {
+      "code": 6039,
+      "name": "NoBadgeEarned",
+      "msg": "No badge earned yet - attend more events to earn a tier"
+    },
+    {
+      "code": 6040,
+      "name": "BadgeAlreadyClaimed",
+      "msg": "Badge for this tier has already been claimed"
     }
   ],
   "types": [
@@ -3261,10 +3272,6 @@
         "fields": [
           {
             "name": "user",
-            "type": "pubkey"
-          },
-          {
-            "name": "event",
             "type": "pubkey"
           },
           {

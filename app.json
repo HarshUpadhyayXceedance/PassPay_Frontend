@@ -49,6 +49,10 @@
             "DEFAULT"
           ]
         }
+      ],
+      "permissions": [
+        "android.permission.RECORD_AUDIO",
+        "android.permission.CAMERA"
       ]
     },
     "web": {
@@ -82,8 +86,9 @@
     "extra": {
       "router": {},
       "eas": {
-        "projectId": "a5866adb-ffea-4312-aa7d-2c6aaf490d6a"
+        "projectId": "700d020d-6ebe-4036-9d38-68b59c8145c4"
       }
-    }
+    },
+    "owner": "2100520100032_ietlucknow"
   }
 }

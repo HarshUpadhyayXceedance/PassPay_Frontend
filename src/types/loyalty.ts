@@ -37,8 +37,8 @@ export const TIER_BENEFITS: Record<BadgeTier, TierBenefits> = {
   },
   [BadgeTier.Bronze]: {
     tier: BadgeTier.Bronze,
-    merchantDiscountPercent: 5,
-    ticketDiscountPercent: 3,
+    merchantDiscountPercent: 10,
+    ticketDiscountPercent: 5,
     earlyAccessHours: 0,
     hasPriorityEntry: false,
     hasVipLounge: false,
@@ -47,8 +47,8 @@ export const TIER_BENEFITS: Record<BadgeTier, TierBenefits> = {
   },
   [BadgeTier.Silver]: {
     tier: BadgeTier.Silver,
-    merchantDiscountPercent: 10,
-    ticketDiscountPercent: 5,
+    merchantDiscountPercent: 15,
+    ticketDiscountPercent: 10,
     earlyAccessHours: 24,
     hasPriorityEntry: true,
     hasVipLounge: false,
@@ -57,8 +57,8 @@ export const TIER_BENEFITS: Record<BadgeTier, TierBenefits> = {
   },
   [BadgeTier.Gold]: {
     tier: BadgeTier.Gold,
-    merchantDiscountPercent: 15,
-    ticketDiscountPercent: 10,
+    merchantDiscountPercent: 20,
+    ticketDiscountPercent: 15,
     earlyAccessHours: 48,
     hasPriorityEntry: true,
     hasVipLounge: true,
@@ -67,8 +67,8 @@ export const TIER_BENEFITS: Record<BadgeTier, TierBenefits> = {
   },
   [BadgeTier.Platinum]: {
     tier: BadgeTier.Platinum,
-    merchantDiscountPercent: 20,
-    ticketDiscountPercent: 15,
+    merchantDiscountPercent: 25,
+    ticketDiscountPercent: 20,
     earlyAccessHours: 72,
     hasPriorityEntry: true,
     hasVipLounge: true,

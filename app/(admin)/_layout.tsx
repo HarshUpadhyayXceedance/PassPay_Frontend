@@ -75,6 +75,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="register-merchant" options={{ href: null }} />
       <Tabs.Screen name="merchant-list" options={{ href: null }} />
       <Tabs.Screen name="dynamic-pricing-setup" options={{ href: null }} />
+      <Tabs.Screen name="setup-badges" options={{ href: null }} />
     </Tabs>
   );
 }

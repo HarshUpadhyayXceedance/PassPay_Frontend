@@ -33,12 +33,13 @@ const GRADIENT_PALETTES: [string, string][] = [
 export function ShopScreen() {
   const router = useRouter();
   const { merchants, fetchMerchants, isLoading } = useMerchants();
-  const { events } = useEvents();
+  const { events, fetchEvents } = useEvents();
   const { loyaltyBenefits } = useLoyalty();
   const [search, setSearch] = useState("");
 
   useEffect(() => {
     fetchMerchants();
+    fetchEvents();
   }, []);
 
   const merchantDiscount = loyaltyBenefits?.merchantDiscount ?? 0;

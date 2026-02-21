@@ -52,8 +52,11 @@ export function TransactionHistoryScreen() {
 
   useEffect(() => {
     fetchMyTickets();
-    if (publicKey) fetchPaymentHistory();
   }, []);
+
+  useEffect(() => {
+    if (publicKey) fetchPaymentHistory();
+  }, [publicKey]);
 
   const fetchPaymentHistory = useCallback(async () => {
     if (!publicKey) return;

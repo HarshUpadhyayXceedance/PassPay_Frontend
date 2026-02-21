@@ -1,12 +1,13 @@
-import { PublicKey } from "@solana/web3.js";
+import { PublicKey, SystemProgram } from "@solana/web3.js";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
-import { findAdminPda, findTicketPda } from "../pda";
+import { findAdminPda, findTicketPda, findUserAttendancePda } from "../pda";
 
 export interface CheckInParams {
   eventPda: PublicKey;
   ticketMint: PublicKey;
   holderTokenAccount: PublicKey;
+  ticketHolder: PublicKey;
 }
 
 export async function checkIn(
@@ -17,6 +18,7 @@ export async function checkIn(
   const adminKey = provider.wallet.publicKey;
   const [adminPda] = findAdminPda(adminKey);
   const [ticketPda] = findTicketPda(params.eventPda, params.ticketMint);
+  const [userAttendanceRecord] = findUserAttendancePda(params.ticketHolder);
 
   const tx = await program.methods
     .checkIn()
@@ -27,6 +29,9 @@ export async function checkIn(
       ticket: ticketPda,
       ticketMint: params.ticketMint,
       holderTokenAccount: params.holderTokenAccount,
+      ticketHolder: params.ticketHolder,
+      userAttendanceRecord,
+      systemProgram: SystemProgram.programId,
     })
     .rpc();
 
