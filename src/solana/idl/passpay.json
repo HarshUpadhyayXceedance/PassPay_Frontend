@@ -1,5 +1,5 @@
 {
-  "address": "3MPrG9z4ixZdsVKiWE64g2UZLSZggQTXWXz2UffeLcpS",
+  "address": "5q8tkv9Rxccrpw1fhH68m8tW4k3iuLCiD4GTuRiWbrSb",
   "metadata": {
     "name": "passpay",
     "version": "0.1.0",
@@ -107,6 +107,520 @@
       "args": []
     },
     {
+      "name": "add_product",
+      "discriminator": [
+        0,
+        219,
+        137,
+        36,
+        105,
+        180,
+        164,
+        93
+      ],
+      "accounts": [
+        {
+          "name": "merchant_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.event",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "merchant_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  100,
+                  117,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "arg",
+                "path": "params.name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "AddProductParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "add_seat_tier",
+      "discriminator": [
+        197,
+        209,
+        244,
+        176,
+        107,
+        165,
+        3,
+        178
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seat_tier",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  116,
+                  95,
+                  116,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "arg",
+                "path": "params.name"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": [
+        {
+          "name": "params",
+          "type": {
+            "defined": {
+              "name": "AddSeatTierParams"
+            }
+          }
+        }
+      ]
+    },
+    {
+      "name": "approve_refund",
+      "discriminator": [
+        133,
+        74,
+        53,
+        175,
+        88,
+        246,
+        218,
+        27
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticket",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "ticket.mint",
+                "account": "Ticket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "refund_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "ticket.mint",
+                "account": "Ticket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seat_tier",
+          "writable": true
+        },
+        {
+          "name": "holder",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "buy_product",
+      "discriminator": [
+        234,
+        192,
+        237,
+        192,
+        174,
+        7,
+        53,
+        136
+      ],
+      "accounts": [
+        {
+          "name": "payer",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "merchant_wallet",
+          "writable": true
+        },
+        {
+          "name": "product",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  100,
+                  117,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "account",
+                "path": "product.name",
+                "account": "MerchantProduct"
+              }
+            ]
+          }
+        },
+        {
+          "name": "user_attendance_record",
+          "docs": [
+            "User attendance record (may not exist for new users)"
+          ]
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "buy_ticket",
       "discriminator": [
         11,
@@ -153,21 +667,48 @@
           }
         },
         {
-          "name": "treasury",
+          "name": "event_escrow",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  116,
-                  114,
                   101,
-                  97,
                   115,
-                  117,
+                  99,
                   114,
-                  121
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
                 ]
               },
               {
@@ -366,6 +907,37 @@
           "name": "collection_master_edition"
         },
         {
+          "name": "seat_tier",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  115,
+                  101,
+                  97,
+                  116,
+                  95,
+                  116,
+                  105,
+                  101,
+                  114
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "seat_tier.name",
+                "account": "SeatTier"
+              }
+            ]
+          }
+        },
+        {
           "name": "user_attendance_record",
           "docs": [
             "User attendance record (may not exist for new users)"
@@ -402,6 +974,98 @@
           }
         }
       ]
+    },
+    {
+      "name": "cancel_event",
+      "discriminator": [
+        55,
+        143,
+        36,
+        45,
+        59,
+        241,
+        89,
+        119
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
     },
     {
       "name": "check_in",
@@ -601,6 +1265,143 @@
       }
     },
     {
+      "name": "claim_cancellation_refund",
+      "discriminator": [
+        137,
+        181,
+        216,
+        23,
+        220,
+        210,
+        61,
+        254
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticket",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "ticket.mint",
+                "account": "Ticket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "seat_tier",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "close_event",
       "discriminator": [
         117,
@@ -794,20 +1595,47 @@
           }
         },
         {
-          "name": "treasury",
+          "name": "event_escrow",
+          "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  116,
-                  114,
                   101,
-                  97,
                   115,
-                  117,
+                  99,
                   114,
-                  121
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
                 ]
               },
               {
@@ -1634,238 +2462,6 @@
       ]
     },
     {
-      "name": "refund_ticket",
-      "discriminator": [
-        178,
-        97,
-        75,
-        218,
-        227,
-        28,
-        21,
-        73
-      ],
-      "accounts": [
-        {
-          "name": "holder",
-          "docs": [
-            "The current ticket holder requesting the refund."
-          ],
-          "writable": true,
-          "signer": true
-        },
-        {
-          "name": "event",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  101,
-                  118,
-                  101,
-                  110,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "event.admin",
-                "account": "Event"
-              },
-              {
-                "kind": "account",
-                "path": "event.name",
-                "account": "Event"
-              }
-            ]
-          }
-        },
-        {
-          "name": "treasury",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  114,
-                  101,
-                  97,
-                  115,
-                  117,
-                  114,
-                  121
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "event"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ticket",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  116,
-                  105,
-                  99,
-                  107,
-                  101,
-                  116
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "event"
-              },
-              {
-                "kind": "account",
-                "path": "ticket_mint"
-              }
-            ]
-          }
-        },
-        {
-          "name": "ticket_mint",
-          "writable": true
-        },
-        {
-          "name": "mint_authority",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
-                  109,
-                  105,
-                  110,
-                  116,
-                  95,
-                  97,
-                  117,
-                  116,
-                  104,
-                  111,
-                  114,
-                  105,
-                  116,
-                  121
-                ]
-              }
-            ]
-          }
-        },
-        {
-          "name": "holder_token_account",
-          "writable": true,
-          "pda": {
-            "seeds": [
-              {
-                "kind": "account",
-                "path": "holder"
-              },
-              {
-                "kind": "const",
-                "value": [
-                  6,
-                  221,
-                  246,
-                  225,
-                  215,
-                  101,
-                  161,
-                  147,
-                  217,
-                  203,
-                  225,
-                  70,
-                  206,
-                  235,
-                  121,
-                  172,
-                  28,
-                  180,
-                  133,
-                  237,
-                  95,
-                  91,
-                  55,
-                  145,
-                  58,
-                  140,
-                  245,
-                  133,
-                  126,
-                  255,
-                  0,
-                  169
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "ticket_mint"
-              }
-            ],
-            "program": {
-              "kind": "const",
-              "value": [
-                140,
-                151,
-                37,
-                143,
-                78,
-                36,
-                137,
-                241,
-                187,
-                61,
-                16,
-                41,
-                20,
-                142,
-                13,
-                131,
-                11,
-                90,
-                19,
-                153,
-                218,
-                255,
-                16,
-                132,
-                4,
-                142,
-                123,
-                216,
-                219,
-                233,
-                248,
-                89
-              ]
-            }
-          }
-        },
-        {
-          "name": "token_program",
-          "address": "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
-        }
-      ],
-      "args": []
-    },
-    {
       "name": "register_merchant",
       "discriminator": [
         238,
@@ -1978,6 +2574,451 @@
           }
         }
       ]
+    },
+    {
+      "name": "reject_refund",
+      "discriminator": [
+        48,
+        63,
+        61,
+        165,
+        2,
+        138,
+        172,
+        214
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "refund_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "refund_request.ticket_mint",
+                "account": "RefundRequest"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "release_funds",
+      "discriminator": [
+        225,
+        88,
+        91,
+        108,
+        126,
+        52,
+        2,
+        26
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_escrow",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "escrow_vault",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119,
+                  95,
+                  118,
+                  97,
+                  117,
+                  108,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_creator",
+          "writable": true
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "request_refund",
+      "discriminator": [
+        155,
+        77,
+        126,
+        53,
+        47,
+        81,
+        144,
+        82
+      ],
+      "accounts": [
+        {
+          "name": "holder",
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event_escrow",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  115,
+                  99,
+                  114,
+                  111,
+                  119
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticket",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "ticket.mint",
+                "account": "Ticket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "holder_token_account",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "account",
+                "path": "holder"
+              },
+              {
+                "kind": "const",
+                "value": [
+                  6,
+                  221,
+                  246,
+                  225,
+                  215,
+                  101,
+                  161,
+                  147,
+                  217,
+                  203,
+                  225,
+                  70,
+                  206,
+                  235,
+                  121,
+                  172,
+                  28,
+                  180,
+                  133,
+                  237,
+                  95,
+                  91,
+                  55,
+                  145,
+                  58,
+                  140,
+                  245,
+                  133,
+                  126,
+                  255,
+                  0,
+                  169
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "ticket.mint",
+                "account": "Ticket"
+              }
+            ],
+            "program": {
+              "kind": "const",
+              "value": [
+                140,
+                151,
+                37,
+                143,
+                78,
+                36,
+                137,
+                241,
+                187,
+                61,
+                16,
+                41,
+                20,
+                142,
+                13,
+                131,
+                11,
+                90,
+                19,
+                153,
+                218,
+                255,
+                16,
+                132,
+                4,
+                142,
+                123,
+                216,
+                219,
+                233,
+                248,
+                89
+              ]
+            }
+          }
+        },
+        {
+          "name": "refund_request",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  114,
+                  101,
+                  102,
+                  117,
+                  110,
+                  100
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "ticket.mint",
+                "account": "Ticket"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
     },
     {
       "name": "transfer_ticket",
@@ -2409,99 +3450,79 @@
       ]
     },
     {
-      "name": "withdraw_funds",
+      "name": "update_product",
       "discriminator": [
+        139,
+        180,
         241,
-        36,
-        29,
-        111,
-        208,
-        31,
-        104,
-        217
+        126,
+        123,
+        240,
+        13,
+        224
       ],
       "accounts": [
         {
-          "name": "admin_authority",
-          "writable": true,
+          "name": "merchant_authority",
           "signer": true
         },
         {
-          "name": "admin",
+          "name": "merchant",
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  97,
-                  100,
                   109,
-                  105,
-                  110
-                ]
-              },
-              {
-                "kind": "account",
-                "path": "admin_authority"
-              }
-            ]
-          }
-        },
-        {
-          "name": "event",
-          "pda": {
-            "seeds": [
-              {
-                "kind": "const",
-                "value": [
                   101,
-                  118,
-                  101,
+                  114,
+                  99,
+                  104,
+                  97,
                   110,
                   116
                 ]
               },
               {
                 "kind": "account",
-                "path": "event.admin",
-                "account": "Event"
+                "path": "merchant.event",
+                "account": "Merchant"
               },
               {
                 "kind": "account",
-                "path": "event.name",
-                "account": "Event"
+                "path": "merchant_authority"
               }
             ]
           }
         },
         {
-          "name": "treasury",
+          "name": "product",
           "writable": true,
           "pda": {
             "seeds": [
               {
                 "kind": "const",
                 "value": [
-                  116,
+                  112,
                   114,
-                  101,
-                  97,
-                  115,
+                  111,
+                  100,
                   117,
-                  114,
-                  121
+                  99,
+                  116
                 ]
               },
               {
                 "kind": "account",
-                "path": "event"
+                "path": "merchant"
+              },
+              {
+                "kind": "account",
+                "path": "product.name",
+                "account": "MerchantProduct"
               }
             ]
           }
-        },
-        {
-          "name": "system_program",
-          "address": "11111111111111111111111111111111"
         }
       ],
       "args": [
@@ -2509,7 +3530,7 @@
           "name": "params",
           "type": {
             "defined": {
-              "name": "WithdrawFundsParams"
+              "name": "UpdateProductParams"
             }
           }
         }
@@ -2557,6 +3578,19 @@
       ]
     },
     {
+      "name": "EventEscrow",
+      "discriminator": [
+        85,
+        23,
+        101,
+        234,
+        111,
+        201,
+        49,
+        36
+      ]
+    },
+    {
       "name": "Merchant",
       "discriminator": [
         71,
@@ -2567,6 +3601,45 @@
         21,
         32,
         64
+      ]
+    },
+    {
+      "name": "MerchantProduct",
+      "discriminator": [
+        172,
+        86,
+        176,
+        55,
+        67,
+        65,
+        81,
+        46
+      ]
+    },
+    {
+      "name": "RefundRequest",
+      "discriminator": [
+        40,
+        79,
+        128,
+        211,
+        184,
+        96,
+        201,
+        204
+      ]
+    },
+    {
+      "name": "SeatTier",
+      "discriminator": [
+        12,
+        0,
+        211,
+        1,
+        187,
+        165,
+        103,
+        203
       ]
     },
     {
@@ -2663,6 +3736,19 @@
       ]
     },
     {
+      "name": "CancellationRefundClaimed",
+      "discriminator": [
+        4,
+        245,
+        111,
+        213,
+        192,
+        43,
+        149,
+        93
+      ]
+    },
+    {
       "name": "DynamicPricingEnabled",
       "discriminator": [
         194,
@@ -2673,6 +3759,32 @@
         118,
         156,
         51
+      ]
+    },
+    {
+      "name": "EscrowReleased",
+      "discriminator": [
+        131,
+        7,
+        138,
+        104,
+        166,
+        190,
+        113,
+        112
+      ]
+    },
+    {
+      "name": "EventCancellation",
+      "discriminator": [
+        84,
+        66,
+        115,
+        87,
+        239,
+        237,
+        243,
+        21
       ]
     },
     {
@@ -2712,19 +3824,6 @@
         182,
         141,
         61
-      ]
-    },
-    {
-      "name": "FundsWithdrawn",
-      "discriminator": [
-        56,
-        130,
-        230,
-        154,
-        35,
-        92,
-        11,
-        118
       ]
     },
     {
@@ -2806,6 +3905,97 @@
       ]
     },
     {
+      "name": "ProductAdded",
+      "discriminator": [
+        148,
+        19,
+        172,
+        135,
+        92,
+        199,
+        234,
+        235
+      ]
+    },
+    {
+      "name": "ProductPurchased",
+      "discriminator": [
+        149,
+        80,
+        32,
+        62,
+        22,
+        245,
+        46,
+        227
+      ]
+    },
+    {
+      "name": "ProductUpdated",
+      "discriminator": [
+        140,
+        150,
+        65,
+        136,
+        109,
+        243,
+        12,
+        25
+      ]
+    },
+    {
+      "name": "RefundApproved",
+      "discriminator": [
+        76,
+        250,
+        79,
+        131,
+        17,
+        218,
+        143,
+        0
+      ]
+    },
+    {
+      "name": "RefundRejected",
+      "discriminator": [
+        200,
+        115,
+        0,
+        150,
+        195,
+        168,
+        24,
+        103
+      ]
+    },
+    {
+      "name": "RefundRequested",
+      "discriminator": [
+        216,
+        146,
+        84,
+        109,
+        155,
+        235,
+        169,
+        179
+      ]
+    },
+    {
+      "name": "SeatTierAdded",
+      "discriminator": [
+        113,
+        122,
+        245,
+        83,
+        216,
+        121,
+        9,
+        205
+      ]
+    },
+    {
       "name": "StreakUpdated",
       "discriminator": [
         170,
@@ -2842,19 +4032,6 @@
         145,
         13,
         71
-      ]
-    },
-    {
-      "name": "TicketRefunded",
-      "discriminator": [
-        46,
-        173,
-        213,
-        43,
-        145,
-        205,
-        132,
-        218
       ]
     },
     {
@@ -3076,9 +4253,146 @@
       "code": 6040,
       "name": "BadgeAlreadyClaimed",
       "msg": "Badge for this tier has already been claimed"
+    },
+    {
+      "code": 6041,
+      "name": "RefundWindowClosed",
+      "msg": "Refund window has closed — deadline has passed"
+    },
+    {
+      "code": 6042,
+      "name": "RefundAlreadyRequested",
+      "msg": "A refund has already been requested for this ticket"
+    },
+    {
+      "code": 6043,
+      "name": "RefundAlreadyProcessed",
+      "msg": "This refund request has already been processed"
+    },
+    {
+      "code": 6044,
+      "name": "EscrowAlreadyReleased",
+      "msg": "Escrow funds have already been released"
+    },
+    {
+      "code": 6045,
+      "name": "EscrowNotReleasable",
+      "msg": "Escrow cannot be released before the event date"
+    },
+    {
+      "code": 6046,
+      "name": "InvalidRefundWindow",
+      "msg": "Invalid refund window — must be between 1 and 720 hours"
+    },
+    {
+      "code": 6047,
+      "name": "InsufficientEscrowBalance",
+      "msg": "Insufficient escrow balance to cover this refund"
+    },
+    {
+      "code": 6048,
+      "name": "EventAlreadyCancelled",
+      "msg": "This event has already been cancelled"
+    },
+    {
+      "code": 6049,
+      "name": "EventCancelled",
+      "msg": "This event has been cancelled — ticket sales are closed"
+    },
+    {
+      "code": 6050,
+      "name": "CancellationRefundWindowOpen",
+      "msg": "Cancellation refund window is still open — wait for holders to claim refunds"
+    },
+    {
+      "code": 6051,
+      "name": "EventNotCancelled",
+      "msg": "This event has not been cancelled"
+    },
+    {
+      "code": 6052,
+      "name": "TierSoldOut",
+      "msg": "This seat tier is sold out"
+    },
+    {
+      "code": 6053,
+      "name": "VipTierRestricted",
+      "msg": "This tier is restricted to Gold/Platinum badge holders"
+    },
+    {
+      "code": 6054,
+      "name": "SeatTierNameTooLong",
+      "msg": "Seat tier name exceeds maximum length"
+    },
+    {
+      "code": 6055,
+      "name": "ProductNotAvailable",
+      "msg": "This product is not available"
+    },
+    {
+      "code": 6056,
+      "name": "ProductNameTooLong",
+      "msg": "Product name exceeds maximum length"
+    },
+    {
+      "code": 6057,
+      "name": "ProductDescriptionTooLong",
+      "msg": "Product description exceeds maximum length"
     }
   ],
   "types": [
+    {
+      "name": "AddProductParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "image_url",
+            "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "AddSeatTierParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "total_seats",
+            "type": "u32"
+          },
+          {
+            "name": "tier_level",
+            "type": "u8"
+          },
+          {
+            "name": "is_restricted",
+            "type": "bool"
+          }
+        ]
+      }
+    },
     {
       "name": "Admin",
       "type": {
@@ -3331,6 +4645,34 @@
       }
     },
     {
+      "name": "CancellationRefundClaimed",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "claimed_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "CreateAdminParams",
       "type": {
         "kind": "struct",
@@ -3373,6 +4715,10 @@
           },
           {
             "name": "total_seats",
+            "type": "u32"
+          },
+          {
+            "name": "refund_window_hours",
             "type": "u32"
           }
         ]
@@ -3435,6 +4781,30 @@
       }
     },
     {
+      "name": "EscrowReleased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "released_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "Event",
       "type": {
         "kind": "struct",
@@ -3481,6 +4851,10 @@
           },
           {
             "name": "is_active",
+            "type": "bool"
+          },
+          {
+            "name": "is_cancelled",
             "type": "bool"
           },
           {
@@ -3535,6 +4909,30 @@
       }
     },
     {
+      "name": "EventCancellation",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "cancelled_at",
+            "type": "i64"
+          },
+          {
+            "name": "refund_deadline",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
       "name": "EventClosed",
       "type": {
         "kind": "struct",
@@ -3583,6 +4981,54 @@
       }
     },
     {
+      "name": "EventEscrow",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "total_collected",
+            "type": "u64"
+          },
+          {
+            "name": "total_refunded",
+            "type": "u64"
+          },
+          {
+            "name": "refund_deadline",
+            "type": "i64"
+          },
+          {
+            "name": "refund_window_hours",
+            "type": "u32"
+          },
+          {
+            "name": "is_released",
+            "type": "bool"
+          },
+          {
+            "name": "released_at",
+            "type": "i64"
+          },
+          {
+            "name": "released_amount",
+            "type": "u64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "EventUpdated",
       "type": {
         "kind": "struct",
@@ -3594,26 +5040,6 @@
           {
             "name": "admin",
             "type": "pubkey"
-          }
-        ]
-      }
-    },
-    {
-      "name": "FundsWithdrawn",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "event",
-            "type": "pubkey"
-          },
-          {
-            "name": "admin",
-            "type": "pubkey"
-          },
-          {
-            "name": "amount",
-            "type": "u64"
           }
         ]
       }
@@ -3779,6 +5205,46 @@
       }
     },
     {
+      "name": "MerchantProduct",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "type": "string"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "image_url",
+            "type": "string"
+          },
+          {
+            "name": "is_available",
+            "type": "bool"
+          },
+          {
+            "name": "total_sold",
+            "type": "u32"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "MerchantRegistered",
       "type": {
         "kind": "struct",
@@ -3895,6 +5361,219 @@
       }
     },
     {
+      "name": "ProductAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "product",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProductPurchased",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "product",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "payer",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "total_sold",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProductUpdated",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "product",
+            "type": "pubkey"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "is_available",
+            "type": "bool"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RefundApproved",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "approved_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RefundRejected",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "rejected_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RefundRequest",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "status",
+            "type": {
+              "defined": {
+                "name": "RefundStatus"
+              }
+            }
+          },
+          {
+            "name": "requested_at",
+            "type": "i64"
+          },
+          {
+            "name": "processed_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RefundRequested",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "ticket_mint",
+            "type": "pubkey"
+          },
+          {
+            "name": "holder",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "requested_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "RefundStatus",
+      "type": {
+        "kind": "enum",
+        "variants": [
+          {
+            "name": "Pending"
+          },
+          {
+            "name": "Approved"
+          },
+          {
+            "name": "Rejected"
+          }
+        ]
+      }
+    },
+    {
       "name": "RegisterMerchantParams",
       "type": {
         "kind": "struct",
@@ -3910,6 +5589,82 @@
           {
             "name": "image_url",
             "type": "string"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeatTier",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "total_seats",
+            "type": "u32"
+          },
+          {
+            "name": "seats_sold",
+            "type": "u32"
+          },
+          {
+            "name": "tier_level",
+            "type": "u8"
+          },
+          {
+            "name": "is_restricted",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
+      "name": "SeatTierAdded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "seat_tier",
+            "type": "pubkey"
+          },
+          {
+            "name": "name",
+            "type": "string"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "total_seats",
+            "type": "u32"
+          },
+          {
+            "name": "tier_level",
+            "type": "u8"
+          },
+          {
+            "name": "is_restricted",
+            "type": "bool"
           }
         ]
       }
@@ -3964,12 +5719,20 @@
             "type": "u32"
           },
           {
+            "name": "seat_tier",
+            "type": "u8"
+          },
+          {
             "name": "is_checked_in",
             "type": "bool"
           },
           {
             "name": "checked_in_at",
             "type": "i64"
+          },
+          {
+            "name": "price_paid",
+            "type": "u64"
           },
           {
             "name": "bump",
@@ -4025,30 +5788,6 @@
           },
           {
             "name": "price_paid",
-            "type": "u64"
-          }
-        ]
-      }
-    },
-    {
-      "name": "TicketRefunded",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "event",
-            "type": "pubkey"
-          },
-          {
-            "name": "mint",
-            "type": "pubkey"
-          },
-          {
-            "name": "holder",
-            "type": "pubkey"
-          },
-          {
-            "name": "refund_amount",
             "type": "u64"
           }
         ]
@@ -4117,6 +5856,38 @@
             "name": "total_seats",
             "type": {
               "option": "u32"
+            }
+          }
+        ]
+      }
+    },
+    {
+      "name": "UpdateProductParams",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "price",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "description",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "image_url",
+            "type": {
+              "option": "string"
+            }
+          },
+          {
+            "name": "is_available",
+            "type": {
+              "option": "bool"
             }
           }
         ]
@@ -4201,18 +5972,6 @@
               "Bump seed"
             ],
             "type": "u8"
-          }
-        ]
-      }
-    },
-    {
-      "name": "WithdrawFundsParams",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          {
-            "name": "amount",
-            "type": "u64"
           }
         ]
       }

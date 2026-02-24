@@ -12,6 +12,7 @@ export interface EventAccount {
   totalSeats: number;
   ticketsSold: number;
   isActive: boolean;
+  isCancelled: boolean;
   earlyAccessDate: number;
   publicSaleDate: number;
   loyaltyDiscountsEnabled: boolean;
@@ -41,6 +42,7 @@ export interface EventDisplay {
   ticketsSold: number;
   availableSeats: number;
   isActive: boolean;
+  isCancelled: boolean;
   isSoldOut: boolean;
   earlyAccessDate: Date;
   publicSaleDate: Date;

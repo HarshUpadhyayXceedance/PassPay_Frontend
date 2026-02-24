@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { AppButton } from "../../components/ui/AppButton";
 import { AppInput } from "../../components/ui/AppInput";
@@ -49,6 +49,21 @@ export function RegisterMerchantScreen() {
   useEffect(() => {
     fetchEvents();
   }, []);
+
+  // Reset all form fields when screen gains focus (expo-router keeps screens mounted)
+  useFocusEffect(
+    useCallback(() => {
+      setSelectedEvent(null);
+      setShowEventPicker(false);
+      setName("");
+      setDescription("");
+      setWalletAddress("");
+      setImageUri("");
+      setUploading(false);
+      setRegistering(false);
+      setErrors({});
+    }, [])
+  );
 
   // SuperAdmin sees all events, normal admin sees only their own
   const availableEvents = isSuperAdmin
@@ -163,7 +178,11 @@ export function RegisterMerchantScreen() {
 
           {/* Dropdown */}
           {showEventPicker && (
-            <View style={styles.eventDropdown}>
+            <ScrollView
+              style={styles.eventDropdown}
+              nestedScrollEnabled
+              showsVerticalScrollIndicator
+            >
               {eventsLoading ? (
                 <View style={styles.dropdownLoading}>
                   <ActivityIndicator size="small" color={colors.primary} />
@@ -207,7 +226,7 @@ export function RegisterMerchantScreen() {
                   </TouchableOpacity>
                 ))
               )}
-            </View>
+            </ScrollView>
           )}
         </View>
 

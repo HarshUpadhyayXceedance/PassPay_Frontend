@@ -176,7 +176,12 @@ export function EventDetailsScreen() {
             <Text style={styles.eventName} numberOfLines={2}>
               {event.name}
             </Text>
-            {event.isSoldOut && (
+            {event.isCancelled && (
+              <View style={styles.cancelledBadgeHero}>
+                <Text style={styles.soldOutBadgeText}>CANCELLED</Text>
+              </View>
+            )}
+            {event.isSoldOut && !event.isCancelled && (
               <View style={styles.soldOutBadgeHero}>
                 <Text style={styles.soldOutBadgeText}>SOLD OUT</Text>
               </View>
@@ -287,16 +292,16 @@ export function EventDetailsScreen() {
         <TouchableOpacity
           style={[
             styles.buyButton,
-            (!event.isActive || event.isSoldOut) && styles.buyButtonDisabled,
+            (!event.isActive || event.isSoldOut || event.isCancelled) && styles.buyButtonDisabled,
           ]}
           activeOpacity={0.8}
-          disabled={!event.isActive || event.isSoldOut}
+          disabled={!event.isActive || event.isSoldOut || event.isCancelled}
           onPress={handleBuyTicket}
           accessibilityRole="button"
-          accessibilityLabel={event.isSoldOut ? "Sold out" : `Buy ticket for ${formatSOL(finalPrice)} SOL`}
-          accessibilityState={{ disabled: !event.isActive || event.isSoldOut }}
+          accessibilityLabel={event.isCancelled ? "Event cancelled" : event.isSoldOut ? "Sold out" : `Buy ticket for ${formatSOL(finalPrice)} SOL`}
+          accessibilityState={{ disabled: !event.isActive || event.isSoldOut || event.isCancelled }}
         >
-          <Text style={styles.buyButtonText}>Buy Ticket</Text>
+          <Text style={styles.buyButtonText}>{event.isCancelled ? "Cancelled" : "Buy Ticket"}</Text>
         </TouchableOpacity>
       </View>
     </View>
@@ -569,6 +574,14 @@ const styles = StyleSheet.create({
   },
   soldOutBadgeHero: {
     backgroundColor: "rgba(255,71,87,0.9)",
+    borderRadius: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    marginTop: 8,
+    alignSelf: "flex-start",
+  },
+  cancelledBadgeHero: {
+    backgroundColor: "rgba(239,68,68,0.9)",
     borderRadius: 8,
     paddingHorizontal: 12,
     paddingVertical: 6,

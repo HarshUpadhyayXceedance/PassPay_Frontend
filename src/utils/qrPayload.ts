@@ -10,6 +10,7 @@ export interface PaymentQRPayload {
   merchantAuthority: string;
   eventKey: string;
   amount: number; // in SOL
+  productName?: string; // optional product reference
 }
 
 export type QRPayload = TicketQRPayload | PaymentQRPayload;

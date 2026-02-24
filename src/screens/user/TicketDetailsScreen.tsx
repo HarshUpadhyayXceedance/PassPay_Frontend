@@ -178,13 +178,24 @@ export function TicketDetailsScreen() {
             style={styles.heroGradient}
           >
             {/* Status Badge */}
-            {ticket.isCheckedIn ? (
+            {ticket.eventIsCancelled ? (
+              <View style={[styles.statusBadge, styles.cancelledBadge]}>
+                <Text style={styles.statusBadgeText}>CANCELLED</Text>
+              </View>
+            ) : ticket.isCheckedIn ? (
               <View style={[styles.statusBadge, styles.usedBadge]}>
                 <Text style={styles.statusBadgeText}>✓ USED</Text>
               </View>
             ) : (
               <View style={[styles.statusBadge, styles.validBadge]}>
                 <Text style={styles.statusBadgeText}>✓ VALID</Text>
+              </View>
+            )}
+
+            {/* Seat tier badge */}
+            {ticket.seatTierName && (
+              <View style={[styles.statusBadge, styles.tierBadge]}>
+                <Text style={styles.statusBadgeText}>{ticket.seatTierName.toUpperCase()}</Text>
               </View>
             )}
 
@@ -229,12 +240,41 @@ export function TicketDetailsScreen() {
             <Text
               style={[
                 styles.infoValue,
-                isPastEvent ? styles.pastEvent : styles.upcomingEvent,
+                ticket.eventIsCancelled
+                  ? styles.cancelledEvent
+                  : isPastEvent
+                  ? styles.pastEvent
+                  : styles.upcomingEvent,
               ]}
             >
-              {isPastEvent ? "Event Ended" : "Upcoming"}
+              {ticket.eventIsCancelled
+                ? "Event Cancelled"
+                : isPastEvent
+                ? "Event Ended"
+                : "Upcoming"}
             </Text>
           </View>
+
+          {/* Refund status */}
+          {ticket.refundStatus !== "none" && (
+            <View style={styles.infoItem}>
+              <Text style={styles.infoLabel}>Refund Status</Text>
+              <Text
+                style={[
+                  styles.infoValue,
+                  ticket.refundStatus === "pending" && { color: "#FFA502" },
+                  ticket.refundStatus === "approved" && { color: "#2ED573" },
+                  ticket.refundStatus === "rejected" && { color: "#FF4757" },
+                ]}
+              >
+                {ticket.refundStatus === "pending"
+                  ? "Refund Pending (awaiting admin)"
+                  : ticket.refundStatus === "approved"
+                  ? "Refund Approved"
+                  : "Refund Rejected"}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Purchase Information Card */}
@@ -278,26 +318,59 @@ export function TicketDetailsScreen() {
           </TouchableOpacity>
         </View>
 
+        {/* Cancellation Alert Banner */}
+        {ticket.eventIsCancelled && (
+          <View style={styles.cancelledAlertBanner}>
+            <Text style={styles.cancelledAlertTitle}>Event Cancelled</Text>
+            <Text style={styles.cancelledAlertText}>
+              This event has been cancelled by the organizer.
+              {!ticket.isCheckedIn && ticket.refundStatus === "none"
+                ? " You are eligible for a full refund."
+                : ""}
+            </Text>
+          </View>
+        )}
+
         {/* Action Buttons */}
         <View style={styles.actionsSection}>
           <Text style={styles.sectionTitle}>Actions</Text>
 
-          <TouchableOpacity
-            style={styles.primaryActionButton}
-            onPress={handleShowQR}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.primaryActionIcon}>📱</Text>
-            <View style={styles.actionButtonContent}>
-              <Text style={styles.primaryActionTitle}>Show QR Code</Text>
-              <Text style={styles.primaryActionSubtitle}>
-                Present this at check-in
-              </Text>
-            </View>
-            <Text style={styles.actionArrow}>→</Text>
-          </TouchableOpacity>
+          {/* Claim Refund for cancelled events */}
+          {ticket.eventIsCancelled && !ticket.isCheckedIn && ticket.refundStatus === "none" && (
+            <TouchableOpacity
+              style={styles.primaryRefundButton}
+              onPress={handleRefund}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryActionIcon}>💰</Text>
+              <View style={styles.actionButtonContent}>
+                <Text style={styles.primaryActionTitle}>Claim Refund</Text>
+                <Text style={styles.primaryActionSubtitle}>
+                  Get your SOL back instantly
+                </Text>
+              </View>
+              <Text style={styles.actionArrow}>→</Text>
+            </TouchableOpacity>
+          )}
 
-          {!isPastEvent && (
+          {!ticket.eventIsCancelled && (
+            <TouchableOpacity
+              style={styles.primaryActionButton}
+              onPress={handleShowQR}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.primaryActionIcon}>📱</Text>
+              <View style={styles.actionButtonContent}>
+                <Text style={styles.primaryActionTitle}>Show QR Code</Text>
+                <Text style={styles.primaryActionSubtitle}>
+                  Present this at check-in
+                </Text>
+              </View>
+              <Text style={styles.actionArrow}>→</Text>
+            </TouchableOpacity>
+          )}
+
+          {!isPastEvent && !ticket.eventIsCancelled && (
             <TouchableOpacity
               style={styles.secondaryActionButton}
               onPress={handleAddToCalendar}
@@ -316,7 +389,7 @@ export function TicketDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {!isPastEvent && !ticket.isCheckedIn && (
+          {!isPastEvent && !ticket.isCheckedIn && !ticket.eventIsCancelled && (
             <>
               <TouchableOpacity
                 style={styles.secondaryActionButton}
@@ -335,7 +408,7 @@ export function TicketDetailsScreen() {
                 <Text style={styles.actionArrow}>→</Text>
               </TouchableOpacity>
 
-              {!ticket.isCheckedIn && (
+              {ticket.refundStatus !== "rejected" && ticket.refundStatus !== "pending" && (
                 <TouchableOpacity
                   style={styles.dangerActionButton}
                   onPress={handleRefund}
@@ -441,6 +514,13 @@ const styles = StyleSheet.create({
   usedBadge: {
     backgroundColor: "rgba(143,149,178,0.9)",
   },
+  cancelledBadge: {
+    backgroundColor: "rgba(255,71,87,0.9)",
+  },
+  tierBadge: {
+    backgroundColor: "rgba(108,92,231,0.8)",
+    marginTop: 8,
+  },
   statusBadgeText: {
     fontSize: 13,
     fontWeight: "700",
@@ -533,6 +613,10 @@ const styles = StyleSheet.create({
   pastEvent: {
     color: colors.textMuted,
   },
+  cancelledEvent: {
+    color: "#FF4757",
+    fontWeight: "700",
+  },
   addressRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -555,6 +639,38 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     color: colors.primary,
     fontFamily: fonts.bodySemiBold,
+  },
+
+  /* ---- Cancellation Alert Banner ---- */
+  cancelledAlertBanner: {
+    backgroundColor: "rgba(255,71,87,0.1)",
+    borderWidth: 1,
+    borderColor: "rgba(255,71,87,0.3)",
+    borderRadius: 16,
+    padding: 16,
+    marginHorizontal: 16,
+    marginBottom: 16,
+  },
+  cancelledAlertTitle: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: "#FF4757",
+    marginBottom: 4,
+    fontFamily: fonts.headingSemiBold,
+  },
+  cancelledAlertText: {
+    fontSize: 14,
+    color: "rgba(255,71,87,0.8)",
+    lineHeight: 20,
+    fontFamily: fonts.body,
+  },
+  primaryRefundButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FF4757",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
   },
 
   /* ---- Actions Section ---- */

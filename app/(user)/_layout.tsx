@@ -84,6 +84,8 @@ export default function UserLayout() {
       <Tabs.Screen name="ticket-details" options={{ href: null }} />
       <Tabs.Screen name="ticket-qr" options={{ href: null }} />
       <Tabs.Screen name="transaction-history" options={{ href: null }} />
+      <Tabs.Screen name="event-merchants" options={{ href: null }} />
+      <Tabs.Screen name="merchant-products" options={{ href: null }} />
     </Tabs>
   );
 }

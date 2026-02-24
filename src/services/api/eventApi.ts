@@ -6,8 +6,16 @@ import { createEvent, CreateEventParams } from "../../solana/actions/createEvent
 import { buyTicket, BuyTicketParams } from "../../solana/actions/buyTicket";
 import { checkIn, CheckInParams } from "../../solana/actions/checkIn";
 import { transferTicket } from "../../solana/actions/transferTicket";
-import { refundTicket } from "../../solana/actions/refundTicket";
-import { withdrawFunds } from "../../solana/actions/withdrawFunds";
+import { requestRefund } from "../../solana/actions/requestRefund";
+import { approveRefund } from "../../solana/actions/approveRefund";
+import { rejectRefund } from "../../solana/actions/rejectRefund";
+import { releaseFunds } from "../../solana/actions/releaseFunds";
+import { cancelEvent } from "../../solana/actions/cancelEvent";
+import { claimCancellationRefund } from "../../solana/actions/claimCancellationRefund";
+import { addSeatTier } from "../../solana/actions/addSeatTier";
+import { addProduct } from "../../solana/actions/addProduct";
+import { updateProduct } from "../../solana/actions/updateProduct";
+import { buyProduct } from "../../solana/actions/buyProduct";
 import { createAdmin } from "../../solana/actions/createAdmin";
 import { claimBadge } from "../../solana/actions/issueAttendanceBadge";
 import { createBadgeMints, initializeBadgeCollection } from "../../solana/actions/initializeBadgeCollection";
@@ -44,9 +52,9 @@ async function ensureAdminPda(provider: ReturnType<typeof createProvider>): Prom
     );
   }
 
-  console.log("🔧 Auto-initializing admin PDA for super_admin...");
+  console.log("Auto-initializing admin PDA for super_admin...");
   await createAdmin(walletKey, walletKey, "Super Admin");
-  console.log("✅ Admin PDA initialized for super_admin");
+  console.log("Admin PDA initialized for super_admin");
 }
 
 export async function apiCreateEvent(params: CreateEventParams): Promise<string> {
@@ -62,6 +70,7 @@ export async function apiCreateEvent(params: CreateEventParams): Promise<string>
 
 export async function apiBuyTicket(
   eventPda: string,
+  seatTierPda: string,
   metadataUri: string
 ): Promise<{ signature: string; mint: string }> {
   const wallet = phantomWalletAdapter;
@@ -69,6 +78,7 @@ export async function apiBuyTicket(
   const provider = createProvider(wallet);
   const result = await buyTicket(provider, {
     eventPda: new PublicKey(eventPda),
+    seatTierPda: new PublicKey(seatTierPda),
     metadataUri,
   });
   return {
@@ -109,29 +119,70 @@ export async function apiTransferTicket(params: {
   });
 }
 
-export async function apiRefundTicket(params: {
+export async function apiRequestRefund(params: {
   eventPda: string;
   ticketMint: string;
 }): Promise<string> {
   const wallet = phantomWalletAdapter;
   if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
   const provider = createProvider(wallet);
-  return refundTicket(provider, {
+  return requestRefund(provider, {
     eventPda: new PublicKey(params.eventPda),
     ticketMint: new PublicKey(params.ticketMint),
   });
 }
 
-export async function apiWithdrawFunds(params: {
+export async function apiApproveRefund(params: {
   eventPda: string;
-  amount: number;
+  ticketMint: string;
+  holder: string;
+  seatTierPda: string;
 }): Promise<string> {
   const wallet = phantomWalletAdapter;
   if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
   const provider = createProvider(wallet);
-  return withdrawFunds(provider, {
+  return approveRefund(provider, {
     eventPda: new PublicKey(params.eventPda),
-    amount: params.amount,
+    ticketMint: new PublicKey(params.ticketMint),
+    holder: new PublicKey(params.holder),
+    seatTierPda: new PublicKey(params.seatTierPda),
+  });
+}
+
+export async function apiRejectRefund(params: {
+  eventPda: string;
+  ticketMint: string;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return rejectRefund(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    ticketMint: new PublicKey(params.ticketMint),
+  });
+}
+
+export async function apiReleaseFunds(params: {
+  eventPda: string;
+  eventCreator: string;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return releaseFunds(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    eventCreator: new PublicKey(params.eventCreator),
+  });
+}
+
+export async function apiCancelEvent(params: {
+  eventPda: string;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return cancelEvent(provider, {
+    eventPda: new PublicKey(params.eventPda),
   });
 }
 
@@ -146,6 +197,98 @@ export async function apiClaimBadge(): Promise<{
   const wallet = phantomWalletAdapter;
   if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
   return claimBadge();
+}
+
+export async function apiClaimCancellationRefund(params: {
+  eventPda: string;
+  ticketMint: string;
+  seatTierPda: string;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return claimCancellationRefund(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    ticketMint: new PublicKey(params.ticketMint),
+    seatTierPda: new PublicKey(params.seatTierPda),
+  });
+}
+
+export async function apiAddSeatTier(params: {
+  eventPda: string;
+  name: string;
+  price: number;
+  totalSeats: number;
+  tierLevel: number;
+  isRestricted: boolean;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  await ensureAdminPda(provider);
+  return addSeatTier(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    name: params.name,
+    price: params.price,
+    totalSeats: params.totalSeats,
+    tierLevel: params.tierLevel,
+    isRestricted: params.isRestricted,
+  });
+}
+
+export async function apiAddProduct(params: {
+  eventPda: string;
+  name: string;
+  description: string;
+  price: number;
+  imageUrl: string;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return addProduct(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    name: params.name,
+    description: params.description,
+    price: params.price,
+    imageUrl: params.imageUrl,
+  });
+}
+
+export async function apiUpdateProduct(params: {
+  eventPda: string;
+  productName: string;
+  price?: number;
+  description?: string;
+  imageUrl?: string;
+  isAvailable?: boolean;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return updateProduct(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    productName: params.productName,
+    price: params.price,
+    description: params.description,
+    imageUrl: params.imageUrl,
+    isAvailable: params.isAvailable,
+  });
+}
+
+export async function apiBuyProduct(params: {
+  eventPda: string;
+  merchantAuthority: string;
+  productName: string;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return buyProduct(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    merchantAuthority: new PublicKey(params.merchantAuthority),
+    productName: params.productName,
+  });
 }
 
 /**

@@ -14,6 +14,8 @@ import * as Haptics from "expo-haptics";
 import { useEvents } from "../../hooks/useEvents";
 import { useWallet } from "../../hooks/useWallet";
 import { useLoyalty } from "../../hooks/useLoyalty";
+import { useMerchants } from "../../hooks/useMerchants";
+import { SeatTierDisplay } from "../../types/merchant";
 import { apiBuyTicket } from "../../services/api/eventApi";
 import { uploadMetadata } from "../../services/api/uploadApi";
 import {
@@ -35,14 +37,27 @@ export function BuyTicketScreen() {
   const { getEvent } = useEvents();
   const { balance, refreshBalance } = useWallet();
   const { loyaltyBenefits, fetchLoyaltyBenefits } = useLoyalty();
+  const { seatTiers, fetchSeatTiers } = useMerchants();
   const [buying, setBuying] = useState(false);
   const [showSuccess, setShowSuccess] = useState(false);
   const [purchasedMint, setPurchasedMint] = useState<string>("");
+  const [selectedTier, setSelectedTier] = useState<SeatTierDisplay | null>(null);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
 
   const event = getEvent(eventKey as string);
+
+  // Filter tiers for this event
+  const eventTiers = seatTiers.filter((t) => t.eventKey === eventKey);
+
+  // Auto-select first available tier
+  useEffect(() => {
+    if (eventTiers.length > 0 && !selectedTier) {
+      const firstAvailable = eventTiers.find((t) => t.availableSeats > 0);
+      if (firstAvailable) setSelectedTier(firstAvailable);
+    }
+  }, [eventTiers.length]);
 
   // Reset stale state when screen re-focuses (expo-router doesn't unmount screens)
   useFocusEffect(
@@ -50,11 +65,13 @@ export function BuyTicketScreen() {
       setShowSuccess(false);
       setPurchasedMint("");
       setBuying(false);
+      setSelectedTier(null);
     }, [])
   );
 
   useEffect(() => {
     fetchLoyaltyBenefits();
+    if (eventKey) fetchSeatTiers(eventKey);
     // Entrance animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
@@ -90,9 +107,9 @@ export function BuyTicketScreen() {
     );
   }
 
-  // Calculate prices with loyalty discount
-  const basePrice = event.baseTicketPrice || event.ticketPrice;
-  const currentPrice = event.currentTicketPrice || event.ticketPrice;
+  // Calculate prices with loyalty discount — use seat tier price if selected
+  const basePrice = selectedTier ? selectedTier.price : (event.baseTicketPrice || event.ticketPrice);
+  const currentPrice = selectedTier ? selectedTier.price : (event.currentTicketPrice || event.ticketPrice);
   const discountPercent = event.loyaltyDiscountsEnabled
     ? loyaltyBenefits?.ticketDiscount || 0
     : 0;
@@ -100,8 +117,14 @@ export function BuyTicketScreen() {
   const finalPrice = currentPrice - discountAmount;
   const total = finalPrice + NETWORK_FEE;
   const canAfford = balance >= total;
+  const canBuy = canAfford && selectedTier != null && selectedTier.availableSeats > 0;
 
   const handleBuy = async () => {
+    if (!selectedTier) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      Alert.alert("Select a Tier", "Please select a seat tier before purchasing.");
+      return;
+    }
     if (!canAfford) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       Alert.alert("Insufficient Funds", "You don't have enough SOL.");
@@ -113,17 +136,18 @@ export function BuyTicketScreen() {
 
     try {
       const metadataUri = await uploadMetadata({
-        name: `${event.name} - Ticket`,
+        name: `${event.name} - ${selectedTier.name} Ticket`,
         symbol: "PASS",
-        description: `Event ticket for ${event.name} at ${event.venue}`,
+        description: `${selectedTier.name} ticket for ${event.name} at ${event.venue}`,
         image: event.imageUrl || "",
         attributes: [
           { trait_type: "Event", value: event.name },
           { trait_type: "Venue", value: event.venue },
+          { trait_type: "Tier", value: selectedTier.name },
           { trait_type: "Price (SOL)", value: formatSOL(currentPrice) },
         ],
       });
-      const result = await apiBuyTicket(event.publicKey, metadataUri);
+      const result = await apiBuyTicket(event.publicKey, selectedTier.publicKey, metadataUri);
       await refreshBalance();
 
       // Send purchase confirmation notification
@@ -151,7 +175,22 @@ export function BuyTicketScreen() {
       setShowSuccess(true);
     } catch (error: any) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Error", error.message ?? "Failed to buy ticket");
+      const msg = error.message ?? "Failed to buy ticket";
+      if (msg.includes("VipTierRestricted") || msg.includes("6053")) {
+        Alert.alert(
+          "VIP Tier Restricted",
+          "This seat tier is reserved for Gold and Platinum badge holders only. Keep attending events to level up your badge!",
+          [{ text: "OK" }]
+        );
+      } else if (msg.includes("TierSoldOut") || msg.includes("6051")) {
+        Alert.alert("Sold Out", "This seat tier is fully sold out. Please try a different tier.");
+      } else if (msg.includes("SoldOut") || msg.includes("6004")) {
+        Alert.alert("Sold Out", "All tickets for this event are sold out.");
+      } else if (msg.includes("Cancelled") || msg.includes("CancellationException")) {
+        Alert.alert("Cancelled", "Transaction was cancelled.");
+      } else {
+        Alert.alert("Error", msg);
+      }
       setBuying(false);
     }
   };
@@ -227,6 +266,59 @@ export function BuyTicketScreen() {
           </View>
         </View>
 
+        {/* Seat Tier Selector */}
+        {eventTiers.length > 0 && (
+          <>
+            <Text style={styles.sectionLabel}>SELECT SEAT TIER</Text>
+            <View style={styles.tierList}>
+              {eventTiers.map((tier) => {
+                const isSelected = selectedTier?.publicKey === tier.publicKey;
+                const isSoldOut = tier.availableSeats <= 0;
+                return (
+                  <TouchableOpacity
+                    key={tier.publicKey}
+                    style={[
+                      styles.tierCard,
+                      isSelected && styles.tierCardSelected,
+                      isSoldOut && styles.tierCardDisabled,
+                    ]}
+                    onPress={() => {
+                      if (!isSoldOut) {
+                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                        setSelectedTier(tier);
+                      }
+                    }}
+                    disabled={isSoldOut}
+                    activeOpacity={0.8}
+                  >
+                    <View style={styles.tierCardHeader}>
+                      <Text style={[styles.tierName, isSelected && styles.tierNameSelected]}>
+                        {tier.name}
+                      </Text>
+                      {tier.isRestricted && (
+                        <View style={styles.vipOnlyBadge}>
+                          <Text style={styles.vipOnlyText}>VIP ONLY</Text>
+                        </View>
+                      )}
+                      {isSelected && (
+                        <View style={styles.selectedDot}>
+                          <Text style={styles.selectedDotText}>{"\u2713"}</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={[styles.tierPrice, isSelected && styles.tierPriceSelected]}>
+                      {formatSOL(tier.price)} SOL
+                    </Text>
+                    <Text style={styles.tierSeats}>
+                      {isSoldOut ? "Sold Out" : `${tier.availableSeats} of ${tier.totalSeats} left`}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </View>
+          </>
+        )}
+
         {/* Payment Method */}
         <Text style={styles.sectionLabel}>PAYMENT METHOD</Text>
         <View style={styles.card}>
@@ -296,10 +388,10 @@ export function BuyTicketScreen() {
         <TouchableOpacity
           style={[
             styles.confirmButton,
-            (buying || !canAfford) && styles.confirmButtonDisabled,
+            (buying || !canBuy) && styles.confirmButtonDisabled,
           ]}
           onPress={handleBuy}
-          disabled={buying || !canAfford}
+          disabled={buying || !canBuy}
           activeOpacity={0.8}
           accessibilityRole="button"
           accessibilityLabel={buying ? "Processing payment" : `Confirm payment of ${formatSOL(total)} SOL`}
@@ -565,6 +657,79 @@ const styles = StyleSheet.create({
     marginRight: 6,
   },
   securedText: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+  },
+
+  /* ---- Seat Tier Selector ---- */
+  tierList: {
+    gap: 10,
+  },
+  tierCard: {
+    backgroundColor: colors.surface,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: 14,
+  },
+  tierCardSelected: {
+    borderColor: colors.primary,
+    backgroundColor: colors.primaryMuted,
+  },
+  tierCardDisabled: {
+    opacity: 0.4,
+  },
+  tierCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  tierName: {
+    fontSize: 15,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
+    flex: 1,
+  },
+  tierNameSelected: {
+    color: colors.primary,
+  },
+  vipOnlyBadge: {
+    backgroundColor: "rgba(255,215,0,0.2)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    marginRight: 8,
+  },
+  vipOnlyText: {
+    fontSize: 10,
+    fontFamily: fonts.bodyBold,
+    color: "#FFD700",
+    letterSpacing: 0.5,
+  },
+  selectedDot: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: colors.primary,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  selectedDotText: {
+    fontSize: 14,
+    color: colors.background,
+    fontWeight: "700",
+  },
+  tierPrice: {
+    fontSize: 14,
+    fontFamily: fonts.bodyBold,
+    color: colors.secondary,
+    marginBottom: 2,
+  },
+  tierPriceSelected: {
+    color: colors.primary,
+  },
+  tierSeats: {
     fontSize: 12,
     fontFamily: fonts.body,
     color: colors.textMuted,

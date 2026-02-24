@@ -5,7 +5,7 @@ import {
 } from "@solana/spl-token";
 import { AnchorProvider, BN } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
-import { findAdminPda, findEventPda, findTreasuryPda } from "../pda";
+import { findAdminPda, findEventPda, findEscrowPda, findEscrowVaultPda } from "../pda";
 import {
   findMintAuthorityPda,
   findCollectionMintPda,
@@ -24,6 +24,7 @@ export interface CreateEventParams {
   ticketPrice: number; // in SOL
   totalSeats: number;
   metadataUri: string;
+  refundWindowHours?: number; // default 48
 }
 
 export async function createEvent(
@@ -35,7 +36,8 @@ export async function createEvent(
 
   const [adminPda] = findAdminPda(adminKey);
   const [eventPda] = findEventPda(adminKey, params.name);
-  const [treasuryPda] = findTreasuryPda(eventPda);
+  const [escrowPda] = findEscrowPda(eventPda);
+  const [escrowVaultPda] = findEscrowVaultPda(eventPda);
   const [mintAuthority] = findMintAuthorityPda();
   const [collectionMint] = findCollectionMintPda(eventPda);
   const [collectionMetadata] = findMetadataPda(collectionMint);
@@ -59,12 +61,14 @@ export async function createEvent(
       ticketPrice: ticketPriceLamports,
       totalSeats: params.totalSeats,
       metadataUri: params.metadataUri,
+      refundWindowHours: params.refundWindowHours ?? 48,
     })
     .accounts({
       adminAuthority: adminKey,
       admin: adminPda,
       event: eventPda,
-      treasury: treasuryPda,
+      eventEscrow: escrowPda,
+      escrowVault: escrowVaultPda,
       collectionMint,
       mintAuthority,
       collectionTokenAccount,

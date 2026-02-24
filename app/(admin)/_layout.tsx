@@ -71,11 +71,12 @@ export default function AdminLayout() {
       <Tabs.Screen name="event-details" options={{ href: null }} />
       <Tabs.Screen name="update-event" options={{ href: null }} />
       <Tabs.Screen name="refund-management" options={{ href: null }} />
-      <Tabs.Screen name="withdraw-funds" options={{ href: null }} />
+      <Tabs.Screen name="release-funds" options={{ href: null }} />
       <Tabs.Screen name="register-merchant" options={{ href: null }} />
       <Tabs.Screen name="merchant-list" options={{ href: null }} />
       <Tabs.Screen name="dynamic-pricing-setup" options={{ href: null }} />
       <Tabs.Screen name="setup-badges" options={{ href: null }} />
+      <Tabs.Screen name="add-seat-tier" options={{ href: null }} />
     </Tabs>
   );
 }

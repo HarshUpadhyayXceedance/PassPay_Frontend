@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,35 +6,163 @@ import {
   StyleSheet,
   ScrollView,
   RefreshControl,
+  TouchableOpacity,
 } from "react-native";
+import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
-import { spacing } from "../../theme/spacing";
+import { spacing, borderRadius } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
+import { useEvents } from "../../hooks/useEvents";
 import { useMerchants } from "../../hooks/useMerchants";
+import { MerchantDisplay } from "../../types/merchant";
 import { shortenAddress, formatSOL } from "../../utils/formatters";
 
 export function MerchantDashboardScreen() {
+  const router = useRouter();
   const { publicKey, balance, refreshBalance } = useWallet();
-  const { merchants, fetchMerchants, isLoading } = useMerchants();
+  const { events, fetchEvents } = useEvents();
+  const { merchants, products, fetchMerchants, fetchProducts, isLoading } =
+    useMerchants();
 
   useEffect(() => {
     fetchMerchants();
+    fetchEvents();
   }, []);
 
-  const onRefresh = async () => {
-    await Promise.all([fetchMerchants(), refreshBalance()]);
-  };
+  // Fetch products for each of my merchants
+  useEffect(() => {
+    const mine = merchants.filter((m) => m.authority === publicKey);
+    mine.forEach((m) => fetchProducts(m.publicKey));
+  }, [merchants.length, publicKey]);
 
-  const myMerchants = merchants.filter(
-    (m) => m.authority === publicKey
-  );
+  const onRefresh = useCallback(async () => {
+    await Promise.all([fetchMerchants(), fetchEvents(), refreshBalance()]);
+  }, []);
+
+  const myMerchants = merchants.filter((m) => m.authority === publicKey);
   const totalReceived = myMerchants.reduce(
     (sum, m) => sum + m.totalReceived,
     0
   );
+
+  const renderMerchantEvent = (item: MerchantDisplay) => {
+    const event = events.find((e) => e.publicKey === item.eventKey);
+    const merchantProducts = products.filter(
+      (p) => p.merchantKey === item.publicKey
+    );
+    const eventDate = event?.eventDate
+      ? new Date(event.eventDate).toLocaleDateString("en-US", {
+          month: "short",
+          day: "numeric",
+          year: "numeric",
+        })
+      : "";
+
+    return (
+      <View key={item.publicKey} style={styles.eventCard}>
+        <View style={styles.eventCardHeader}>
+          <View style={styles.eventCardInfo}>
+            <Text style={styles.eventCardName} numberOfLines={1}>
+              {event?.name ?? "Unknown Event"}
+            </Text>
+            {event?.venue ? (
+              <View style={styles.eventMeta}>
+                <Ionicons
+                  name="location-outline"
+                  size={12}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.eventMetaText} numberOfLines={1}>
+                  {event.venue}
+                </Text>
+              </View>
+            ) : null}
+            {eventDate ? (
+              <View style={styles.eventMeta}>
+                <Ionicons
+                  name="time-outline"
+                  size={12}
+                  color={colors.textMuted}
+                />
+                <Text style={styles.eventMetaText}>{eventDate}</Text>
+              </View>
+            ) : null}
+          </View>
+          <View style={styles.eventStats}>
+            <View style={styles.eventStatBadge}>
+              <Ionicons name="cube-outline" size={12} color={colors.primary} />
+              <Text style={styles.eventStatText}>
+                {merchantProducts.length}
+              </Text>
+            </View>
+            <View style={styles.eventStatBadge}>
+              <Ionicons
+                name="cash-outline"
+                size={12}
+                color={colors.secondary}
+              />
+              <Text style={styles.eventStatText}>
+                {formatSOL(item.totalReceived)}
+              </Text>
+            </View>
+          </View>
+        </View>
+        <View style={styles.eventCardActions}>
+          <TouchableOpacity
+            style={styles.eventAction}
+            onPress={() =>
+              router.push({
+                pathname: "/(merchant)/manage-products",
+                params: {
+                  eventKey: item.eventKey,
+                  merchantKey: item.publicKey,
+                },
+              })
+            }
+            activeOpacity={0.7}
+          >
+            <Ionicons name="cube" size={16} color={colors.secondary} />
+            <Text style={styles.eventActionText}>Products</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.eventAction}
+            onPress={() =>
+              router.push({
+                pathname: "/(merchant)/generate-qr",
+                params: {
+                  eventKey: item.eventKey,
+                  merchantKey: item.publicKey,
+                },
+              })
+            }
+            activeOpacity={0.7}
+          >
+            <Ionicons name="qr-code" size={16} color={colors.primary} />
+            <Text style={styles.eventActionText}>Generate QR</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.eventAction}
+            onPress={() =>
+              router.push({
+                pathname: "/(merchant)/add-product",
+                params: {
+                  eventKey: item.eventKey,
+                  merchantKey: item.publicKey,
+                },
+              })
+            }
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add-circle" size={16} color={colors.success} />
+            <Text style={styles.eventActionText}>Add Product</Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    );
+  };
 
   return (
     <ScrollView
@@ -90,26 +218,53 @@ export function MerchantDashboardScreen() {
       {/* Stats Row */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
-          <View style={[styles.statIconWrap, { backgroundColor: colors.primaryMuted }]}>
+          <View
+            style={[
+              styles.statIconWrap,
+              { backgroundColor: colors.primaryMuted },
+            ]}
+          >
             <Ionicons name="cash" size={18} color={colors.primary} />
           </View>
           <Text style={styles.statValue}>{formatSOL(totalReceived)}</Text>
           <Text style={styles.statLabel}>Total Received (SOL)</Text>
         </View>
         <View style={styles.statCard}>
-          <View style={[styles.statIconWrap, { backgroundColor: colors.secondaryMuted }]}>
+          <View
+            style={[
+              styles.statIconWrap,
+              { backgroundColor: colors.secondaryMuted },
+            ]}
+          >
             <Ionicons name="calendar" size={18} color={colors.secondary} />
           </View>
           <Text style={styles.statValue}>{myMerchants.length}</Text>
-          <Text style={styles.statLabel}>Registered At</Text>
+          <Text style={styles.statLabel}>Events</Text>
         </View>
       </View>
 
+      {/* My Events Section */}
+      {myMerchants.length > 0 && (
+        <View style={styles.eventsSection}>
+          <Text style={styles.sectionTitle}>
+            Your Events ({myMerchants.length})
+          </Text>
+          <Text style={styles.sectionSubtitle}>
+            Manage products and generate QR codes per event
+          </Text>
+          {myMerchants.map((m) => renderMerchantEvent(m))}
+        </View>
+      )}
+
       {/* Empty State */}
-      {myMerchants.length === 0 && (
+      {myMerchants.length === 0 && !isLoading && (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>
-            <Ionicons name="storefront-outline" size={48} color={colors.textMuted} />
+            <Ionicons
+              name="storefront-outline"
+              size={48}
+              color={colors.textMuted}
+            />
           </View>
           <Text style={styles.emptyTitle}>Not Registered</Text>
           <Text style={styles.emptyText}>
@@ -231,6 +386,97 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginTop: 2,
     textAlign: "center",
+  },
+  eventsSection: {
+    paddingHorizontal: spacing.lg,
+  },
+  sectionTitle: {
+    fontSize: 18,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  sectionSubtitle: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+    lineHeight: 18,
+  },
+  eventCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  eventCardHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    marginBottom: spacing.sm,
+  },
+  eventCardInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  eventCardName: {
+    fontSize: 16,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
+    marginBottom: 4,
+  },
+  eventMeta: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: 2,
+  },
+  eventMetaText: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    flex: 1,
+  },
+  eventStats: {
+    gap: 4,
+  },
+  eventStatBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: colors.surfaceLight,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+  },
+  eventStatText: {
+    fontSize: 11,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.textSecondary,
+  },
+  eventCardActions: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+    paddingTop: spacing.sm,
+  },
+  eventAction: {
+    flex: 1,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 4,
+    paddingVertical: 8,
+    borderRadius: borderRadius.md,
+    backgroundColor: colors.surfaceLight,
+  },
+  eventActionText: {
+    fontSize: 12,
+    fontFamily: fonts.bodySemiBold,
+    color: colors.text,
   },
   emptyContainer: {
     alignItems: "center",

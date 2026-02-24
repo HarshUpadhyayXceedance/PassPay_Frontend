@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,7 +8,7 @@ import {
   TouchableOpacity,
   Modal,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useFocusEffect } from "expo-router";
 import { AppButton } from "../../components/ui/AppButton";
 import { AppInput } from "../../components/ui/AppInput";
 import { AppHeader } from "../../components/ui/AppHeader";
@@ -17,15 +17,16 @@ import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
 import { fonts } from "../../theme/fonts";
+import { PublicKey } from "@solana/web3.js";
 import { apiCreateEvent } from "../../services/api/eventApi";
 import { uploadMetadata } from "../../services/api/uploadApi";
 import { uploadImageToCloudinary } from "../../services/cloudinary/uploadImage";
+import { useWallet } from "../../hooks/useWallet";
+import { findEventPda } from "../../solana/pda";
 import {
   validateEventName,
   validateVenue,
   validateEventDescription,
-  validateTicketPrice,
-  validateTotalSeats,
 } from "../../utils/validators";
 
 const MONTH_NAMES = [
@@ -44,11 +45,10 @@ function formatHour12(hour: number): string {
 
 export function CreateEventScreen() {
   const router = useRouter();
+  const { publicKey } = useWallet();
   const [name, setName] = useState("");
   const [venue, setVenue] = useState("");
   const [description, setDescription] = useState("");
-  const [ticketPrice, setTicketPrice] = useState("");
-  const [totalSeats, setTotalSeats] = useState("");
   const [imageUri, setImageUri] = useState("");
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
@@ -67,6 +67,24 @@ export function CreateEventScreen() {
   const [tempYear, setTempYear] = useState(new Date().getFullYear());
   const [tempHour, setTempHour] = useState(10);
   const [tempMinute, setTempMinute] = useState(0);
+
+  // Reset all form fields when screen gains focus (expo-router keeps screens mounted)
+  useFocusEffect(
+    useCallback(() => {
+      setName("");
+      setVenue("");
+      setDescription("");
+      setImageUri("");
+      setErrors({});
+      setUploading(false);
+      setCreating(false);
+      const d = new Date();
+      d.setDate(d.getDate() + 7);
+      d.setHours(10, 0, 0, 0);
+      setEventDate(d);
+      setPickerMode(null);
+    }, [])
+  );
 
   const openDatePicker = () => {
     setTempMonth(eventDate.getMonth());
@@ -114,8 +132,6 @@ export function CreateEventScreen() {
       name: validateEventName(name),
       venue: validateVenue(venue),
       description: validateEventDescription(description),
-      ticketPrice: validateTicketPrice(ticketPrice),
-      totalSeats: validateTotalSeats(totalSeats),
       eventDate:
         eventDate <= new Date() ? "Event date must be in the future" : null,
     };
@@ -138,14 +154,15 @@ export function CreateEventScreen() {
         }
       }
 
-      const tx = await apiCreateEvent({
+      // Use placeholder values — actual pricing/capacity comes from seat tiers
+      await apiCreateEvent({
         name,
         venue,
         description,
         imageUrl,
         eventDate,
-        ticketPrice: parseFloat(ticketPrice),
-        totalSeats: parseInt(totalSeats, 10),
+        ticketPrice: 0.000000001, // placeholder — real price comes from seat tiers
+        totalSeats: 10000, // placeholder cap — real limits come from seat tiers
         metadataUri: await uploadMetadata({
           name: `${name} - Event Collection`,
           symbol: "PASS",
@@ -154,14 +171,30 @@ export function CreateEventScreen() {
           attributes: [
             { trait_type: "Event", value: name },
             { trait_type: "Venue", value: venue },
-            { trait_type: "Total Seats", value: parseInt(totalSeats, 10) },
           ],
         }),
       });
 
-      Alert.alert("Success", "Event created successfully!", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      // Compute the event PDA address from admin wallet + event name
+      const adminPubkey = new PublicKey(publicKey!);
+      const [eventPda] = findEventPda(adminPubkey, name);
+      const eventPdaStr = eventPda.toBase58();
+
+      Alert.alert(
+        "Event Created!",
+        "Now add seat tiers (Bronze, Silver, Gold, VIP) with different prices and capacities.",
+        [
+          {
+            text: "Add Seat Tiers",
+            onPress: () =>
+              router.replace({
+                pathname: "/(admin)/add-seat-tier",
+                params: { eventKey: eventPdaStr, eventName: name },
+              }),
+          },
+          { text: "Later", style: "cancel", onPress: () => router.back() },
+        ]
+      );
     } catch (error: any) {
       const msg = error.message ?? "Failed to create event";
       if (
@@ -423,23 +456,12 @@ export function CreateEventScreen() {
           uploading={uploading}
         />
 
-        <AppInput
-          label="Ticket Price (SOL)"
-          value={ticketPrice}
-          onChangeText={setTicketPrice}
-          placeholder="0.1"
-          keyboardType="decimal-pad"
-          error={errors.ticketPrice ?? undefined}
-        />
-
-        <AppInput
-          label="Total Seats"
-          value={totalSeats}
-          onChangeText={setTotalSeats}
-          placeholder="100"
-          keyboardType="number-pad"
-          error={errors.totalSeats ?? undefined}
-        />
+        {/* Note: Ticket price and seat capacity are configured per seat tier */}
+        <View style={styles.tierHintCard}>
+          <Text style={styles.tierHintText}>
+            Pricing and seat capacity will be configured in the next step when you add seat tiers (Bronze, Silver, Gold, VIP).
+          </Text>
+        </View>
 
         <AppButton
           title="Create Event"
@@ -467,6 +489,18 @@ const styles = StyleSheet.create({
   },
   createButton: {
     marginTop: spacing.lg,
+  },
+  tierHintCard: {
+    backgroundColor: colors.primaryMuted,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  tierHintText: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.primary,
+    lineHeight: 20,
   },
   dateSection: {
     marginBottom: spacing.md,

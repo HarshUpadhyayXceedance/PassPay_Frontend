@@ -1,37 +1,35 @@
 import { PublicKey, SystemProgram } from "@solana/web3.js";
-import { TOKEN_PROGRAM_ID } from "@solana/spl-token";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
-import { findTicketPda, findTreasuryPda } from "../pda";
-import { findMintAuthorityPda, getAssociatedTokenAddress } from "../utils/tokenUtils";
+import { findTicketPda, findEscrowPda, findRefundRequestPda } from "../pda";
+import { getAssociatedTokenAddress } from "../utils/tokenUtils";
 
-export interface RefundTicketParams {
+export interface RequestRefundParams {
   eventPda: PublicKey;
   ticketMint: PublicKey;
 }
 
-export async function refundTicket(
+export async function requestRefund(
   provider: AnchorProvider,
-  params: RefundTicketParams
+  params: RequestRefundParams
 ): Promise<string> {
   const program = getProgram(provider);
   const holder = provider.wallet.publicKey;
+
   const [ticketPda] = findTicketPda(params.eventPda, params.ticketMint);
-  const [treasuryPda] = findTreasuryPda(params.eventPda);
-  const [mintAuthority] = findMintAuthorityPda();
+  const [escrowPda] = findEscrowPda(params.eventPda);
+  const [refundRequestPda] = findRefundRequestPda(params.eventPda, params.ticketMint);
   const holderTokenAccount = getAssociatedTokenAddress(params.ticketMint, holder);
 
   const tx = await program.methods
-    .refundTicket()
+    .requestRefund()
     .accounts({
       holder,
       event: params.eventPda,
-      treasury: treasuryPda,
+      eventEscrow: escrowPda,
       ticket: ticketPda,
-      ticketMint: params.ticketMint,
-      mintAuthority,
       holderTokenAccount,
-      tokenProgram: TOKEN_PROGRAM_ID,
+      refundRequest: refundRequestPda,
       systemProgram: SystemProgram.programId,
     })
     .rpc();

@@ -13,19 +13,19 @@ import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { useTickets } from "../../hooks/useTickets";
 import { useEvents } from "../../hooks/useEvents";
-import { apiRefundTicket } from "../../services/api/eventApi";
+import { useMerchants } from "../../hooks/useMerchants";
+import { apiRequestRefund, apiClaimCancellationRefund } from "../../services/api/eventApi";
 import { formatSOL } from "../../utils/formatters";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
-
-const NETWORK_FEE = 0.000005;
 
 export function RefundRequestScreen() {
   const router = useRouter();
   const { ticketKey } = useLocalSearchParams<{ ticketKey: string }>();
   const { tickets } = useTickets();
   const { getEvent } = useEvents();
+  const { seatTiers, fetchSeatTiers } = useMerchants();
   const [processing, setProcessing] = useState(false);
 
   const ticket = useMemo(
@@ -65,42 +65,102 @@ export function RefundRequestScreen() {
     );
   }
 
-  const ticketPrice = event.ticketPrice;
-  const refundEstimate = ticketPrice - NETWORK_FEE;
+  // Use actual price paid (after loyalty discount) for refund display
+  const refundAmount = ticket.pricePaid > 0
+    ? ticket.pricePaid / 1_000_000_000
+    : event.ticketPrice;
+
+  const isCancelledEvent = ticket.eventIsCancelled;
+
+  // Resolve the seat tier PDA for this ticket
+  const resolveSeatTierPda = async (): Promise<string> => {
+    // Fetch tiers for this event if not already loaded
+    await fetchSeatTiers(ticket.eventKey);
+    const eventTiers = seatTiers.filter((t) => t.eventKey === ticket.eventKey);
+    const matchingTier = eventTiers.find((t) => t.tierLevel === ticket.seatTier);
+    if (!matchingTier) {
+      throw new Error("Could not find matching seat tier for this ticket. Please try again.");
+    }
+    return matchingTier.publicKey;
+  };
 
   const handleRefund = async () => {
-    Alert.alert(
-      "Confirm Refund",
-      "Are you sure you want to refund this ticket? This action is irreversible and your ticket NFT will be burned.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Confirm",
-          style: "destructive",
-          onPress: async () => {
-            setProcessing(true);
-            try {
-              await apiRefundTicket({
-                eventPda: ticket.eventKey,
-                ticketMint: ticket.mint,
-              });
-              Alert.alert(
-                "Refund Confirmed",
-                "Your ticket has been refunded successfully. The SOL has been returned to your wallet.",
-                [{ text: "OK", onPress: () => router.back() }]
-              );
-            } catch (error: any) {
-              Alert.alert(
-                "Refund Failed",
-                error.message ?? "Failed to process refund. Please try again."
-              );
-            } finally {
-              setProcessing(false);
-            }
+    if (isCancelledEvent) {
+      // Auto-refund for cancelled events — no admin approval needed
+      Alert.alert(
+        "Claim Refund",
+        `Claim your refund of ${formatSOL(refundAmount)} SOL? The event was cancelled and you'll receive your SOL back immediately.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Claim Refund",
+            onPress: async () => {
+              setProcessing(true);
+              try {
+                const seatTierPda = await resolveSeatTierPda();
+                await apiClaimCancellationRefund({
+                  eventPda: ticket.eventKey,
+                  ticketMint: ticket.mint,
+                  seatTierPda,
+                });
+                Alert.alert(
+                  "Refund Claimed",
+                  "Your refund has been processed. The SOL has been returned to your wallet.",
+                  [{ text: "OK", onPress: () => router.back() }]
+                );
+              } catch (error: any) {
+                const msg = error.message ?? "Failed to claim refund.";
+                if (msg.includes("RefundWindowClosed")) {
+                  Alert.alert("Refund Window Closed", "The refund deadline for this cancelled event has passed.");
+                } else {
+                  Alert.alert("Refund Failed", msg);
+                }
+              } finally {
+                setProcessing(false);
+              }
+            },
           },
-        },
-      ]
-    );
+        ]
+      );
+    } else {
+      // Regular refund request — needs admin approval
+      Alert.alert(
+        "Request Refund",
+        `Submit a refund request for ${formatSOL(refundAmount)} SOL? The event admin will review and approve or reject your request.`,
+        [
+          { text: "Cancel", style: "cancel" },
+          {
+            text: "Submit Request",
+            style: "destructive",
+            onPress: async () => {
+              setProcessing(true);
+              try {
+                await apiRequestRefund({
+                  eventPda: ticket.eventKey,
+                  ticketMint: ticket.mint,
+                });
+                Alert.alert(
+                  "Refund Requested",
+                  "Your refund request has been submitted. The event admin will review it shortly.",
+                  [{ text: "OK", onPress: () => router.back() }]
+                );
+              } catch (error: any) {
+                const msg = error.message ?? "Failed to submit refund request.";
+                if (msg.includes("RefundWindowClosed")) {
+                  Alert.alert("Refund Window Closed", "The refund deadline for this event has passed.");
+                } else if (msg.includes("TicketAlreadyCheckedIn")) {
+                  Alert.alert("Cannot Refund", "This ticket has already been checked in.");
+                } else {
+                  Alert.alert("Refund Failed", msg);
+                }
+              } finally {
+                setProcessing(false);
+              }
+            },
+          },
+        ]
+      );
+    }
   };
 
   return (
@@ -159,55 +219,36 @@ export function RefundRequestScreen() {
         <Text style={styles.sectionLabel}>REFUND SUMMARY</Text>
         <View style={styles.card}>
           <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Original Ticket Price</Text>
+            <Text style={styles.summaryLabel}>Price Paid</Text>
             <Text style={styles.summaryValue}>
-              {formatSOL(ticketPrice)} SOL
-            </Text>
-          </View>
-          <View style={styles.summaryRow}>
-            <View style={styles.networkFeeLabel}>
-              <Text style={styles.summaryLabel}>Network Fee</Text>
-              <View style={styles.solanaBadge}>
-                <Text style={styles.solanaBadgeText}>Solana</Text>
-              </View>
-            </View>
-            <Text style={styles.summaryValue}>
-              -{formatSOL(NETWORK_FEE)} SOL
-            </Text>
-          </View>
-          <View style={styles.feeNotice}>
-            <Ionicons
-              name="information-circle-outline"
-              size={14}
-              color={colors.textMuted}
-            />
-            <Text style={styles.feeNoticeText}>
-              Network fees are non-refundable
+              {formatSOL(refundAmount)} SOL
             </Text>
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryRow}>
-            <Text style={styles.totalLabel}>Estimated Refund</Text>
+            <Text style={styles.totalLabel}>Refund Amount</Text>
             <Text style={styles.totalValue}>
-              {formatSOL(refundEstimate)} SOL
+              {formatSOL(refundAmount)} SOL
             </Text>
           </View>
         </View>
 
-        {/* Warning Section */}
-        <View style={styles.warningCard}>
-          <View style={styles.warningHeader}>
+        {/* Info Section */}
+        <View style={styles.infoCard}>
+          <View style={styles.infoHeader}>
             <Ionicons
-              name="warning"
+              name="information-circle"
               size={22}
-              color={colors.warning}
+              color={colors.primary}
             />
-            <Text style={styles.warningTitle}>Important Notice</Text>
+            <Text style={styles.infoTitle}>
+              {isCancelledEvent ? "Cancellation Refund" : "How Refunds Work"}
+            </Text>
           </View>
-          <Text style={styles.warningBody}>
-            This action is irreversible. Your ticket NFT will be burned and you
-            will lose access to the event. The refund amount will be returned to
-            your wallet after the transaction is confirmed on-chain.
+          <Text style={styles.infoBody}>
+            {isCancelledEvent
+              ? "This event has been cancelled by the organizer. You are eligible for an automatic refund. Click the button below to claim your SOL back instantly — no admin approval needed."
+              : "Your refund request will be reviewed by the event admin. If approved, the SOL will be returned to your wallet and your ticket will be invalidated. Refund requests can only be submitted before the refund deadline and for tickets that haven't been checked in."}
           </Text>
         </View>
       </ScrollView>
@@ -233,7 +274,9 @@ export function RefundRequestScreen() {
                 color={colors.text}
                 style={styles.buttonIcon}
               />
-              <Text style={styles.refundButtonText}>Confirm Refund</Text>
+              <Text style={styles.refundButtonText}>
+                {isCancelledEvent ? "Claim Refund Now" : "Submit Refund Request"}
+              </Text>
             </>
           )}
         </TouchableOpacity>
@@ -369,33 +412,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyMedium,
     color: colors.text,
   },
-  networkFeeLabel: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-  },
-  solanaBadge: {
-    backgroundColor: colors.secondaryMuted,
-    borderRadius: 4,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-  },
-  solanaBadgeText: {
-    fontSize: 10,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.secondary,
-  },
-  feeNotice: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 6,
-    marginBottom: 12,
-  },
-  feeNoticeText: {
-    fontSize: 12,
-    fontFamily: fonts.body,
-    color: colors.textMuted,
-  },
   summaryDivider: {
     height: 1,
     backgroundColor: colors.border,
@@ -411,26 +427,26 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
     color: colors.primary,
   },
-  warningCard: {
-    backgroundColor: colors.errorLight,
+  infoCard: {
+    backgroundColor: colors.primaryMuted,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: colors.error,
+    borderColor: colors.primary,
     padding: spacing.md,
     marginTop: 20,
   },
-  warningHeader: {
+  infoHeader: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
     marginBottom: spacing.sm,
   },
-  warningTitle: {
+  infoTitle: {
     fontSize: 15,
     fontFamily: fonts.headingSemiBold,
-    color: colors.warning,
+    color: colors.primary,
   },
-  warningBody: {
+  infoBody: {
     fontSize: 13,
     fontFamily: fonts.body,
     color: colors.textSecondary,

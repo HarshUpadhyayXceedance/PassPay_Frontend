@@ -139,8 +139,12 @@ export function MyTicketsScreen() {
 
           {/* Top row badges */}
           <View style={styles.topBadgesRow}>
-            {/* VALID or USED badge */}
-            {item.isCheckedIn ? (
+            {/* CANCELLED badge takes priority */}
+            {item.eventIsCancelled ? (
+              <View style={[styles.statusBadge, styles.cancelledBadge]}>
+                <Text style={styles.statusBadgeText}>CANCELLED</Text>
+              </View>
+            ) : item.isCheckedIn ? (
               <View style={[styles.statusBadge, styles.usedBadge]}>
                 <Text style={styles.statusBadgeText}>USED</Text>
               </View>
@@ -150,8 +154,32 @@ export function MyTicketsScreen() {
               </View>
             )}
 
+            {/* Refund status badge */}
+            {item.refundStatus === "pending" && (
+              <View style={[styles.statusBadge, { backgroundColor: "#FFA502" }]}>
+                <Text style={styles.statusBadgeText}>REFUND PENDING</Text>
+              </View>
+            )}
+            {item.refundStatus === "approved" && (
+              <View style={[styles.statusBadge, { backgroundColor: "#2ED573" }]}>
+                <Text style={styles.statusBadgeText}>REFUNDED</Text>
+              </View>
+            )}
+            {item.refundStatus === "rejected" && (
+              <View style={[styles.statusBadge, { backgroundColor: "#FF4757" }]}>
+                <Text style={styles.statusBadgeText}>REFUND REJECTED</Text>
+              </View>
+            )}
+
+            {/* Seat tier badge */}
+            {item.seatTierName && (
+              <View style={[styles.statusBadge, styles.tierBadge]}>
+                <Text style={styles.statusBadgeText}>{item.seatTierName.toUpperCase()}</Text>
+              </View>
+            )}
+
             {/* Active badge for today's events */}
-            {isToday && !started && !isPast && (
+            {!item.eventIsCancelled && isToday && !started && !isPast && (
               <View style={styles.activeBadge}>
                 <View style={styles.activeDot} />
                 <Text style={styles.activeBadgeText}>TODAY</Text>
@@ -159,7 +187,7 @@ export function MyTicketsScreen() {
             )}
 
             {/* Event Started badge */}
-            {started && !isPast && (
+            {!item.eventIsCancelled && started && !isPast && (
               <View style={styles.startedBadge}>
                 <Text style={styles.startedBadgeText}>LIVE NOW</Text>
               </View>
@@ -204,19 +232,33 @@ export function MyTicketsScreen() {
 
           {/* Bottom action row */}
           <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.qrButton}
-              onPress={(e) => {
-                e.stopPropagation();
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-                router.push({ pathname: "/(user)/ticket-qr", params: { ticketKey: item.publicKey } });
-              }}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.qrButtonText}>
-                {isPast ? "View QR" : "Show Ticket QR"}
-              </Text>
-            </TouchableOpacity>
+            {item.eventIsCancelled && !item.isCheckedIn && item.refundStatus === "none" ? (
+              <TouchableOpacity
+                style={styles.refundButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push({ pathname: "/(user)/refund", params: { ticketKey: item.publicKey } });
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.refundButtonText}>Get Refund</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.qrButton}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  router.push({ pathname: "/(user)/ticket-qr", params: { ticketKey: item.publicKey } });
+                }}
+                activeOpacity={0.8}
+              >
+                <Text style={styles.qrButtonText}>
+                  {isPast ? "View QR" : "Show Ticket QR"}
+                </Text>
+              </TouchableOpacity>
+            )}
 
             <TouchableOpacity
               style={styles.shareButton}
@@ -492,6 +534,12 @@ const styles = StyleSheet.create({
     letterSpacing: 0.5,
     fontFamily: fonts.bodyBold,
   },
+  cancelledBadge: {
+    backgroundColor: "#FF4757",
+  },
+  tierBadge: {
+    backgroundColor: "rgba(108,92,231,0.8)",
+  },
   proofPassBadge: {
     position: "absolute",
     bottom: 12,
@@ -590,6 +638,21 @@ const styles = StyleSheet.create({
   shareIcon: {
     fontSize: 20,
     color: colors.text,
+  },
+  refundButton: {
+    flex: 1,
+    backgroundColor: "#FF4757",
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: 12,
+  },
+  refundButtonText: {
+    fontSize: 15,
+    fontWeight: "700",
+    color: colors.text,
+    fontFamily: fonts.bodySemiBold,
   },
 
   /* ---- Empty state ---- */

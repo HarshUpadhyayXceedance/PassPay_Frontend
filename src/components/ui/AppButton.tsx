@@ -94,17 +94,17 @@ const styles = StyleSheet.create({
   size_sm: {
     paddingVertical: spacing.xs,
     paddingHorizontal: spacing.md,
-    height: 36,
+    minHeight: 36,
   },
   size_md: {
     paddingVertical: spacing.sm,
     paddingHorizontal: spacing.lg,
-    height: 48,
+    minHeight: 48,
   },
   size_lg: {
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.xl,
-    height: 56,
+    minHeight: 56,
   },
   disabled: {
     opacity: 0.5,

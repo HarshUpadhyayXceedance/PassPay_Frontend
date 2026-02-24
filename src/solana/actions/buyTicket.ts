@@ -13,7 +13,8 @@ import { getProgram } from "../config/program";
 import {
   findEventPda,
   findTicketPda,
-  findTreasuryPda,
+  findEscrowPda,
+  findEscrowVaultPda,
   findUserAttendancePda,
 } from "../pda";
 import {
@@ -27,6 +28,7 @@ import { TOKEN_METADATA_PROGRAM_ID } from "../config/constants";
 
 export interface BuyTicketParams {
   eventPda: PublicKey;
+  seatTierPda: PublicKey;
   metadataUri: string;
 }
 
@@ -39,7 +41,8 @@ export async function buyTicket(
 
   const ticketMint = Keypair.generate();
   const [ticketPda] = findTicketPda(params.eventPda, ticketMint.publicKey);
-  const [treasuryPda] = findTreasuryPda(params.eventPda);
+  const [escrowPda] = findEscrowPda(params.eventPda);
+  const [escrowVaultPda] = findEscrowVaultPda(params.eventPda);
   const [mintAuthority] = findMintAuthorityPda();
   const [ticketMetadata] = findMetadataPda(ticketMint.publicKey);
 
@@ -62,7 +65,8 @@ export async function buyTicket(
     .accounts({
       buyer,
       event: params.eventPda,
-      treasury: treasuryPda,
+      eventEscrow: escrowPda,
+      escrowVault: escrowVaultPda,
       ticketMint: ticketMint.publicKey,
       mintAuthority,
       buyerTokenAccount,
@@ -71,6 +75,7 @@ export async function buyTicket(
       collectionMint,
       collectionMetadata,
       collectionMasterEdition,
+      seatTier: params.seatTierPda,
       userAttendanceRecord,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,

@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 export const PROGRAM_ID = new PublicKey(
-  "3MPrG9z4ixZdsVKiWE64g2UZLSZggQTXWXz2UffeLcpS"
+  "5q8tkv9Rxccrpw1fhH68m8tW4k3iuLCiD4GTuRiWbrSb"
 );
 
 export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
@@ -21,11 +21,15 @@ export const ADMIN_SEED = "admin";
 export const EVENT_SEED = "event";
 export const TICKET_SEED = "ticket";
 export const MERCHANT_SEED = "merchant";
-export const TREASURY_SEED = "treasury";
+export const ESCROW_SEED = "escrow";
+export const ESCROW_VAULT_SEED = "escrow_vault";
+export const REFUND_SEED = "refund";
 export const MINT_AUTHORITY_SEED = "mint_authority";
 export const COLLECTION_SEED = "collection";
 export const ATTENDANCE_SEED = "attendance";
 export const BADGE_AUTHORITY_SEED = "badge_authority";
+export const SEAT_TIER_SEED = "seat_tier";
+export const PRODUCT_SEED = "product";
 
 // Limits
 export const MAX_EVENT_NAME_LEN = 64;

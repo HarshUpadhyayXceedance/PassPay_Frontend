@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -20,8 +20,10 @@ import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { formatSOL, formatDate } from "../../utils/formatters";
 import { useWallet } from "../../hooks/useWallet";
+import { useMerchants } from "../../hooks/useMerchants";
 import { updateDynamicPrice } from "../../solana/actions/updateDynamicPrice";
 import { closeEvent } from "../../solana/actions/closeEvent";
+import { apiCancelEvent } from "../../services/api/eventApi";
 import { createProvider } from "../../solana/wallet/walletSession";
 import { phantomWalletAdapter } from "../../solana/wallet/phantomWalletAdapter";
 import { EventDisplay } from "../../types/event";
@@ -37,8 +39,16 @@ export function EventDetailsAdminScreen({
 }: EventDetailsAdminScreenProps) {
   const { publicKey } = useWallet();
   const router = useRouter();
+  const { seatTiers, fetchSeatTiers } = useMerchants();
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
   const [isClosingEvent, setIsClosingEvent] = useState(false);
+  const [isCancellingEvent, setIsCancellingEvent] = useState(false);
+
+  useEffect(() => {
+    fetchSeatTiers(event.publicKey);
+  }, [event.publicKey]);
+
+  const eventTiers = seatTiers.filter((t) => t.eventKey === event.publicKey);
 
   const revenue = event.ticketsSold * event.currentTicketPrice;
   const fillRate =
@@ -93,6 +103,42 @@ export function EventDetailsAdminScreen({
     );
   };
 
+  const handleCancelEvent = () => {
+    Alert.alert(
+      "Cancel Event",
+      `Are you sure you want to CANCEL "${event.name}"?\n\nThis will:\n- Stop all ticket sales\n- Open a 30-day refund window for all holders\n- Block fund release until refund window closes\n\nThis action cannot be undone.`,
+      [
+        { text: "Go Back", style: "cancel" },
+        {
+          text: "Cancel Event",
+          style: "destructive",
+          onPress: async () => {
+            setIsCancellingEvent(true);
+            try {
+              const sig = await apiCancelEvent({
+                eventPda: event.publicKey,
+              });
+              Alert.alert(
+                "Event Cancelled",
+                `"${event.name}" has been cancelled. A 30-day refund window is now open for all ticket holders.\n\nSig: ${sig.slice(0, 8)}...`
+              );
+              onRefresh?.();
+            } catch (error: any) {
+              const msg = error.message || "Failed to cancel event";
+              if (msg.includes("EventAlreadyCancelled")) {
+                Alert.alert("Already Cancelled", "This event has already been cancelled.");
+              } else {
+                Alert.alert("Error", msg);
+              }
+            } finally {
+              setIsCancellingEvent(false);
+            }
+          },
+        },
+      ]
+    );
+  };
+
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
       {/* Back / Title Header */}
@@ -116,6 +162,19 @@ export function EventDetailsAdminScreen({
           <Text style={styles.eventDescription}>{event.description}</Text>
         ) : null}
         <Text style={styles.eventDate}>{formatDate(event.eventDate)}</Text>
+
+        {event.isCancelled && (
+          <View style={styles.cancelledBadge}>
+            <Ionicons name="close-circle" size={16} color={colors.error} />
+            <Text style={styles.cancelledText}>EVENT CANCELLED</Text>
+          </View>
+        )}
+        {!event.isActive && !event.isCancelled && (
+          <View style={styles.closedBadge}>
+            <Ionicons name="lock-closed" size={14} color={colors.warning} />
+            <Text style={styles.closedText}>EVENT CLOSED</Text>
+          </View>
+        )}
       </View>
 
       {/* Pricing Section */}
@@ -191,6 +250,61 @@ export function EventDetailsAdminScreen({
         </Text>
       </AppCard>
 
+      {/* Seat Tiers */}
+      <AppCard style={styles.card}>
+        <View style={styles.cardHeader}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="layers" size={18} color={colors.accent} />
+            <Text style={styles.cardTitle}>Seat Tiers</Text>
+          </View>
+          <AppButton
+            title="+ Add Tier"
+            variant="outline"
+            size="sm"
+            onPress={() =>
+              router.push({
+                pathname: "/(admin)/add-seat-tier",
+                params: { eventKey: event.publicKey, eventName: event.name },
+              })
+            }
+          />
+        </View>
+
+        {eventTiers.length === 0 ? (
+          <Text style={styles.noTiersText}>
+            No seat tiers configured. Add tiers to enable ticket sales.
+          </Text>
+        ) : (
+          eventTiers.map((tier) => (
+            <View key={tier.publicKey} style={styles.tierRow}>
+              <View style={styles.tierInfo}>
+                <Text style={styles.tierName}>
+                  {tier.name}
+                  {tier.isRestricted ? " (VIP)" : ""}
+                </Text>
+                <Text style={styles.tierMeta}>
+                  {formatSOL(tier.price)} SOL · {tier.seatsSold}/{tier.totalSeats} sold
+                </Text>
+              </View>
+              <View style={styles.tierBar}>
+                <View
+                  style={[
+                    styles.tierBarFill,
+                    {
+                      width: `${
+                        tier.totalSeats > 0
+                          ? Math.min((tier.seatsSold / tier.totalSeats) * 100, 100)
+                          : 0
+                      }%`,
+                    },
+                  ]}
+                />
+              </View>
+            </View>
+          ))
+        )}
+      </AppCard>
+
       {/* Loyalty Settings */}
       <AppCard style={styles.card}>
         <View style={styles.cardTitleRow}>
@@ -240,7 +354,7 @@ export function EventDetailsAdminScreen({
         <AppButton
           title="View Merchants"
           variant="outline"
-          onPress={() => router.push("/(admin)/merchant-list")}
+          onPress={() => router.push({ pathname: "/(admin)/merchant-list", params: { eventKey: event.publicKey } })}
         />
         <AppButton
           title="Manage Refunds"
@@ -250,10 +364,10 @@ export function EventDetailsAdminScreen({
           }
         />
         <AppButton
-          title="Withdraw Funds"
+          title="Release Escrow Funds"
           variant="outline"
           onPress={() =>
-            router.push({ pathname: "/(admin)/withdraw-funds", params: { eventKey: event.publicKey } })
+            router.push({ pathname: "/(admin)/release-funds", params: { eventKey: event.publicKey } })
           }
         />
         {event.isActive && (
@@ -263,6 +377,15 @@ export function EventDetailsAdminScreen({
             onPress={handleCloseEvent}
             loading={isClosingEvent}
             style={styles.closeEventButton}
+          />
+        )}
+        {!event.isCancelled && (
+          <AppButton
+            title={isCancellingEvent ? "Cancelling..." : "Cancel Event"}
+            variant="outline"
+            onPress={handleCancelEvent}
+            loading={isCancellingEvent}
+            style={styles.cancelEventButton}
           />
         )}
       </View>
@@ -465,5 +588,83 @@ const styles = StyleSheet.create({
   },
   closeEventButton: {
     borderColor: colors.error,
+  },
+  cancelEventButton: {
+    borderColor: colors.error,
+    backgroundColor: "rgba(239, 68, 68, 0.08)",
+  },
+  cancelledBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: "rgba(239, 68, 68, 0.1)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    marginTop: spacing.sm,
+    alignSelf: "flex-start",
+  },
+  cancelledText: {
+    fontSize: 13,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.error,
+    letterSpacing: 0.5,
+  },
+  closedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    backgroundColor: "rgba(245, 158, 11, 0.1)",
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: 8,
+    marginTop: spacing.sm,
+    alignSelf: "flex-start",
+  },
+  closedText: {
+    fontSize: 13,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.warning,
+    letterSpacing: 0.5,
+  },
+  noTiersText: {
+    fontSize: 14,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    textAlign: "center",
+    paddingVertical: spacing.md,
+  },
+  tierRow: {
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tierInfo: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  tierName: {
+    fontSize: 14,
+    fontFamily: fonts.bodyMedium,
+    color: colors.text,
+  },
+  tierMeta: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+  },
+  tierBar: {
+    width: "100%",
+    height: 4,
+    backgroundColor: colors.border,
+    borderRadius: 2,
+    overflow: "hidden",
+  },
+  tierBarFill: {
+    height: "100%",
+    backgroundColor: colors.accent,
+    borderRadius: 2,
   },
 });

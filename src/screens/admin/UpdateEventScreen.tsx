@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import {
   View,
   Text,
@@ -39,6 +39,16 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
   const [ticketPrice, setTicketPrice] = useState(event.ticketPrice.toString());
   const [totalSeats, setTotalSeats] = useState(event.totalSeats.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
+
+  // Reset state when event prop changes (when navigating to different event's update screen)
+  useEffect(() => {
+    setVenue(event.venue);
+    setDescription(event.description ?? "");
+    setImageUri(event.imageUrl ?? "");
+    setImageChanged(false);
+    setTicketPrice(event.ticketPrice.toString());
+    setTotalSeats(event.totalSeats.toString());
+  }, [event.publicKey]); // Only reset when event actually changes (use publicKey as dependency)
 
   const handleUpdate = async () => {
     if (!publicKey) {
@@ -177,6 +187,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.lg,
+    paddingTop: 60,
     paddingBottom: spacing.xxl,
   },
   title: {

@@ -10,7 +10,7 @@ import {
   ActivityIndicator,
   Alert,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
@@ -28,6 +28,7 @@ import {
 
 export function MerchantListScreen() {
   const router = useRouter();
+  const { eventKey } = useLocalSearchParams<{ eventKey?: string }>();
   const { merchants, fetchMerchants, isLoading } = useMerchants();
   const { events, fetchEvents } = useEvents();
   const publicKey = useWalletStore((s) => s.publicKey);
@@ -44,16 +45,17 @@ export function MerchantListScreen() {
     await Promise.all([fetchMerchants(), fetchEvents()]);
   }, [fetchMerchants, fetchEvents]);
 
-  // SuperAdmin sees all merchants, normal admin sees only merchants for their events
+  // If eventKey is provided, show only merchants for that event
+  // Otherwise: SuperAdmin sees all merchants, normal admin sees only merchants for their events
   const myEventKeys = new Set(
     isSuperAdmin
       ? events.map((e) => e.publicKey)
       : events.filter((e) => e.admin === publicKey).map((e) => e.publicKey)
   );
 
-  const filteredMerchants = merchants.filter((m) =>
-    myEventKeys.has(m.eventKey)
-  );
+  const filteredMerchants = eventKey
+    ? merchants.filter((m) => m.eventKey === eventKey)
+    : merchants.filter((m) => myEventKeys.has(m.eventKey));
 
   const getEventName = (eventKey: string): string => {
     const event = events.find((e) => e.publicKey === eventKey);
@@ -221,27 +223,31 @@ export function MerchantListScreen() {
     );
   };
 
-  const renderHeader = () => (
-    <View style={styles.headerSection}>
-      <View style={styles.headerRow}>
-        <View>
-          <Text style={styles.headerTitle}>Merchants</Text>
-          <Text style={styles.headerSubtitle}>
-            {filteredMerchants.length}{" "}
-            {filteredMerchants.length === 1 ? "merchant" : "merchants"}
-          </Text>
+  const renderHeader = () => {
+    const eventName = eventKey ? getEventName(eventKey) : null;
+    return (
+      <View style={styles.headerSection}>
+        <View style={styles.headerRow}>
+          <View>
+            <Text style={styles.headerTitle}>Merchants</Text>
+            <Text style={styles.headerSubtitle}>
+              {eventName && `${eventName} • `}
+              {filteredMerchants.length}{" "}
+              {filteredMerchants.length === 1 ? "merchant" : "merchants"}
+            </Text>
+          </View>
+          <TouchableOpacity
+            style={styles.headerCreateButton}
+            onPress={() => router.push("/(admin)/register-merchant")}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="add" size={20} color={colors.background} />
+            <Text style={styles.headerCreateText}>Add</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.headerCreateButton}
-          onPress={() => router.push("/(admin)/register-merchant")}
-          activeOpacity={0.7}
-        >
-          <Ionicons name="add" size={20} color={colors.background} />
-          <Text style={styles.headerCreateText}>Add</Text>
-        </TouchableOpacity>
       </View>
-    </View>
-  );
+    );
+  };
 
   const renderEmpty = () => {
     if (isLoading) {
@@ -318,7 +324,7 @@ const styles = StyleSheet.create({
   // Header
   headerSection: {
     paddingHorizontal: spacing.lg,
-    paddingTop: spacing.lg,
+    paddingTop: 60,
     paddingBottom: spacing.md,
   },
   headerRow: {
