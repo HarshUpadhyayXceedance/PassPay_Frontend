@@ -20,7 +20,6 @@ import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
 import { updateEvent } from "../../solana/actions/updateEvent";
 import { uploadImageToCloudinary } from "../../services/cloudinary/uploadImage";
-import { solToLamports } from "../../utils/formatters";
 import { EventDisplay } from "../../types/event";
 
 interface UpdateEventScreenProps {
@@ -36,19 +35,15 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
   const [imageUri, setImageUri] = useState(event.imageUrl ?? "");
   const [imageChanged, setImageChanged] = useState(false);
   const [uploading, setUploading] = useState(false);
-  const [ticketPrice, setTicketPrice] = useState(event.ticketPrice.toString());
-  const [totalSeats, setTotalSeats] = useState(event.totalSeats.toString());
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset state when event prop changes (when navigating to different event's update screen)
+  // Reset state when event prop changes
   useEffect(() => {
     setVenue(event.venue);
     setDescription(event.description ?? "");
     setImageUri(event.imageUrl ?? "");
     setImageChanged(false);
-    setTicketPrice(event.ticketPrice.toString());
-    setTotalSeats(event.totalSeats.toString());
-  }, [event.publicKey]); // Only reset when event actually changes (use publicKey as dependency)
+  }, [event.publicKey]);
 
   const handleUpdate = async () => {
     if (!publicKey) {
@@ -71,12 +66,6 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
         } finally {
           setUploading(false);
         }
-      }
-      if (parseFloat(ticketPrice) !== event.ticketPrice) {
-        params.ticketPrice = solToLamports(parseFloat(ticketPrice));
-      }
-      if (parseInt(totalSeats) !== event.totalSeats) {
-        params.totalSeats = parseInt(totalSeats);
       }
 
       if (Object.keys(params).length === 0) {
@@ -139,26 +128,24 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
               uploading={uploading}
             />
           </View>
+        </AppCard>
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Ticket Price (SOL)</Text>
-            <AppInput
-              placeholder="0.5"
-              value={ticketPrice}
-              onChangeText={setTicketPrice}
-              keyboardType="decimal-pad"
-            />
-          </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={styles.label}>Total Seats</Text>
-            <AppInput
-              placeholder="100"
-              value={totalSeats}
-              onChangeText={setTotalSeats}
-              keyboardType="number-pad"
-            />
-          </View>
+        {/* Seat Tier Management */}
+        <AppCard style={styles.card}>
+          <Text style={styles.tierCardTitle}>Pricing & Capacity</Text>
+          <Text style={styles.tierCardHint}>
+            Ticket prices and seat capacity are managed per tier.
+          </Text>
+          <AppButton
+            title="Manage Seat Tiers"
+            variant="outline"
+            onPress={() =>
+              router.push({
+                pathname: "/(admin)/add-seat-tier",
+                params: { eventKey: event.publicKey, eventName: event.name },
+              })
+            }
+          />
         </AppCard>
 
         <View style={styles.actions}>
@@ -214,6 +201,19 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     color: colors.text,
     marginBottom: spacing.xs,
+  },
+  tierCardTitle: {
+    fontSize: 16,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  tierCardHint: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+    marginBottom: spacing.md,
+    lineHeight: 18,
   },
   actions: {
     flexDirection: "row",

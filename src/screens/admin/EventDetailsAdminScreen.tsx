@@ -50,11 +50,27 @@ export function EventDetailsAdminScreen({
 
   const eventTiers = seatTiers.filter((t) => t.eventKey === event.publicKey);
 
-  const revenue = event.ticketsSold * event.currentTicketPrice;
-  const fillRate =
-    event.totalSeats > 0
-      ? ((event.ticketsSold / event.totalSeats) * 100).toFixed(0)
-      : "0";
+  // Derive all analytics from seat tiers (not event-level fields)
+  const totalCapacity = eventTiers.reduce((sum, t) => sum + t.totalSeats, 0);
+  const totalSold = eventTiers.reduce((sum, t) => sum + t.seatsSold, 0);
+  const totalAvailable = totalCapacity - totalSold;
+  const tierRevenue = eventTiers.reduce((sum, t) => sum + t.seatsSold * t.price, 0);
+  const fillRate = totalCapacity > 0
+    ? ((totalSold / totalCapacity) * 100).toFixed(0)
+    : "0";
+
+  // Tier price range
+  const tierPrices = eventTiers.map((t) => t.price).filter((p) => p > 0);
+  const minTierPrice = tierPrices.length > 0 ? Math.min(...tierPrices) : 0;
+  const maxTierPrice = tierPrices.length > 0 ? Math.max(...tierPrices) : 0;
+
+  // Dynamic pricing multiplier
+  const dynamicMultiplier =
+    event.dynamicPricingEnabled && event.baseTicketPrice > 0
+      ? event.currentTicketPrice / event.baseTicketPrice
+      : 1;
+  const adjustedMinPrice = minTierPrice * dynamicMultiplier;
+  const adjustedMaxPrice = maxTierPrice * dynamicMultiplier;
 
   const handleUpdatePrice = async () => {
     if (!publicKey) return;
@@ -193,32 +209,55 @@ export function EventDetailsAdminScreen({
           )}
         </View>
 
-        <View style={styles.priceRow}>
-          <View style={styles.priceItem}>
-            <Text style={styles.priceLabel}>Base Price</Text>
-            <Text style={styles.priceValue}>{formatSOL(event.baseTicketPrice)} SOL</Text>
-          </View>
-          <View style={styles.priceItem}>
-            <Text style={styles.priceLabel}>Current Price</Text>
-            <Text style={[styles.priceValue, styles.priceHighlight]}>
-              {formatSOL(event.currentTicketPrice)} SOL
-            </Text>
-          </View>
-        </View>
+        {eventTiers.length === 0 ? (
+          <Text style={styles.noTiersText}>
+            Add seat tiers to set pricing for this event.
+          </Text>
+        ) : (
+          <>
+            <View style={styles.priceRow}>
+              <View style={styles.priceItem}>
+                <Text style={styles.priceLabel}>
+                  {minTierPrice === maxTierPrice ? "Tier Price" : "Price Range"}
+                </Text>
+                <Text style={styles.priceValue}>
+                  {minTierPrice === maxTierPrice
+                    ? `${formatSOL(minTierPrice)} SOL`
+                    : `${formatSOL(minTierPrice)} – ${formatSOL(maxTierPrice)} SOL`}
+                </Text>
+              </View>
+              {event.dynamicPricingEnabled && dynamicMultiplier !== 1 && (
+                <View style={styles.priceItem}>
+                  <Text style={styles.priceLabel}>Adjusted Range</Text>
+                  <Text style={[styles.priceValue, styles.priceHighlight]}>
+                    {adjustedMinPrice === adjustedMaxPrice
+                      ? `${formatSOL(adjustedMinPrice)} SOL`
+                      : `${formatSOL(adjustedMinPrice)} – ${formatSOL(adjustedMaxPrice)} SOL`}
+                  </Text>
+                </View>
+              )}
+            </View>
 
-        {event.dynamicPricingEnabled && (
-          <View style={styles.dynamicInfo}>
-            <Text style={styles.dynamicLabel}>
-              Range: {formatSOL(event.minTicketPrice)} - {formatSOL(event.maxTicketPrice)} SOL
-            </Text>
-            <AppButton
-              title={isUpdatingPrice ? "Updating..." : "Update Price Now"}
-              variant="outline"
-              size="sm"
-              onPress={handleUpdatePrice}
-              loading={isUpdatingPrice}
-            />
-          </View>
+            {event.dynamicPricingEnabled && (
+              <View style={styles.dynamicInfo}>
+                <View>
+                  <Text style={styles.dynamicLabel}>
+                    Multiplier: {dynamicMultiplier.toFixed(2)}x
+                  </Text>
+                  <Text style={styles.dynamicLabel}>
+                    Event Range: {formatSOL(event.minTicketPrice)} – {formatSOL(event.maxTicketPrice)} SOL
+                  </Text>
+                </View>
+                <AppButton
+                  title={isUpdatingPrice ? "Updating..." : "Update Price"}
+                  variant="outline"
+                  size="sm"
+                  onPress={handleUpdatePrice}
+                  loading={isUpdatingPrice}
+                />
+              </View>
+            )}
+          </>
         )}
       </AppCard>
 
@@ -230,10 +269,10 @@ export function EventDetailsAdminScreen({
         </View>
 
         <View style={styles.statsGrid}>
-          <StatBox label="Tickets Sold" value={event.ticketsSold.toString()} />
-          <StatBox label="Available" value={event.availableSeats.toString()} />
+          <StatBox label="Tickets Sold" value={totalSold.toString()} />
+          <StatBox label="Available" value={totalAvailable.toString()} />
           <StatBox label="Fill Rate" value={`${fillRate}%`} />
-          <StatBox label="Revenue" value={`${formatSOL(revenue)} SOL`} />
+          <StatBox label="Revenue" value={`${formatSOL(tierRevenue)} SOL`} />
         </View>
 
         {/* Simple capacity bar */}
@@ -246,7 +285,7 @@ export function EventDetailsAdminScreen({
           />
         </View>
         <Text style={styles.capacityText}>
-          {event.ticketsSold} / {event.totalSeats} seats filled
+          {totalSold} / {totalCapacity} seats filled
         </Text>
       </AppCard>
 
@@ -275,33 +314,40 @@ export function EventDetailsAdminScreen({
             No seat tiers configured. Add tiers to enable ticket sales.
           </Text>
         ) : (
-          eventTiers.map((tier) => (
-            <View key={tier.publicKey} style={styles.tierRow}>
-              <View style={styles.tierInfo}>
-                <Text style={styles.tierName}>
-                  {tier.name}
-                  {tier.isRestricted ? " (VIP)" : ""}
-                </Text>
-                <Text style={styles.tierMeta}>
-                  {formatSOL(tier.price)} SOL · {tier.seatsSold}/{tier.totalSeats} sold
-                </Text>
+          eventTiers.map((tier) => {
+            const adjustedPrice = tier.price * dynamicMultiplier;
+            const showAdjusted = event.dynamicPricingEnabled && dynamicMultiplier !== 1;
+            return (
+              <View key={tier.publicKey} style={styles.tierRow}>
+                <View style={styles.tierInfo}>
+                  <Text style={styles.tierName}>
+                    {tier.name}
+                    {tier.isRestricted ? " (VIP)" : ""}
+                  </Text>
+                  <Text style={styles.tierMeta}>
+                    {showAdjusted
+                      ? `${formatSOL(tier.price)} → ${formatSOL(adjustedPrice)} SOL`
+                      : `${formatSOL(tier.price)} SOL`}
+                    {" · "}{tier.seatsSold}/{tier.totalSeats} sold
+                  </Text>
+                </View>
+                <View style={styles.tierBar}>
+                  <View
+                    style={[
+                      styles.tierBarFill,
+                      {
+                        width: `${
+                          tier.totalSeats > 0
+                            ? Math.min((tier.seatsSold / tier.totalSeats) * 100, 100)
+                            : 0
+                        }%`,
+                      },
+                    ]}
+                  />
+                </View>
               </View>
-              <View style={styles.tierBar}>
-                <View
-                  style={[
-                    styles.tierBarFill,
-                    {
-                      width: `${
-                        tier.totalSeats > 0
-                          ? Math.min((tier.seatsSold / tier.totalSeats) * 100, 100)
-                          : 0
-                      }%`,
-                    },
-                  ]}
-                />
-              </View>
-            </View>
-          ))
+            );
+          })
         )}
       </AppCard>
 
@@ -343,11 +389,11 @@ export function EventDetailsAdminScreen({
           variant="outline"
           onPress={() => router.push({ pathname: "/(admin)/update-event", params: { eventKey: event.publicKey } })}
         />
-        {!event.dynamicPricingEnabled && (
+        {!event.dynamicPricingEnabled && eventTiers.length > 0 && (
           <AppButton
             title="Enable Dynamic Pricing"
             onPress={() =>
-              router.push({ pathname: "/(admin)/dynamic-pricing-setup", params: { eventKey: event.publicKey, basePrice: String(event.baseTicketPrice) } })
+              router.push({ pathname: "/(admin)/dynamic-pricing-setup", params: { eventKey: event.publicKey, basePrice: String(minTierPrice) } })
             }
           />
         )}
@@ -653,7 +699,7 @@ const styles = StyleSheet.create({
   tierMeta: {
     fontSize: 12,
     fontFamily: fonts.body,
-    color: colors.textMuted,
+    color: colors.textSecondary,
   },
   tierBar: {
     width: "100%",

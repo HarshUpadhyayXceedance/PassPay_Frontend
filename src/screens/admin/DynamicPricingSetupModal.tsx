@@ -18,10 +18,12 @@ import { spacing } from "../../theme/spacing";
 import { useWallet } from "../../hooks/useWallet";
 import { enableDynamicPricing } from "../../solana/actions/enableDynamicPricing";
 import { formatSOL, solToLamports } from "../../utils/formatters";
+import { SeatTierDisplay } from "../../types/merchant";
 
 interface DynamicPricingSetupModalProps {
   eventPubkey: string;
-  basePrice: number; // SOL
+  basePrice: number; // SOL (cheapest tier price)
+  tiers?: SeatTierDisplay[];
   onSuccess?: () => void;
   onCancel?: () => void;
 }
@@ -36,6 +38,7 @@ const INTERVAL_OPTIONS = [
 export function DynamicPricingSetupModal({
   eventPubkey,
   basePrice,
+  tiers,
   onSuccess,
   onCancel,
 }: DynamicPricingSetupModalProps) {
@@ -51,6 +54,9 @@ export function DynamicPricingSetupModal({
 
   const minPrice = basePrice * (minPricePct / 100);
   const maxPrice = basePrice * (maxPricePct / 100);
+
+  // Preview: at max multiplier, how would each tier be affected?
+  const maxMultiplier = maxPricePct / 100;
 
   const handleEnable = async () => {
     if (!publicKey) {
@@ -89,32 +95,54 @@ export function DynamicPricingSetupModal({
       <ScrollView contentContainerStyle={styles.content}>
         <Text style={styles.title}>Dynamic Pricing</Text>
         <Text style={styles.subtitle}>
-          Configure price adjustments based on demand, time, and scarcity
+          Prices adjust automatically based on demand, time, and scarcity.
+          The multiplier applies proportionally to all seat tiers.
         </Text>
 
         <AppCard style={styles.card}>
           <Text style={styles.sectionTitle}>Price Range</Text>
+          <Text style={styles.sectionHint}>
+            Set the min/max multiplier range relative to base tier prices
+          </Text>
 
           <SliderRow
-            label="Min Price"
+            label="Min Multiplier"
             value={minPricePct}
             min={30}
             max={100}
             suffix="%"
-            displayValue={`${formatSOL(minPrice)} SOL`}
+            displayValue={`${minPricePct}% (${formatSOL(minPrice)} SOL)`}
             onChange={setMinPricePct}
           />
 
           <SliderRow
-            label="Max Price"
+            label="Max Multiplier"
             value={maxPricePct}
             min={100}
             max={500}
             suffix="%"
-            displayValue={`${formatSOL(maxPrice)} SOL`}
+            displayValue={`${maxPricePct}% (${formatSOL(maxPrice)} SOL)`}
             onChange={setMaxPricePct}
           />
         </AppCard>
+
+        {/* Tier Impact Preview */}
+        {tiers && tiers.length > 0 && (
+          <AppCard style={styles.card}>
+            <Text style={styles.sectionTitle}>Tier Impact Preview</Text>
+            <Text style={styles.sectionHint}>
+              At max multiplier ({maxMultiplier.toFixed(1)}x), tier prices would be:
+            </Text>
+            {tiers.map((tier) => (
+              <View key={tier.publicKey} style={styles.tierPreviewRow}>
+                <Text style={styles.tierPreviewName}>{tier.name}</Text>
+                <Text style={styles.tierPreviewPrice}>
+                  {formatSOL(tier.price)} → {formatSOL(tier.price * maxMultiplier)} SOL
+                </Text>
+              </View>
+            ))}
+          </AppCard>
+        )}
 
         <AppCard style={styles.card}>
           <Text style={styles.sectionTitle}>Update Interval</Text>
@@ -238,6 +266,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
     color: colors.textSecondary,
     marginBottom: spacing.lg,
+    lineHeight: 20,
   },
   card: {
     marginBottom: spacing.md,
@@ -247,7 +276,14 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.headingSemiBold,
     color: colors.text,
+    marginBottom: spacing.xs,
+  },
+  sectionHint: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
     marginBottom: spacing.md,
+    lineHeight: 18,
   },
   sliderRow: {
     marginBottom: spacing.md,
@@ -280,6 +316,24 @@ const styles = StyleSheet.create({
   intervalBtn: {
     flex: 1,
     minWidth: "40%",
+  },
+  tierPreviewRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  tierPreviewName: {
+    fontSize: 14,
+    fontFamily: fonts.bodyMedium,
+    color: colors.text,
+  },
+  tierPreviewPrice: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
   },
   actions: {
     flexDirection: "row",

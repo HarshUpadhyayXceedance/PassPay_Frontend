@@ -1,4 +1,4 @@
-import React, { useRef } from "react";
+import React, { useRef, useEffect } from "react";
 import {
   View,
   Text,
@@ -14,10 +14,12 @@ import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useEvents } from "../../hooks/useEvents";
 import { useLoyalty } from "../../hooks/useLoyalty";
+import { useMerchants } from "../../hooks/useMerchants";
 import { formatDate, formatSOL } from "../../utils/formatters";
 import { DynamicPriceIndicator } from "../../components/event/DynamicPriceIndicator";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
+import { spacing } from "../../theme/spacing";
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get("window");
 const HERO_HEIGHT = 320;
@@ -33,9 +35,16 @@ export function EventDetailsScreen() {
   const { eventKey } = useLocalSearchParams<{ eventKey: string }>();
   const { getEvent } = useEvents();
   const { loyaltyBenefits } = useLoyalty();
+  const { seatTiers, fetchSeatTiers } = useMerchants();
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const event = getEvent(eventKey as string);
+
+  useEffect(() => {
+    if (eventKey) fetchSeatTiers(eventKey);
+  }, [eventKey]);
+
+  const eventTiers = seatTiers.filter((t) => t.eventKey === eventKey);
 
   // Parallax effect for hero image
   const heroTranslateY = scrollY.interpolate({
@@ -72,16 +81,28 @@ export function EventDetailsScreen() {
     );
   }
 
-  const seatsLeft = event.availableSeats;
+  // Derive capacity & pricing from tiers
+  const totalCapacity = eventTiers.reduce((sum, t) => sum + t.totalSeats, 0);
+  const seatsLeft = eventTiers.reduce((sum, t) => sum + t.availableSeats, 0);
   const isLowSeats = seatsLeft > 0 && seatsLeft < 50;
 
-  // Calculate loyalty discount
+  // Get cheapest tier price
+  const tierPrices = eventTiers.map((t) => t.price).filter((p) => p > 0);
+  const minTierPrice = tierPrices.length > 0 ? Math.min(...tierPrices) : 0;
+
+  // Dynamic pricing multiplier
+  const dynamicMultiplier =
+    event.dynamicPricingEnabled && event.baseTicketPrice > 0
+      ? event.currentTicketPrice / event.baseTicketPrice
+      : 1;
+  const startingPrice = minTierPrice * dynamicMultiplier;
+
+  // Calculate loyalty discount on cheapest tier
   const discountPercent = event.loyaltyDiscountsEnabled && loyaltyBenefits
     ? loyaltyBenefits.ticketDiscount
     : 0;
-  const currentPrice = event.currentTicketPrice || event.ticketPrice;
-  const discountAmount = currentPrice * (discountPercent / 100);
-  const finalPrice = currentPrice - discountAmount;
+  const discountAmount = startingPrice * (discountPercent / 100);
+  const finalPrice = startingPrice - discountAmount;
 
   const handleBuyTicket = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
@@ -217,13 +238,48 @@ export function EventDetailsScreen() {
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Total Capacity</Text>
-            <Text style={styles.statValue}>{event.totalSeats}</Text>
+            <Text style={styles.statValue}>{totalCapacity}</Text>
           </View>
           <View style={styles.statCard}>
-            <Text style={styles.statLabel}>Ticket Type</Text>
-            <Text style={styles.statValue}>NFT Pass</Text>
+            <Text style={styles.statLabel}>Starting From</Text>
+            <Text style={styles.statValue}>
+              {minTierPrice > 0 ? `${formatSOL(startingPrice)} SOL` : "TBA"}
+            </Text>
           </View>
         </View>
+
+        {/* ============ SEAT TIERS ============ */}
+        {eventTiers.length > 0 && (
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Seat Tiers</Text>
+            <View style={styles.tiersContainer}>
+              {eventTiers.map((tier) => {
+                const adjustedPrice = tier.price * dynamicMultiplier;
+                const isSoldOut = tier.availableSeats <= 0;
+                return (
+                  <View key={tier.publicKey} style={[styles.tierCard, isSoldOut && styles.tierCardSoldOut]}>
+                    <View style={styles.tierCardTop}>
+                      <Text style={styles.tierCardName}>{tier.name}</Text>
+                      {tier.isRestricted && (
+                        <View style={styles.vipBadge}>
+                          <Text style={styles.vipBadgeText}>VIP</Text>
+                        </View>
+                      )}
+                    </View>
+                    <Text style={styles.tierCardPrice}>
+                      {dynamicMultiplier !== 1
+                        ? `${formatSOL(adjustedPrice)} SOL`
+                        : `${formatSOL(tier.price)} SOL`}
+                    </Text>
+                    <Text style={styles.tierCardSeats}>
+                      {isSoldOut ? "Sold Out" : `${tier.availableSeats} of ${tier.totalSeats} left`}
+                    </Text>
+                  </View>
+                );
+              })}
+            </View>
+          </View>
+        )}
 
         {/* ============ ABOUT EVENT ============ */}
         <View style={styles.section}>
@@ -278,14 +334,16 @@ export function EventDetailsScreen() {
               </Text>
             </View>
           )}
-          <Text style={styles.totalPriceLabel}>Total Price</Text>
+          <Text style={styles.totalPriceLabel}>
+            {eventTiers.length > 1 ? "From" : "Price"}
+          </Text>
           {discountPercent > 0 && (
             <Text style={styles.originalPrice}>
-              {formatSOL(currentPrice)} SOL
+              {formatSOL(startingPrice)} SOL
             </Text>
           )}
           <Text style={styles.totalPriceValue}>
-            {formatSOL(finalPrice)} SOL
+            {minTierPrice > 0 ? `${formatSOL(finalPrice)} SOL` : "TBA"}
           </Text>
         </View>
 
@@ -688,5 +746,57 @@ const styles = StyleSheet.create({
   },
   stickyHeaderSpacer: {
     width: 36,
+  },
+
+  /* ---- Seat Tiers ---- */
+  tiersContainer: {
+    gap: 10,
+  },
+  tierCard: {
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  tierCardSoldOut: {
+    opacity: 0.5,
+  },
+  tierCardTop: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 4,
+  },
+  tierCardName: {
+    fontSize: 15,
+    fontWeight: "600",
+    color: colors.text,
+    fontFamily: fonts.headingSemiBold,
+    flex: 1,
+  },
+  vipBadge: {
+    backgroundColor: "rgba(255,215,0,0.2)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+  },
+  vipBadgeText: {
+    fontSize: 10,
+    fontWeight: "700",
+    color: "#FFD700",
+    letterSpacing: 0.5,
+  },
+  tierCardPrice: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: colors.primary,
+    fontFamily: fonts.heading,
+    marginBottom: 2,
+  },
+  tierCardSeats: {
+    fontSize: 12,
+    fontWeight: "500",
+    color: colors.textSecondary,
   },
 });

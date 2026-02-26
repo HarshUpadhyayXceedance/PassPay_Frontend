@@ -18,6 +18,7 @@ import { LinearGradient } from "expo-linear-gradient";
 import { useWallet } from "../../hooks/useWallet";
 import { useEvents } from "../../hooks/useEvents";
 import { useTickets } from "../../hooks/useTickets";
+import { useMerchants } from "../../hooks/useMerchants";
 import { formatSOL } from "../../utils/formatters";
 import { DynamicPriceIndicator } from "../../components/event/DynamicPriceIndicator";
 import { EventDisplay } from "../../types/event";
@@ -52,6 +53,7 @@ export function HomeScreen() {
   const { balance, refreshBalance } = useWallet();
   const { events, fetchEvents, isLoading, error } = useEvents();
   const { fetchMyTickets } = useTickets();
+  const { seatTiers, fetchSeatTiers } = useMerchants();
 
   const [searchQuery, setSearchQuery] = useState("");
   const [debouncedSearch, setDebouncedSearch] = useState("");
@@ -68,6 +70,7 @@ export function HomeScreen() {
   useEffect(() => {
     fetchEvents();
     fetchMyTickets();
+    fetchSeatTiers(); // Fetch all tiers (no eventKey = fetch all)
   }, []);
 
   // Debounce search
@@ -87,8 +90,23 @@ export function HomeScreen() {
   }, [searchQuery]);
 
   const onRefresh = async () => {
-    await Promise.all([fetchEvents(), fetchMyTickets(), refreshBalance()]);
+    await Promise.all([fetchEvents(), fetchMyTickets(), refreshBalance(), fetchSeatTiers()]);
   };
+
+  // Build map: eventKey → min tier price (with dynamic pricing applied)
+  const getEventPrice = useCallback((event: EventDisplay): number => {
+    const eventTierPrices = seatTiers
+      .filter((t) => t.eventKey === event.publicKey)
+      .map((t) => t.price)
+      .filter((p) => p > 0);
+    if (eventTierPrices.length === 0) return event.currentTicketPrice || event.ticketPrice;
+    const minPrice = Math.min(...eventTierPrices);
+    // Apply dynamic pricing multiplier
+    if (event.dynamicPricingEnabled && event.baseTicketPrice > 0) {
+      return minPrice * (event.currentTicketPrice / event.baseTicketPrice);
+    }
+    return minPrice;
+  }, [seatTiers]);
 
   const activeEvents = useMemo(() => {
     return events.filter((e) => e.isActive);
@@ -121,17 +139,15 @@ export function HomeScreen() {
         if (sortBy === "date") {
           return a.eventDate.getTime() - b.eventDate.getTime();
         } else if (sortBy === "price") {
-          const priceA = a.currentTicketPrice || a.ticketPrice;
-          const priceB = b.currentTicketPrice || b.ticketPrice;
-          return priceA - priceB;
+          return getEventPrice(a) - getEventPrice(b);
         } else {
           // popularity = seats sold
-          const ratioA = a.ticketsSold / a.totalSeats;
-          const ratioB = b.ticketsSold / b.totalSeats;
+          const ratioA = a.totalSeats > 0 ? a.ticketsSold / a.totalSeats : 0;
+          const ratioB = b.totalSeats > 0 ? b.ticketsSold / b.totalSeats : 0;
           return ratioB - ratioA;
         }
       });
-  }, [activeEvents, debouncedSearch, sortBy, activeCategory]);
+  }, [activeEvents, debouncedSearch, sortBy, activeCategory, getEventPrice]);
 
   const featuredEvents = useMemo(() => {
     return filteredEvents
@@ -228,7 +244,7 @@ export function HomeScreen() {
         }}
         style={styles.featuredCardWrapper}
         accessibilityRole="button"
-        accessibilityLabel={`${item.name}, ${formatShortDate(item.eventDate)}, ${formatSOL(item.currentTicketPrice || item.ticketPrice)} SOL`}
+        accessibilityLabel={`${item.name}, ${formatShortDate(item.eventDate)}, ${formatSOL(getEventPrice(item))} SOL`}
       >
         <View style={styles.featuredCard}>
           {item.imageUrl ? (
@@ -277,7 +293,7 @@ export function HomeScreen() {
                 </Text>
                 <View style={styles.featuredPricePill}>
                   <Text style={styles.featuredPrice}>
-                    {formatSOL(item.currentTicketPrice || item.ticketPrice)} SOL
+                    {formatSOL(getEventPrice(item))} SOL
                   </Text>
                 </View>
               </View>
@@ -344,7 +360,7 @@ export function HomeScreen() {
             currentPrice={event.currentTicketPrice}
           />
           <Text style={styles.upcomingPrice}>
-            {formatSOL(event.currentTicketPrice || event.ticketPrice)} SOL
+            {formatSOL(getEventPrice(event))} SOL
           </Text>
           <TouchableOpacity
             style={[

@@ -36,6 +36,21 @@ export const useAuthStore = create<AuthState>((set) => ({
   detectRole: async (walletPublicKey: string) => {
     set({ isDetectingRole: true, error: null });
     try {
+      // Fast path: check cached role for this wallet
+      const storedWallet = await SecureStore.getItemAsync(WALLET_STORAGE_KEY);
+      const storedRole = await SecureStore.getItemAsync(ROLE_STORAGE_KEY);
+
+      if (storedWallet === walletPublicKey && storedRole) {
+        console.log("📦 Using cached role:", storedRole);
+        set({
+          role: storedRole as UserRole,
+          isAuthenticated: true,
+          isDetectingRole: false,
+        });
+        return;
+      }
+
+      // Slow path: on-chain role detection
       const pubKey = new PublicKey(walletPublicKey);
       const connection = new Connection(DEVNET_RPC, "confirmed");
 
@@ -69,21 +84,11 @@ export const useAuthStore = create<AuthState>((set) => ({
   loadStoredRole: async () => {
     set({ isLoading: true });
     try {
-      const storedRole = await SecureStore.getItemAsync(ROLE_STORAGE_KEY);
-      const storedWallet = await SecureStore.getItemAsync(WALLET_STORAGE_KEY);
-
-      if (storedRole && storedWallet) {
-        console.log("📦 Loaded stored role:", storedRole);
-        set({
-          role: storedRole as UserRole,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-      } else {
-        set({ isLoading: false });
-      }
+      // Don't restore isAuthenticated — requires active wallet connection.
+      // The cached role is used by detectRole() for fast re-auth after reconnect.
+      set({ isLoading: false });
     } catch (error) {
-      console.error("❌ Failed to load stored role:", error);
+      console.error("❌ Failed during startup:", error);
       set({ isLoading: false });
     }
   },

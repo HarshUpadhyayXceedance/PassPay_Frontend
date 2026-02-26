@@ -107,9 +107,16 @@ export function BuyTicketScreen() {
     );
   }
 
-  // Calculate prices with loyalty discount — use seat tier price if selected
-  const basePrice = selectedTier ? selectedTier.price : (event.baseTicketPrice || event.ticketPrice);
-  const currentPrice = selectedTier ? selectedTier.price : (event.currentTicketPrice || event.ticketPrice);
+  // Dynamic pricing multiplier: applies ratio to all tier prices
+  const dynamicMultiplier =
+    event.dynamicPricingEnabled && event.baseTicketPrice > 0
+      ? event.currentTicketPrice / event.baseTicketPrice
+      : 1;
+
+  // Calculate prices with dynamic pricing + loyalty discount
+  const tierBasePrice = selectedTier ? selectedTier.price : 0;
+  const basePrice = tierBasePrice;
+  const currentPrice = tierBasePrice * dynamicMultiplier;
   const discountPercent = event.loyaltyDiscountsEnabled
     ? loyaltyBenefits?.ticketDiscount || 0
     : 0;
@@ -307,7 +314,9 @@ export function BuyTicketScreen() {
                       )}
                     </View>
                     <Text style={[styles.tierPrice, isSelected && styles.tierPriceSelected]}>
-                      {formatSOL(tier.price)} SOL
+                      {dynamicMultiplier !== 1
+                        ? `${formatSOL(tier.price * dynamicMultiplier)} SOL`
+                        : `${formatSOL(tier.price)} SOL`}
                     </Text>
                     <Text style={styles.tierSeats}>
                       {isSoldOut ? "Sold Out" : `${tier.availableSeats} of ${tier.totalSeats} left`}

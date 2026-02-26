@@ -44,13 +44,15 @@ export function EventCard({ event, onPress }: EventCardProps) {
         <View style={styles.detailItem}>
           <Text style={styles.detailLabel}>Price</Text>
           <Text style={styles.detailValue}>
-            {formatSOL(event.ticketPrice)} SOL
+            {(event.currentTicketPrice || event.ticketPrice) > 0.0001
+              ? `${formatSOL(event.currentTicketPrice || event.ticketPrice)} SOL`
+              : "Tier-based"}
           </Text>
         </View>
         <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Seats</Text>
+          <Text style={styles.detailLabel}>Sold</Text>
           <Text style={styles.detailValue}>
-            {event.ticketsSold}/{event.totalSeats}
+            {event.ticketsSold}
           </Text>
         </View>
       </View>
