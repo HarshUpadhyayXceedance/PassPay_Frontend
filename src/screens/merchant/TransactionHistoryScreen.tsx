@@ -6,7 +6,6 @@ import {
   FlatList,
   TouchableOpacity,
   RefreshControl,
-  Alert,
   Linking,
   ActivityIndicator,
 } from "react-native";
@@ -14,7 +13,6 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import { PublicKey, ParsedTransactionWithMeta } from "@solana/web3.js";
-import * as Haptics from "expo-haptics";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
@@ -25,6 +23,7 @@ import { getConnection } from "../../solana/config/connection";
 import { getTxUrl } from "../../solana/utils/explorer";
 import { useWallet } from "../../hooks/useWallet";
 import { useMerchants } from "../../hooks/useMerchants";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 // ---------------------------------------------------------------------------
 // Types
@@ -78,18 +77,25 @@ function delay(ms: number): Promise<void> {
 }
 
 /**
- * Parse a confirmed transaction to extract pay_merchant details.
- * Returns null if the transaction isn't a pay_merchant call or can't be parsed.
+ * Parse a confirmed transaction to extract payment details.
+ *
+ * Primary: Parse inner CPI instructions for system_program::transfer
+ * directed at the merchant wallet. pay_merchant / buy_product use
+ * system_program::transfer CPI, which appears as a parsed inner
+ * instruction with type "transfer".
+ *
+ * Fallback: Balance-delta detection across known merchant addresses.
  */
 function parseMerchantPayment(
   tx: ParsedTransactionWithMeta,
   signature: string,
-  merchantWallet: string,
+  merchantAddresses: string[],
   merchantName: string
 ): MerchantTransaction | null {
   if (!tx || !tx.meta) return null;
+
+  // Check for transaction errors
   if (tx.meta.err) {
-    // Failed transaction — still show it
     const ts = tx.blockTime ? new Date(tx.blockTime * 1000) : new Date();
     return {
       signature,
@@ -101,30 +107,55 @@ function parseMerchantPayment(
     };
   }
 
-  // Determine the merchant wallet index in the account keys
-  const accountKeys = tx.transaction.message.accountKeys;
-  const merchantIdx = accountKeys.findIndex(
-    (k) => k.pubkey.toBase58() === merchantWallet
-  );
+  const knownSet = new Set(merchantAddresses);
+  let totalInbound = 0;
 
-  if (merchantIdx < 0) return null;
+  // ── Method 1: Parse inner CPI instructions ──
+  // pay_merchant / buy_product execute system_program::transfer as a CPI
+  // call. In the parsed transaction this appears as an inner instruction
+  // with parsed.type === "transfer" and parsed.info.destination set to the
+  // merchant authority wallet.
+  if (tx.meta.innerInstructions) {
+    for (const inner of tx.meta.innerInstructions) {
+      for (const ix of inner.instructions) {
+        if (
+          "parsed" in ix &&
+          ix.parsed?.type === "transfer" &&
+          ix.parsed?.info
+        ) {
+          const dest: string | undefined = ix.parsed.info.destination;
+          const lamports: number | undefined = ix.parsed.info.lamports;
+          if (dest && knownSet.has(dest) && lamports && lamports > 0) {
+            totalInbound += lamports;
+          }
+        }
+      }
+    }
+  }
 
-  // Calculate amount from balance change on the merchant wallet
-  const preBalance = tx.meta.preBalances[merchantIdx] ?? 0;
-  const postBalance = tx.meta.postBalances[merchantIdx] ?? 0;
-  const balanceChange = postBalance - preBalance;
+  // ── Method 2: Balance-change fallback ──
+  if (totalInbound === 0) {
+    const accountKeys = tx.transaction.message.accountKeys;
+    for (let idx = 0; idx < accountKeys.length; idx++) {
+      const pubkey = accountKeys[idx]?.pubkey?.toBase58();
+      if (!pubkey || !knownSet.has(pubkey)) continue;
+      const change =
+        (tx.meta.postBalances[idx] ?? 0) - (tx.meta.preBalances[idx] ?? 0);
+      if (change > 0) totalInbound += change;
+    }
+  }
 
-  // Only show inbound payments (positive balance change)
-  if (balanceChange <= 0) return null;
+  // Ignore dust (< 0.0001 SOL)
+  if (totalInbound <= 100_000) return null;
 
-  // The payer is always the first account (fee payer / signer)
-  const customer = accountKeys[0]?.pubkey?.toBase58() ?? "Unknown";
+  const customer =
+    tx.transaction.message.accountKeys[0]?.pubkey?.toBase58() ?? "Unknown";
   const ts = tx.blockTime ? new Date(tx.blockTime * 1000) : new Date();
 
   return {
     signature,
     customerAddress: customer,
-    amount: lamportsToSOL(balanceChange),
+    amount: lamportsToSOL(totalInbound),
     merchantName,
     timestamp: ts,
     status: "confirmed",
@@ -149,7 +180,17 @@ export function TransactionHistoryScreen() {
     [merchants, publicKey]
   );
 
-  // ----- Fetch on-chain transactions for all merchant PDAs -----
+  // ----- Fetch on-chain transactions for merchant PDAs -----
+  //
+  // Strategy: Query ONLY the merchant PDA for recent signatures. Every
+  // pay_merchant / buy_product transaction involves the merchant PDA, so
+  // this single query covers all payment activity. We skip querying the
+  // authority wallet separately, which halves the RPC calls and avoids
+  // noise from non-payment transactions (event creation, airdrops, etc.).
+  //
+  // Total RPC calls per merchant: 2 (getSignaturesForAddress + getParsedTransactions)
+  // Devnet public RPC rate-limits aggressively (~40 req/10s), so minimizing
+  // calls is critical to avoid silent 429 failures.
 
   const fetchTransactions = useCallback(async () => {
     if (!publicKey || myMerchants.length === 0) {
@@ -157,90 +198,124 @@ export function TransactionHistoryScreen() {
       return;
     }
 
+    console.log(`[TxHistory] Fetching for ${myMerchants.length} merchant(s), wallet=${publicKey.slice(0, 8)}`);
     const connection = getConnection();
     const allTxns: MerchantTransaction[] = [];
+    const seenSigs = new Set<string>();
 
-    for (const merchant of myMerchants) {
+    for (let mi = 0; mi < myMerchants.length; mi++) {
+      const merchant = myMerchants[mi];
+      const knownAddresses = [merchant.authority, merchant.publicKey];
+
       try {
-        const merchantPda = new PublicKey(merchant.publicKey);
-
-        // Get recent transaction signatures for this merchant PDA
+        // 1. Get recent signatures for the merchant PDA
         const signatures = await connection.getSignaturesForAddress(
-          merchantPda,
-          { limit: 50 }
+          new PublicKey(merchant.publicKey),
+          { limit: 10 }
         );
 
-        if (signatures.length === 0) continue;
+        if (signatures.length === 0) {
+          console.log(`[TxHistory] ${merchant.name}: 0 signatures`);
+          continue;
+        }
+        console.log(`[TxHistory] ${merchant.name}: ${signatures.length} signatures found`);
 
-        // Batch fetch parsed transactions (3 at a time to avoid 429)
-        const BATCH_SIZE = 3;
-        for (let i = 0; i < signatures.length; i += BATCH_SIZE) {
-          const batch = signatures.slice(i, i + BATCH_SIZE);
-          const sigs = batch.map((s) => s.signature);
+        // Small pause before next RPC call
+        await delay(200);
 
-          try {
-            const parsedTxns = await connection.getParsedTransactions(sigs, {
-              maxSupportedTransactionVersion: 0,
-            });
-
-            for (let j = 0; j < parsedTxns.length; j++) {
-              const parsed = parsedTxns[j];
-              if (!parsed) continue;
-
-              const result = parseMerchantPayment(
-                parsed,
-                sigs[j],
-                merchant.authority,
-                merchant.name
+        // 2. Fetch parsed transactions in a single batch
+        const sigs = signatures.map((s) => s.signature);
+        let parsedTxns: (ParsedTransactionWithMeta | null)[] = [];
+        try {
+          parsedTxns = await connection.getParsedTransactions(sigs, {
+            maxSupportedTransactionVersion: 0,
+          });
+        } catch (e: any) {
+          // Retry with smaller chunks on 429
+          console.warn(`[TxHistory] Batch failed for ${merchant.name}, chunking:`, e.message);
+          await delay(600);
+          const CHUNK = 5;
+          for (let i = 0; i < sigs.length; i += CHUNK) {
+            try {
+              const chunk = await connection.getParsedTransactions(
+                sigs.slice(i, i + CHUNK),
+                { maxSupportedTransactionVersion: 0 }
               );
-              if (result) {
-                allTxns.push(result);
-              }
+              parsedTxns.push(...chunk);
+            } catch {
+              parsedTxns.push(
+                ...new Array(Math.min(CHUNK, sigs.length - i)).fill(null)
+              );
             }
-          } catch (e: any) {
-            console.warn("Failed to parse transaction batch:", e.message);
-          }
-
-          // Delay between batches to avoid rate limiting
-          if (i + BATCH_SIZE < signatures.length) {
-            await delay(300);
+            if (i + CHUNK < sigs.length) await delay(300);
           }
         }
-      } catch (e: any) {
-        console.warn(
-          `Failed to fetch signatures for merchant ${merchant.name}:`,
-          e.message
+
+        // 3. Parse each transaction for payment data
+        let found = 0;
+        for (let j = 0; j < parsedTxns.length; j++) {
+          const parsed = parsedTxns[j];
+          if (!parsed || seenSigs.has(sigs[j])) continue;
+
+          const result = parseMerchantPayment(
+            parsed,
+            sigs[j],
+            knownAddresses,
+            merchant.name
+          );
+          if (result) {
+            seenSigs.add(sigs[j]);
+            allTxns.push(result);
+            found++;
+          }
+        }
+
+        console.log(
+          `[TxHistory] ${merchant.name}: ${parsedTxns.filter(Boolean).length} parsed, ${found} payments`
         );
+      } catch (e: any) {
+        console.warn(`[TxHistory] Failed for ${merchant.name}:`, e.message);
       }
+
+      // Brief delay between merchants
+      if (mi < myMerchants.length - 1) await delay(300);
     }
 
-    // Sort by timestamp, newest first
     allTxns.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-
-    // Deduplicate by signature (in case multiple merchant PDAs overlap)
-    const seen = new Set<string>();
-    const unique = allTxns.filter((tx) => {
-      if (seen.has(tx.signature)) return false;
-      seen.add(tx.signature);
-      return true;
-    });
-
-    setTransactions(unique);
+    console.log(`[TxHistory] Total: ${allTxns.length} payment(s) found`);
+    setTransactions(allTxns);
   }, [publicKey, myMerchants]);
 
-  // Initial load
+  // Initial load: fetch merchants then transactions
   useEffect(() => {
-    if (merchants.length === 0) {
-      fetchMerchants();
-    }
+    const init = async () => {
+      setLoading(true);
+      try {
+        if (merchants.length === 0) {
+          await fetchMerchants();
+        }
+      } catch (e) {
+        console.warn("Failed to fetch merchants:", e);
+      }
+      // fetchMerchants() swallows errors internally (never throws).
+      // If merchants failed to load, store stays [], second useEffect
+      // won't fire, and loading would stay true forever.
+      // Setting loading=false here ensures the screen recovers.
+      // The second useEffect will set loading=true again if merchants loaded.
+      setLoading(false);
+    };
+    init();
   }, []);
 
   useEffect(() => {
     if (myMerchants.length > 0) {
       setLoading(true);
       fetchTransactions().finally(() => setLoading(false));
+    } else if (merchants.length > 0) {
+      // Merchants loaded but none belong to this wallet — stop loading
+      setLoading(false);
     }
-  }, [myMerchants.length]);
+  }, [myMerchants.length, merchants.length, fetchTransactions]);
 
   // ----- Filtering -----
 
@@ -275,7 +350,11 @@ export function TransactionHistoryScreen() {
     [transactions]
   );
 
-  const totalCount = transactions.length;
+  // On-chain totalReceived (always accurate — read directly from merchant account data)
+  const onChainTotal = useMemo(
+    () => myMerchants.reduce((sum, m) => sum + m.totalReceived, 0),
+    [myMerchants]
+  );
 
   // ----- Refresh -----
 
@@ -292,7 +371,6 @@ export function TransactionHistoryScreen() {
   // ----- Open in Explorer -----
 
   const openExplorer = useCallback((signature: string) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     Linking.openURL(getTxUrl(signature));
   }, []);
 
@@ -307,9 +385,9 @@ export function TransactionHistoryScreen() {
       minute: "2-digit",
     });
 
-    Alert.alert(
-      "Transaction Details",
-      [
+    confirm({
+      title: "Transaction Details",
+      message: [
         `Customer: ${shortenAddress(tx.customerAddress, 6)}`,
         `Amount: ${formatSOL(tx.amount)} SOL`,
         `Merchant: ${tx.merchantName}`,
@@ -317,11 +395,12 @@ export function TransactionHistoryScreen() {
         `Status: ${tx.status === "confirmed" ? "Confirmed" : "Failed"}`,
         `Signature: ${shortenAddress(tx.signature, 8)}`,
       ].join("\n"),
-      [
-        { text: "View on Explorer", onPress: () => openExplorer(tx.signature) },
-        { text: "Close", style: "cancel" },
-      ]
-    );
+      type: "info",
+      buttons: [
+        { text: "View on Explorer", style: "default", onPress: () => openExplorer(tx.signature) },
+        { text: "Close", style: "cancel", onPress: () => {} },
+      ],
+    });
   }, [openExplorer]);
 
   // ----- Filter tabs -----
@@ -405,8 +484,12 @@ export function TransactionHistoryScreen() {
           </View>
           <View style={styles.summaryDivider} />
           <View style={styles.summaryItem}>
-            <Text style={styles.summaryLabel}>Total Txns</Text>
-            <Text style={styles.summaryValue}>{totalCount}</Text>
+            <Text style={styles.summaryLabel}>All-Time</Text>
+            <Text style={styles.summaryValue}>
+              {onChainTotal > 0
+                ? `${formatSOL(onChainTotal)} SOL`
+                : "0"}
+            </Text>
           </View>
         </View>
       </LinearGradient>
@@ -419,10 +502,7 @@ export function TransactionHistoryScreen() {
             <TouchableOpacity
               key={f.key}
               style={[styles.filterTab, isActive && styles.filterTabActive]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveFilter(f.key);
-              }}
+              onPress={() => setActiveFilter(f.key)}
               activeOpacity={0.7}
             >
               <Text

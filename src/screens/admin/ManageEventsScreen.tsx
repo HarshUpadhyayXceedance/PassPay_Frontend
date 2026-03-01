@@ -14,6 +14,7 @@ import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { useEvents } from "../../hooks/useEvents";
+import { useMerchants } from "../../hooks/useMerchants";
 import { useWalletStore } from "../../store/walletStore";
 import { useAuthStore } from "../../store/authStore";
 import { EventDisplay } from "../../types/event";
@@ -22,18 +23,22 @@ import { formatSOL, formatDate } from "../../utils/formatters";
 export function ManageEventsScreen() {
   const router = useRouter();
   const { events, fetchEvents, isLoading } = useEvents();
+  const { seatTiers, fetchSeatTiers } = useMerchants();
   const publicKey = useWalletStore((s) => s.publicKey);
   const role = useAuthStore((s) => s.role);
   const isSuperAdmin = role === "super_admin";
 
   useEffect(() => {
     fetchEvents();
+    fetchSeatTiers();
   }, []);
 
   // SuperAdmin sees all events, normal admin sees only their own
-  const myEvents = isSuperAdmin
+  // Sort newest first by event date
+  const myEvents = (isSuperAdmin
     ? events
-    : events.filter((e) => e.admin === publicKey);
+    : events.filter((e) => e.admin === publicKey)
+  ).slice().sort((a, b) => b.eventDate.getTime() - a.eventDate.getTime());
 
   const handleCreateEvent = useCallback(() => {
     router.push("/(admin)/create-event");
@@ -47,8 +52,16 @@ export function ManageEventsScreen() {
   );
 
   const renderEventItem = ({ item }: { item: EventDisplay }) => {
-    const soldCount = item.ticketsSold;
-    const totalCount = item.totalSeats;
+    const eventTiers = seatTiers.filter((t) => t.eventKey === item.publicKey);
+    const soldCount = eventTiers.length > 0
+      ? eventTiers.reduce((sum, t) => sum + t.seatsSold, 0)
+      : item.ticketsSold;
+    const totalCount = eventTiers.length > 0
+      ? eventTiers.reduce((sum, t) => sum + t.totalSeats, 0)
+      : item.totalSeats;
+    const minPrice = eventTiers.length > 0
+      ? Math.min(...eventTiers.map((t) => t.price))
+      : item.currentTicketPrice;
     const sellPercentage =
       totalCount > 0 ? Math.round((soldCount / totalCount) * 100) : 0;
 
@@ -112,7 +125,7 @@ export function ManageEventsScreen() {
                   color={colors.accentLight}
                 />
                 <Text style={styles.statText}>
-                  {formatSOL(item.currentTicketPrice)} SOL
+                  {eventTiers.length > 0 ? `From ${formatSOL(minPrice)}` : formatSOL(minPrice)} SOL
                 </Text>
               </View>
 

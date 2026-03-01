@@ -2,25 +2,64 @@ import React from "react";
 import {
   TouchableOpacity,
   Text,
+  View,
   StyleSheet,
   ActivityIndicator,
   ViewStyle,
   TextStyle,
 } from "react-native";
+import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { borderRadius, spacing } from "../../theme/spacing";
 
+type IoniconsName = keyof typeof Ionicons.glyphMap;
+
+type ButtonVariant = "primary" | "secondary" | "outline" | "ghost" | "danger";
+type ButtonSize = "sm" | "md" | "lg";
+
 interface AppButtonProps {
   title: string;
   onPress: () => void;
-  variant?: "primary" | "secondary" | "outline" | "ghost";
-  size?: "sm" | "md" | "lg";
+  variant?: ButtonVariant;
+  size?: ButtonSize;
   loading?: boolean;
   disabled?: boolean;
+  selected?: boolean;
+  icon?: IoniconsName;
   style?: ViewStyle;
   textStyle?: TextStyle;
 }
+
+// ---------- Lookup tables ----------
+
+const GRADIENT_COLORS: Record<string, readonly [string, string]> = {
+  primary: colors.gradientPrimary as unknown as [string, string],
+  secondary: colors.gradientSecondary as unknown as [string, string],
+};
+
+const TRANSPARENT_GRADIENT: readonly [string, string] = [
+  "transparent",
+  "transparent",
+];
+
+const SHADOW_STYLES: Record<string, ViewStyle> = {
+  primary: {
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  secondary: {
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+};
 
 export function AppButton({
   title,
@@ -29,67 +68,127 @@ export function AppButton({
   size = "md",
   loading = false,
   disabled = false,
+  selected = false,
+  icon,
   style,
   textStyle,
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
 
+  // When selected, promote to secondary gradient
+  const resolved = selected ? "secondary" : variant;
+  const useGradient = resolved === "primary" || resolved === "secondary";
+
+  // Determine gradient colors
+  const gradientColors = useGradient
+    ? GRADIENT_COLORS[resolved]
+    : TRANSPARENT_GRADIENT;
+
+  // Determine text / icon color
+  const foreground =
+    resolved === "outline" || resolved === "ghost"
+      ? colors.primary
+      : resolved === "danger"
+      ? colors.white
+      : colors.white;
+
+  // Loader color
+  const loaderColor =
+    resolved === "outline" || resolved === "ghost"
+      ? colors.primary
+      : colors.background;
+
+  // Surface styles: border + background for non-gradient variants
+  const surfaceStyle: ViewStyle[] = [styles.surface, styles[`size_${size}`]];
+  if (resolved === "outline") {
+    surfaceStyle.push(styles.outlineSurface);
+  } else if (resolved === "ghost") {
+    surfaceStyle.push(styles.ghostSurface);
+  } else if (resolved === "danger") {
+    surfaceStyle.push(styles.dangerSurface);
+  }
+
+  // Wrapper shadow for gradient variants
+  const wrapperStyle: ViewStyle[] = [styles.wrapper];
+  if (useGradient) {
+    const shadow = SHADOW_STYLES[resolved];
+    if (shadow) wrapperStyle.push(shadow);
+  }
+  if (isDisabled) wrapperStyle.push(styles.disabled);
+  if (style) wrapperStyle.push(style);
+
   return (
     <TouchableOpacity
       onPress={onPress}
       disabled={isDisabled}
-      style={[
-        styles.base,
-        styles[variant],
-        styles[`size_${size}`],
-        isDisabled && styles.disabled,
-        style,
-      ]}
-      activeOpacity={0.7}
+      activeOpacity={useGradient ? 0.8 : 0.7}
       accessibilityRole="button"
       accessibilityLabel={title}
       accessibilityState={{ disabled: isDisabled }}
+      style={wrapperStyle}
     >
-      {loading ? (
-        <ActivityIndicator
-          color={variant === "outline" ? colors.primary : colors.white}
-          size="small"
-        />
-      ) : (
-        <Text
-          style={[
-            styles.text,
-            styles[`text_${variant}`],
-            styles[`textSize_${size}`],
-            textStyle,
-          ]}
-        >
-          {title}
-        </Text>
-      )}
+      <LinearGradient
+        colors={gradientColors as unknown as [string, string]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 0 }}
+        style={surfaceStyle}
+      >
+        {loading ? (
+          <ActivityIndicator color={loaderColor} size="small" />
+        ) : (
+          <View style={styles.content}>
+            {icon && (
+              <Ionicons
+                name={icon}
+                size={size === "sm" ? 16 : size === "lg" ? 22 : 18}
+                color={foreground}
+                style={styles.icon}
+              />
+            )}
+            <Text
+              style={[
+                styles.text,
+                styles[`textSize_${size}`],
+                { color: foreground },
+                textStyle,
+              ]}
+            >
+              {title}
+            </Text>
+          </View>
+        )}
+      </LinearGradient>
     </TouchableOpacity>
   );
 }
 
 const styles = StyleSheet.create({
-  base: {
+  wrapper: {
+    borderRadius: borderRadius.md,
+    overflow: "hidden",
+  },
+  surface: {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: borderRadius.md,
   },
-  primary: {
-    backgroundColor: colors.primary,
-  },
-  secondary: {
-    backgroundColor: colors.secondary,
-  },
-  outline: {
-    backgroundColor: colors.transparent,
+  outlineSurface: {
     borderWidth: 1.5,
     borderColor: colors.primary,
   },
-  ghost: {
-    backgroundColor: colors.transparent,
+  ghostSurface: {
+    // transparent, no border
+  },
+  dangerSurface: {
+    backgroundColor: colors.error,
+  },
+  content: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  icon: {
+    marginRight: spacing.xs + 2,
   },
   size_sm: {
     paddingVertical: spacing.xs,
@@ -111,19 +210,6 @@ const styles = StyleSheet.create({
   },
   text: {
     ...typography.button,
-    color: colors.white,
-  },
-  text_primary: {
-    color: colors.white,
-  },
-  text_secondary: {
-    color: colors.white,
-  },
-  text_outline: {
-    color: colors.primary,
-  },
-  text_ghost: {
-    color: colors.primary,
   },
   textSize_sm: {
     fontSize: 14,

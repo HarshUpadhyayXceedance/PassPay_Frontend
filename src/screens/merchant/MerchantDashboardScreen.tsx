@@ -157,7 +157,15 @@ export function MerchantDashboardScreen() {
             activeOpacity={0.7}
           >
             <Ionicons name="add-circle" size={16} color={colors.success} />
-            <Text style={styles.eventActionText}>Add Product</Text>
+            <Text style={styles.eventActionText}>Add</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={styles.eventAction}
+            onPress={() => router.push("/(merchant)/verify-purchase")}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="scan" size={16} color={colors.accent} />
+            <Text style={styles.eventActionText}>Verify</Text>
           </TouchableOpacity>
         </View>
       </View>

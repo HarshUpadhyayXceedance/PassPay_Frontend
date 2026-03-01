@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -19,6 +18,7 @@ import { useWallet } from "../../hooks/useWallet";
 import { enableDynamicPricing } from "../../solana/actions/enableDynamicPricing";
 import { formatSOL, solToLamports } from "../../utils/formatters";
 import { SeatTierDisplay } from "../../types/merchant";
+import { showSuccess, showError } from "../../utils/alerts";
 
 interface DynamicPricingSetupModalProps {
   eventPubkey: string;
@@ -60,7 +60,7 @@ export function DynamicPricingSetupModal({
 
   const handleEnable = async () => {
     if (!publicKey) {
-      Alert.alert("Error", "Wallet not connected");
+      showError("Error", "Wallet not connected");
       return;
     }
 
@@ -78,10 +78,10 @@ export function DynamicPricingSetupModal({
         updateInterval: INTERVAL_OPTIONS[intervalIndex].value,
       });
 
-      Alert.alert("Success", "Dynamic pricing enabled for this event!");
+      showSuccess("Success", "Dynamic pricing enabled for this event!");
       onSuccess?.();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to enable dynamic pricing");
+      showError("Error", error.message || "Failed to enable dynamic pricing");
     } finally {
       setIsSubmitting(false);
     }
@@ -151,7 +151,8 @@ export function DynamicPricingSetupModal({
               <AppButton
                 key={opt.value}
                 title={opt.label}
-                variant={i === intervalIndex ? "primary" : "outline"}
+                variant="outline"
+                selected={i === intervalIndex}
                 size="sm"
                 onPress={() => setIntervalIndex(i)}
                 style={styles.intervalBtn}

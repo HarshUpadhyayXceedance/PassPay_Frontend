@@ -8,7 +8,6 @@ import {
   RefreshControl,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -25,6 +24,8 @@ import {
   apiActivateMerchant,
   apiDeactivateMerchant,
 } from "../../services/api/merchantApi";
+import { showSuccess, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 export function MerchantListScreen() {
   const router = useRouter();
@@ -65,11 +66,12 @@ export function MerchantListScreen() {
   const handleToggleStatus = async (merchant: MerchantDisplay) => {
     const action = merchant.isActive ? "Deactivate" : "Activate";
 
-    Alert.alert(
-      `${action} Merchant`,
-      `${action} "${merchant.name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: `${action} Merchant`,
+      message: `${action} "${merchant.name}"?`,
+      type: merchant.isActive ? "danger" : "default",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: action,
           style: merchant.isActive ? "destructive" : "default",
@@ -87,17 +89,17 @@ export function MerchantListScreen() {
                   merchantAuthority: merchant.authority,
                 });
               }
-              Alert.alert("Success", `Merchant ${action.toLowerCase()}d.`);
+              showSuccess("Success", `Merchant ${action.toLowerCase()}d.`);
               await fetchMerchants();
             } catch (error: any) {
-              Alert.alert("Error", error.message ?? `Failed to ${action.toLowerCase()} merchant`);
+              showError("Error", error.message ?? `Failed to ${action.toLowerCase()} merchant`);
             } finally {
               setTogglingId(null);
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const renderMerchantItem = ({ item }: { item: MerchantDisplay }) => {

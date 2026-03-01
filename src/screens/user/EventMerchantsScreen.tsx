@@ -11,7 +11,6 @@ import {
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
-import * as Haptics from "expo-haptics";
 import { useMerchants } from "../../hooks/useMerchants";
 import { useLoyalty } from "../../hooks/useLoyalty";
 import { MerchantDisplay } from "../../types/merchant";
@@ -79,7 +78,6 @@ export function EventMerchantsScreen() {
         style={styles.merchantCard}
         activeOpacity={0.8}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           router.push({
             pathname: "/(user)/merchant-products",
             params: {

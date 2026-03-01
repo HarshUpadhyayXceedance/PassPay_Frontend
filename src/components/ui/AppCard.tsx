@@ -12,14 +12,15 @@ interface AppCardProps {
   children: React.ReactNode;
   onPress?: () => void;
   style?: ViewStyle;
+  elevated?: boolean;
 }
 
-export function AppCard({ children, onPress, style }: AppCardProps) {
+export function AppCard({ children, onPress, style, elevated }: AppCardProps) {
   const Container = onPress ? TouchableOpacity : View;
 
   return (
     <Container
-      style={[styles.card, style]}
+      style={[styles.card, elevated && styles.elevated, style]}
       onPress={onPress}
       activeOpacity={onPress ? 0.7 : 1}
     >
@@ -35,5 +36,13 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  elevated: {
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 12,
+    elevation: 4,
+    borderColor: colors.borderLight,
   },
 });

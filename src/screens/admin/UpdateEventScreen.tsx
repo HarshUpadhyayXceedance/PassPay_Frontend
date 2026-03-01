@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
@@ -21,6 +20,7 @@ import { useWallet } from "../../hooks/useWallet";
 import { updateEvent } from "../../solana/actions/updateEvent";
 import { uploadImageToCloudinary } from "../../services/cloudinary/uploadImage";
 import { EventDisplay } from "../../types/event";
+import { showSuccess, showInfo, showError } from "../../utils/alerts";
 
 interface UpdateEventScreenProps {
   event: EventDisplay;
@@ -47,7 +47,7 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
 
   const handleUpdate = async () => {
     if (!publicKey) {
-      Alert.alert("Error", "Wallet not connected");
+      showError("Error", "Wallet not connected");
       return;
     }
 
@@ -69,17 +69,17 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
       }
 
       if (Object.keys(params).length === 0) {
-        Alert.alert("No Changes", "No fields were modified.");
+        showInfo("No Changes", "No fields were modified.");
+        setIsSubmitting(false);
         return;
       }
 
       const signature = await updateEvent(adminPubkey, eventPubkey, params);
 
-      Alert.alert("Success", `Event updated!\n\nSignature: ${signature.slice(0, 8)}...`, [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      showSuccess("Event Updated", `Signature: ${signature.slice(0, 8)}...`);
+      router.back();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to update event");
+      showError("Update Failed", error.message || "Failed to update event");
     } finally {
       setIsSubmitting(false);
     }

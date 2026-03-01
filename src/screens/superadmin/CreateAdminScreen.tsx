@@ -4,12 +4,12 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { PublicKey, Connection } from "@solana/web3.js";
+import { showSuccess, showWarning, showError } from "../../utils/alerts";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { AppInput } from "../../components/ui/AppInput";
 import { AppButton } from "../../components/ui/AppButton";
@@ -32,17 +32,17 @@ export function CreateAdminScreen() {
 
   const validateInputs = (): boolean => {
     if (!adminName.trim()) {
-      Alert.alert("Error", "Admin name is required");
+      showError("Error", "Admin name is required");
       return false;
     }
 
     if (adminName.length > 64) {
-      Alert.alert("Error", "Admin name must be 64 characters or less");
+      showError("Error", "Admin name must be 64 characters or less");
       return false;
     }
 
     if (!adminWallet.trim()) {
-      Alert.alert("Error", "Admin wallet address is required");
+      showError("Error", "Admin wallet address is required");
       return false;
     }
 
@@ -50,7 +50,7 @@ export function CreateAdminScreen() {
     try {
       new PublicKey(adminWallet.trim());
     } catch (error) {
-      Alert.alert("Error", "Invalid Solana wallet address");
+      showError("Error", "Invalid Solana wallet address");
       return false;
     }
 
@@ -60,7 +60,7 @@ export function CreateAdminScreen() {
   const handleCreateAdmin = async () => {
     if (!validateInputs()) return;
     if (!publicKey) {
-      Alert.alert("Error", "Wallet not connected");
+      showError("Error", "Wallet not connected");
       return;
     }
 
@@ -81,7 +81,7 @@ export function CreateAdminScreen() {
 
       const existingAdmin = await program.account.admin.fetchNullable(adminPda);
       if (existingAdmin) {
-        Alert.alert(
+        showWarning(
           "Admin Already Exists",
           `An admin account already exists for this wallet address.\n\nName: ${existingAdmin.name}\nStatus: ${existingAdmin.isActive ? "Active" : "Inactive"}`
         );
@@ -102,19 +102,8 @@ export function CreateAdminScreen() {
 
       console.log("✅ Admin created successfully:", signature);
 
-      Alert.alert(
-        "Success",
-        `Admin "${adminName}" created successfully!\n\nSignature: ${signature.slice(
-          0,
-          8
-        )}...`,
-        [
-          {
-            text: "OK",
-            onPress: () => router.back(),
-          },
-        ]
-      );
+      showSuccess("Success", `Admin "${adminName}" created successfully!`);
+      router.back();
 
       // Reset form
       setAdminName("");
@@ -123,14 +112,14 @@ export function CreateAdminScreen() {
       console.error("❌ Failed to create admin:", error);
       const msg = error.message || "An unknown error occurred";
       if (msg.includes("already in use")) {
-        Alert.alert(
+        showWarning(
           "Admin Already Exists",
           "An admin account already exists for this wallet address."
         );
       } else if (msg.includes("Cancelled") || msg.includes("CancellationException")) {
-        Alert.alert("Cancelled", "Transaction was cancelled.");
+        showWarning("Cancelled", "Transaction was cancelled.");
       } else {
-        Alert.alert("Failed to Create Admin", msg);
+        showError("Failed to Create Admin", msg);
       }
     } finally {
       setIsSubmitting(false);

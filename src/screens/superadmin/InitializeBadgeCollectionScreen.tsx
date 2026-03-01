@@ -4,12 +4,13 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { PublicKey } from "@solana/web3.js";
+import { showSuccess, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { AppInput } from "../../components/ui/AppInput";
 import { AppButton } from "../../components/ui/AppButton";
 import { AppCard } from "../../components/ui/AppCard";
@@ -34,17 +35,17 @@ export function InitializeBadgeCollectionScreen() {
 
   const validateInputs = (): boolean => {
     if (!collectionName.trim()) {
-      Alert.alert("Error", "Collection name is required");
+      showError("Error", "Collection name is required");
       return false;
     }
 
     if (!collectionSymbol.trim()) {
-      Alert.alert("Error", "Collection symbol is required");
+      showError("Error", "Collection symbol is required");
       return false;
     }
 
     if (!collectionUri.trim()) {
-      Alert.alert("Error", "Collection URI is required");
+      showError("Error", "Collection URI is required");
       return false;
     }
 
@@ -58,14 +59,14 @@ export function InitializeBadgeCollectionScreen() {
 
     for (const mint of mints) {
       if (!mint.value.trim()) {
-        Alert.alert("Error", `${mint.name} badge mint address is required`);
+        showError("Error", `${mint.name} badge mint address is required`);
         return false;
       }
 
       try {
         new PublicKey(mint.value.trim());
       } catch (error) {
-        Alert.alert("Error", `Invalid ${mint.name} badge mint address`);
+        showError("Error", `Invalid ${mint.name} badge mint address`);
         return false;
       }
     }
@@ -76,15 +77,17 @@ export function InitializeBadgeCollectionScreen() {
   const handleInitialize = async () => {
     if (!validateInputs()) return;
     if (!publicKey) {
-      Alert.alert("Error", "Wallet not connected");
+      showError("Error", "Wallet not connected");
       return;
     }
 
-    Alert.alert(
-      "⚠️ One-Time Setup",
-      "This can only be done ONCE for the entire PassPay system.\n\nAre you sure all badge mint addresses are correct?",
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: "One-Time Setup",
+      message:
+        "This can only be done ONCE for the entire PassPay system.\n\nAre you sure all badge mint addresses are correct?",
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Initialize",
           style: "default",
@@ -110,22 +113,17 @@ export function InitializeBadgeCollectionScreen() {
 
               console.log("✅ Badge collection initialized:", signature);
 
-              Alert.alert(
-                "Success! 🎉",
+              showSuccess(
+                "Success!",
                 `Badge collection initialized successfully!\n\nThe loyalty badge system is now active.\n\nSignature: ${signature.slice(
                   0,
                   8
-                )}...`,
-                [
-                  {
-                    text: "OK",
-                    onPress: () => router.back(),
-                  },
-                ]
+                )}...`
               );
+              router.back();
             } catch (error: any) {
               console.error("❌ Failed to initialize badge collection:", error);
-              Alert.alert(
+              showError(
                 "Initialization Failed",
                 error.message || "An unknown error occurred"
               );
@@ -134,8 +132,8 @@ export function InitializeBadgeCollectionScreen() {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   return (

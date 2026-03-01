@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
@@ -24,6 +23,8 @@ import { createProvider } from "../../solana/wallet/walletSession";
 import { phantomWalletAdapter } from "../../solana/wallet/phantomWalletAdapter";
 import { findEscrowPda, findEscrowVaultPda } from "../../solana/pda";
 import { formatSOL, shortenAddress } from "../../utils/formatters";
+import { showSuccess, showWarning, showInfo, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 export function ReleaseFundsScreen() {
   const router = useRouter();
@@ -100,13 +101,15 @@ export function ReleaseFundsScreen() {
   const handleRelease = async () => {
     if (!canRelease) return;
 
-    Alert.alert(
-      "Release Escrow Funds",
-      `Release ${formatSOL(escrowBalanceSOL)} SOL from escrow to the event creator's wallet?\n\nThis action is irreversible.`,
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: "Release Escrow Funds",
+      message: `Release ${formatSOL(escrowBalanceSOL)} SOL from escrow to the event creator's wallet?\n\nThis action is irreversible.`,
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Release Funds",
+          style: "destructive",
           onPress: async () => {
             setIsReleasing(true);
             try {
@@ -114,29 +117,26 @@ export function ReleaseFundsScreen() {
                 eventPda: eventKey!,
                 eventCreator: event!.admin,
               });
-              Alert.alert(
-                "Funds Released",
-                `${formatSOL(escrowBalanceSOL)} SOL has been released to the event creator.\n\nSignature: ${signature.slice(0, 16)}...`,
-                [{ text: "OK", onPress: () => router.back() }]
-              );
+              showSuccess("Funds Released", `${formatSOL(escrowBalanceSOL)} SOL has been released to the event creator.\n\nSignature: ${signature.slice(0, 16)}...`);
+              router.back();
             } catch (err: any) {
               const msg = err.message || "Failed to release funds";
               if (msg.includes("EscrowNotReleasable")) {
-                Alert.alert("Too Early", "Funds can only be released after the event date.");
+                showWarning("Too Early", "Funds can only be released after the event date.");
               } else if (msg.includes("CancellationRefundWindowOpen")) {
-                Alert.alert("Refund Window Open", "This event was cancelled. Funds cannot be released until the refund window closes (30 days).");
+                showWarning("Refund Window Open", "This event was cancelled. Funds cannot be released until the refund window closes (30 days).");
               } else if (msg.includes("EscrowAlreadyReleased")) {
-                Alert.alert("Already Released", "Escrow funds have already been released.");
+                showInfo("Already Released", "Escrow funds have already been released.");
               } else {
-                Alert.alert("Error", msg);
+                showError("Error", msg);
               }
             } finally {
               setIsReleasing(false);
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   if (!event) {

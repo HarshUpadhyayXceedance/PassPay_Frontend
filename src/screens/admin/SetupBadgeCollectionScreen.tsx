@@ -6,10 +6,10 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import { showInfo } from "../../utils/alerts";
 import { useLoyalty } from "../../hooks/useLoyalty";
 import { apiSetupBadgeCollection } from "../../services/api/eventApi";
 import { colors } from "../../theme/colors";
@@ -34,7 +34,7 @@ export function SetupBadgeCollectionScreen() {
 
   const handleSetup = async () => {
     if (isAlreadyInitialized) {
-      Alert.alert("Already Set Up", "Badge collection is already initialized.");
+      showInfo("Already Set Up", "Badge collection is already initialized.");
       return;
     }
 

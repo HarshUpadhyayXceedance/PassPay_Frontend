@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
@@ -28,6 +27,7 @@ import {
   validateMerchantDescription,
   validatePublicKey,
 } from "../../utils/validators";
+import { showSuccess, showError } from "../../utils/alerts";
 
 export function RegisterMerchantScreen() {
   const router = useRouter();
@@ -104,11 +104,10 @@ export function RegisterMerchantScreen() {
         imageUrl,
       });
 
-      Alert.alert("Success", "Merchant registered!", [
-        { text: "OK", onPress: () => router.back() },
-      ]);
+      showSuccess("Success", "Merchant registered!");
+      router.back();
     } catch (error: any) {
-      Alert.alert("Error", error.message ?? "Failed to register merchant");
+      showError("Registration Failed", error.message ?? "Failed to register merchant");
     } finally {
       setRegistering(false);
     }

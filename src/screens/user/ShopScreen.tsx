@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from "react";
+import React, { useEffect, useCallback, useState } from "react";
 import {
   View,
   Text,
@@ -7,18 +7,25 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
+  Modal,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import QRCode from "react-native-qrcode-svg";
 import { useTickets } from "../../hooks/useTickets";
 import { useEvents } from "../../hooks/useEvents";
 import { useMerchants } from "../../hooks/useMerchants";
+import { usePurchaseStore, PurchaseReceipt } from "../../store/purchaseStore";
 import { EventDisplay } from "../../types/event";
+import { formatSOL, shortenAddress } from "../../utils/formatters";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
+
+const REDEEMED_PURCHASES_KEY = "redeemed_purchases";
 
 const GRADIENT_PALETTES: [string, string][] = [
   ["#6C5CE7", "#a855f7"],
@@ -33,17 +40,43 @@ export function ShopScreen() {
   const { tickets, fetchMyTickets, isLoading: ticketsLoading } = useTickets();
   const { events, fetchEvents, isLoading: eventsLoading } = useEvents();
   const { merchants, fetchMerchants } = useMerchants();
+  const { purchases, loadPurchases, isLoaded: purchasesLoaded } = usePurchaseStore();
+  const [selectedReceipt, setSelectedReceipt] = useState<PurchaseReceipt | null>(null);
+  const [isReceiptUsed, setIsReceiptUsed] = useState(false);
+
+  // Check if a purchase ID has been redeemed
+  const checkIfRedeemed = useCallback(async (purchaseId: string): Promise<boolean> => {
+    try {
+      const stored = await AsyncStorage.getItem(REDEEMED_PURCHASES_KEY);
+      if (!stored) return false;
+      const redeemedSet = new Set<string>(JSON.parse(stored));
+      return redeemedSet.has(purchaseId);
+    } catch (error) {
+      console.error("Error checking redemption status:", error);
+      return false;
+    }
+  }, []);
+
+  // Check redemption status when receipt is selected
+  useEffect(() => {
+    if (selectedReceipt) {
+      checkIfRedeemed(selectedReceipt.id).then(setIsReceiptUsed);
+    } else {
+      setIsReceiptUsed(false);
+    }
+  }, [selectedReceipt, checkIfRedeemed]);
 
   useEffect(() => {
     fetchMyTickets();
     fetchEvents();
     fetchMerchants();
+    loadPurchases();
   }, []);
 
   const isLoading = ticketsLoading || eventsLoading;
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([fetchMyTickets(), fetchEvents(), fetchMerchants()]);
+    await Promise.all([fetchMyTickets(), fetchEvents(), fetchMerchants(), loadPurchases()]);
   }, []);
 
   // Get unique event keys from user's tickets
@@ -67,9 +100,21 @@ export function ShopScreen() {
     }[];
 
   const navigateToScan = useCallback(() => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push("/(user)/scan");
   }, [router]);
+
+  const getReceiptQR = (receipt: PurchaseReceipt) =>
+    JSON.stringify({
+      type: "delivery",
+      purchaseId: receipt.id,
+      productName: receipt.productName,
+      buyer: receipt.buyer,
+      merchant: receipt.merchantAuthority,
+      amount: receipt.amount,
+      timestamp: receipt.timestamp,
+      txSignature: receipt.txSignature,
+    });
 
   const renderEventCard = ({
     item,
@@ -93,7 +138,6 @@ export function ShopScreen() {
         style={styles.eventCard}
         activeOpacity={0.8}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           router.push({
             pathname: "/(user)/event-merchants",
             params: { eventKey: item.eventKey, eventName: event.name },
@@ -167,7 +211,7 @@ export function ShopScreen() {
         renderItem={renderEventCard}
         contentContainerStyle={[
           styles.listContent,
-          myEvents.length === 0 && styles.emptyListContent,
+          myEvents.length === 0 && purchases.length === 0 && styles.emptyListContent,
         ]}
         refreshControl={
           <RefreshControl
@@ -177,43 +221,92 @@ export function ShopScreen() {
           />
         }
         ListHeaderComponent={
-          myEvents.length > 0 ? (
-            <View>
-              {/* Scan to Pay CTA */}
-              <TouchableOpacity activeOpacity={0.8} onPress={navigateToScan}>
-                <LinearGradient
-                  colors={[colors.primary, colors.secondary]}
-                  start={{ x: 0, y: 0 }}
-                  end={{ x: 1, y: 1 }}
-                  style={styles.scanCta}
-                >
-                  <View style={styles.scanCtaContent}>
-                    <View style={styles.scanCtaLeft}>
-                      <Text style={styles.scanCtaTitle}>Scan to Pay</Text>
-                      <Text style={styles.scanCtaSubtitle}>
-                        Scan a merchant's QR code to pay with SOL
-                      </Text>
-                    </View>
-                    <Ionicons
-                      name="qr-code"
-                      size={44}
-                      color="rgba(255,255,255,0.3)"
-                    />
+          <View>
+            {/* Scan to Pay CTA */}
+            <TouchableOpacity activeOpacity={0.8} onPress={navigateToScan}>
+              <LinearGradient
+                colors={[colors.primary, colors.secondary]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 1 }}
+                style={styles.scanCta}
+              >
+                <View style={styles.scanCtaContent}>
+                  <View style={styles.scanCtaLeft}>
+                    <Text style={styles.scanCtaTitle}>Scan to Pay</Text>
+                    <Text style={styles.scanCtaSubtitle}>
+                      Scan a merchant's QR code to pay with SOL
+                    </Text>
                   </View>
-                </LinearGradient>
-              </TouchableOpacity>
+                  <Ionicons
+                    name="qr-code"
+                    size={44}
+                    color="rgba(255,255,255,0.3)"
+                  />
+                </View>
+              </LinearGradient>
+            </TouchableOpacity>
 
-              <Text style={styles.sectionTitle}>
-                Your Events ({myEvents.length})
-              </Text>
-              <Text style={styles.sectionSubtitle}>
-                Browse merchants and products at events you have tickets for
-              </Text>
-            </View>
-          ) : null
+            {/* My Purchases Section */}
+            {purchases.length > 0 && (
+              <View style={styles.purchasesSection}>
+                <Text style={styles.sectionTitle}>
+                  My Purchases ({purchases.length})
+                </Text>
+                <Text style={styles.sectionSubtitle}>
+                  Show the QR code to the merchant to collect your item
+                </Text>
+                {purchases.slice(0, 10).map((purchase) => {
+                  const eventName = events.find(
+                    (e) => e.publicKey === purchase.eventKey
+                  )?.name;
+                  const dateStr = new Date(purchase.timestamp).toLocaleDateString(
+                    "en-US",
+                    { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
+                  );
+                  return (
+                    <TouchableOpacity
+                      key={purchase.id}
+                      style={styles.purchaseCard}
+                      activeOpacity={0.7}
+                      onPress={() => setSelectedReceipt(purchase)}
+                    >
+                      <View style={styles.purchaseIconWrap}>
+                        <Ionicons name="receipt-outline" size={20} color={colors.secondary} />
+                      </View>
+                      <View style={styles.purchaseInfo}>
+                        <Text style={styles.purchaseProduct} numberOfLines={1}>
+                          {purchase.productName}
+                        </Text>
+                        <Text style={styles.purchaseMeta} numberOfLines={1}>
+                          {eventName ?? shortenAddress(purchase.merchantAuthority)} · {dateStr}
+                        </Text>
+                      </View>
+                      <View style={styles.purchaseRight}>
+                        <Text style={styles.purchaseAmount}>
+                          {formatSOL(purchase.amount)} SOL
+                        </Text>
+                        <Ionicons name="qr-code-outline" size={16} color={colors.primary} />
+                      </View>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+            )}
+
+            {myEvents.length > 0 && (
+              <View>
+                <Text style={styles.sectionTitle}>
+                  Your Events ({myEvents.length})
+                </Text>
+                <Text style={styles.sectionSubtitle}>
+                  Browse merchants and products at events you have tickets for
+                </Text>
+              </View>
+            )}
+          </View>
         }
         ListEmptyComponent={
-          !isLoading ? (
+          !isLoading && myEvents.length === 0 && purchases.length === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconWrap}>
                 <Ionicons
@@ -240,6 +333,95 @@ export function ShopScreen() {
         }
         showsVerticalScrollIndicator={false}
       />
+
+      {/* Receipt QR Modal */}
+      <Modal
+        visible={selectedReceipt !== null}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setSelectedReceipt(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <TouchableOpacity
+              style={styles.modalClose}
+              onPress={() => setSelectedReceipt(null)}
+            >
+              <Ionicons name="close" size={20} color={colors.textSecondary} />
+            </TouchableOpacity>
+
+            <Ionicons name="receipt" size={36} color={colors.secondary} />
+            <Text style={styles.modalTitle}>Purchase Receipt</Text>
+            <Text style={styles.modalSubtitle}>
+              Show this QR to the merchant to collect your item
+            </Text>
+
+            {/* Status Badge */}
+            <View style={[
+              styles.statusBadge,
+              isReceiptUsed ? styles.statusBadgeUsed : styles.statusBadgeValid
+            ]}>
+              <Ionicons
+                name={isReceiptUsed ? "ban" : "checkmark-circle"}
+                size={16}
+                color={isReceiptUsed ? colors.error : colors.success}
+              />
+              <Text style={[
+                styles.statusBadgeText,
+                { color: isReceiptUsed ? colors.error : colors.success }
+              ]}>
+                {isReceiptUsed ? "USED" : "VALID"}
+              </Text>
+            </View>
+
+            <View style={styles.qrContainer}>
+              {selectedReceipt && (
+                <QRCode
+                  value={getReceiptQR(selectedReceipt)}
+                  size={200}
+                  backgroundColor="#FFFFFF"
+                  color="#000000"
+                />
+              )}
+            </View>
+
+            {selectedReceipt && (
+              <View style={styles.receiptDetails}>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>Product</Text>
+                  <Text style={styles.receiptValue}>{selectedReceipt.productName}</Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>Amount</Text>
+                  <Text style={styles.receiptValueGreen}>
+                    {formatSOL(selectedReceipt.amount)} SOL
+                  </Text>
+                </View>
+                <View style={styles.receiptRow}>
+                  <Text style={styles.receiptLabel}>Date</Text>
+                  <Text style={styles.receiptValue}>
+                    {new Date(selectedReceipt.timestamp).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                  </Text>
+                </View>
+              </View>
+            )}
+
+            <TouchableOpacity
+              style={styles.doneButton}
+              onPress={() => setSelectedReceipt(null)}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.doneButtonText}>Close</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -422,5 +604,165 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontFamily: fonts.bodySemiBold,
     color: colors.text,
+  },
+
+  // ── Purchases Section ──────────────────────────────────
+  purchasesSection: {
+    marginBottom: spacing.lg,
+  },
+  purchaseCard: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+  },
+  purchaseIconWrap: {
+    width: 40,
+    height: 40,
+    borderRadius: 10,
+    backgroundColor: colors.secondaryMuted,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.sm,
+  },
+  purchaseInfo: {
+    flex: 1,
+    marginRight: spacing.sm,
+  },
+  purchaseProduct: {
+    fontSize: 14,
+    fontFamily: fonts.headingSemiBold,
+    color: colors.text,
+    marginBottom: 2,
+  },
+  purchaseMeta: {
+    fontSize: 12,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+  },
+  purchaseRight: {
+    alignItems: "flex-end",
+    gap: 4,
+  },
+  purchaseAmount: {
+    fontSize: 14,
+    fontFamily: fonts.heading,
+    color: colors.secondary,
+  },
+
+  // ── Receipt Modal ──────────────────────────────────────
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: "rgba(0,0,0,0.7)",
+    justifyContent: "flex-end",
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    padding: spacing.lg,
+    paddingBottom: 40,
+    alignItems: "center",
+  },
+  modalClose: {
+    position: "absolute",
+    top: spacing.md,
+    right: spacing.md,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: fonts.heading,
+    color: colors.text,
+    marginTop: spacing.sm,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontFamily: fonts.body,
+    color: colors.textSecondary,
+    textAlign: "center",
+    marginTop: 4,
+    marginBottom: spacing.lg,
+    lineHeight: 20,
+  },
+  qrContainer: {
+    backgroundColor: "#FFFFFF",
+    borderRadius: 16,
+    padding: 20,
+    marginBottom: spacing.lg,
+  },
+  receiptDetails: {
+    width: "100%",
+    backgroundColor: colors.surfaceLight,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  receiptRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  receiptLabel: {
+    fontSize: 13,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+  },
+  receiptValue: {
+    fontSize: 14,
+    fontFamily: fonts.bodyMedium,
+    color: colors.text,
+  },
+  receiptValueGreen: {
+    fontSize: 14,
+    fontFamily: fonts.heading,
+    color: colors.secondary,
+  },
+  doneButton: {
+    width: "100%",
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    height: 50,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  doneButtonText: {
+    fontSize: 16,
+    fontFamily: fonts.heading,
+    color: "#fff",
+  },
+  statusBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: spacing.md,
+    paddingVertical: 8,
+    borderRadius: borderRadius.full,
+    borderWidth: 1.5,
+    marginTop: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  statusBadgeValid: {
+    backgroundColor: colors.success + "18",
+    borderColor: colors.success,
+  },
+  statusBadgeUsed: {
+    backgroundColor: colors.error + "18",
+    borderColor: colors.error,
+  },
+  statusBadgeText: {
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
+    letterSpacing: 1.2,
   },
 });

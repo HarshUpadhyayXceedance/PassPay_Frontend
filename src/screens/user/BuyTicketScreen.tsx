@@ -3,7 +3,6 @@ import {
   View,
   Text,
   StyleSheet,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
   Animated,
@@ -23,6 +22,7 @@ import {
   scheduleNotificationAt,
 } from "../../services/notifications/pushNotifications";
 import { formatSOL } from "../../utils/formatters";
+import { showWarning, showError } from "../../utils/alerts";
 import { PriceBreakdown } from "../../components/event/PriceBreakdown";
 import { EarlyAccessBadge } from "../../components/event/EarlyAccessBadge";
 import { TicketPurchaseSuccess } from "../../components/animations/TicketPurchaseSuccess";
@@ -129,16 +129,16 @@ export function BuyTicketScreen() {
   const handleBuy = async () => {
     if (!selectedTier) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Select a Tier", "Please select a seat tier before purchasing.");
+      showWarning("Select a Tier", "Please select a seat tier before purchasing.");
       return;
     }
     if (!canAfford) {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
-      Alert.alert("Insufficient Funds", "You don't have enough SOL.");
+      showWarning("Insufficient Funds", "You don't have enough SOL.");
       return;
     }
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     setBuying(true);
 
     try {
@@ -184,19 +184,15 @@ export function BuyTicketScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       const msg = error.message ?? "Failed to buy ticket";
       if (msg.includes("VipTierRestricted") || msg.includes("6053")) {
-        Alert.alert(
-          "VIP Tier Restricted",
-          "This seat tier is reserved for Gold and Platinum badge holders only. Keep attending events to level up your badge!",
-          [{ text: "OK" }]
-        );
+        showWarning("VIP Tier Restricted", "This seat tier is reserved for Gold and Platinum badge holders only. Keep attending events to level up your badge!");
       } else if (msg.includes("TierSoldOut") || msg.includes("6051")) {
-        Alert.alert("Sold Out", "This seat tier is fully sold out. Please try a different tier.");
+        showWarning("Sold Out", "This seat tier is fully sold out. Please try a different tier.");
       } else if (msg.includes("SoldOut") || msg.includes("6004")) {
-        Alert.alert("Sold Out", "All tickets for this event are sold out.");
+        showWarning("Sold Out", "All tickets for this event are sold out.");
       } else if (msg.includes("Cancelled") || msg.includes("CancellationException")) {
-        Alert.alert("Cancelled", "Transaction was cancelled.");
+        showWarning("Cancelled", "Transaction was cancelled.");
       } else {
-        Alert.alert("Error", msg);
+        showError("Error", msg);
       }
       setBuying(false);
     }
@@ -208,10 +204,7 @@ export function BuyTicketScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
+          onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >
@@ -290,10 +283,7 @@ export function BuyTicketScreen() {
                       isSoldOut && styles.tierCardDisabled,
                     ]}
                     onPress={() => {
-                      if (!isSoldOut) {
-                        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                        setSelectedTier(tier);
-                      }
+                      if (!isSoldOut) setSelectedTier(tier);
                     }}
                     disabled={isSoldOut}
                     activeOpacity={0.8}

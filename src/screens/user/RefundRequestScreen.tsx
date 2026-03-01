@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
 } from "react-native";
@@ -16,6 +15,8 @@ import { useEvents } from "../../hooks/useEvents";
 import { useMerchants } from "../../hooks/useMerchants";
 import { apiRequestRefund, apiClaimCancellationRefund } from "../../services/api/eventApi";
 import { formatSOL } from "../../utils/formatters";
+import { showSuccess, showWarning, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
@@ -87,13 +88,15 @@ export function RefundRequestScreen() {
   const handleRefund = async () => {
     if (isCancelledEvent) {
       // Auto-refund for cancelled events — no admin approval needed
-      Alert.alert(
-        "Claim Refund",
-        `Claim your refund of ${formatSOL(refundAmount)} SOL? The event was cancelled and you'll receive your SOL back immediately.`,
-        [
-          { text: "Cancel", style: "cancel" },
+      confirm({
+        title: "Claim Refund",
+        message: `Claim your refund of ${formatSOL(refundAmount)} SOL? The event was cancelled and you'll receive your SOL back immediately.`,
+        type: "default",
+        buttons: [
+          { text: "Cancel", style: "cancel", onPress: () => {} },
           {
             text: "Claim Refund",
+            style: "default",
             onPress: async () => {
               setProcessing(true);
               try {
@@ -103,32 +106,30 @@ export function RefundRequestScreen() {
                   ticketMint: ticket.mint,
                   seatTierPda,
                 });
-                Alert.alert(
-                  "Refund Claimed",
-                  "Your refund has been processed. The SOL has been returned to your wallet.",
-                  [{ text: "OK", onPress: () => router.back() }]
-                );
+                showSuccess("Refund Claimed", "Your refund has been processed. The SOL has been returned to your wallet.");
+                router.back();
               } catch (error: any) {
                 const msg = error.message ?? "Failed to claim refund.";
                 if (msg.includes("RefundWindowClosed")) {
-                  Alert.alert("Refund Window Closed", "The refund deadline for this cancelled event has passed.");
+                  showWarning("Refund Window Closed", "The refund deadline for this cancelled event has passed.");
                 } else {
-                  Alert.alert("Refund Failed", msg);
+                  showError("Refund Failed", msg);
                 }
               } finally {
                 setProcessing(false);
               }
             },
           },
-        ]
-      );
+        ],
+      });
     } else {
       // Regular refund request — needs admin approval
-      Alert.alert(
-        "Request Refund",
-        `Submit a refund request for ${formatSOL(refundAmount)} SOL? The event admin will review and approve or reject your request.`,
-        [
-          { text: "Cancel", style: "cancel" },
+      confirm({
+        title: "Request Refund",
+        message: `Submit a refund request for ${formatSOL(refundAmount)} SOL? The event admin will review and approve or reject your request.`,
+        type: "danger",
+        buttons: [
+          { text: "Cancel", style: "cancel", onPress: () => {} },
           {
             text: "Submit Request",
             style: "destructive",
@@ -139,27 +140,24 @@ export function RefundRequestScreen() {
                   eventPda: ticket.eventKey,
                   ticketMint: ticket.mint,
                 });
-                Alert.alert(
-                  "Refund Requested",
-                  "Your refund request has been submitted. The event admin will review it shortly.",
-                  [{ text: "OK", onPress: () => router.back() }]
-                );
+                showSuccess("Refund Requested", "Your refund request has been submitted. The event admin will review it shortly.");
+                router.back();
               } catch (error: any) {
                 const msg = error.message ?? "Failed to submit refund request.";
                 if (msg.includes("RefundWindowClosed")) {
-                  Alert.alert("Refund Window Closed", "The refund deadline for this event has passed.");
+                  showWarning("Refund Window Closed", "The refund deadline for this event has passed.");
                 } else if (msg.includes("TicketAlreadyCheckedIn")) {
-                  Alert.alert("Cannot Refund", "This ticket has already been checked in.");
+                  showWarning("Cannot Refund", "This ticket has already been checked in.");
                 } else {
-                  Alert.alert("Refund Failed", msg);
+                  showError("Refund Failed", msg);
                 }
               } finally {
                 setProcessing(false);
               }
             },
           },
-        ]
-      );
+        ],
+      });
     }
   };
 

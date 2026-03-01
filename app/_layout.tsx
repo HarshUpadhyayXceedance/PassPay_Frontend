@@ -2,6 +2,7 @@ import { Redirect, Slot, SplashScreen, useSegments, useRouter } from "expo-route
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
 import { useEffect, useRef, useState } from "react";
+import { AppState, AppStateStatus } from "react-native";
 import { useFonts } from "expo-font";
 import * as Linking from "expo-linking";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -12,6 +13,8 @@ import { OnboardingCarousel } from "../src/components/ui/OnboardingCarousel";
 import { fontAssets } from "../src/theme/fonts";
 import { ErrorBoundary } from "../src/components/ui/ErrorBoundary";
 import { OfflineBanner } from "../src/components/ui/OfflineBanner";
+import { AlertNotificationRoot } from "react-native-alert-notification";
+import { ConfirmDialogProvider } from "../src/components/ui/ConfirmDialogProvider";
 import { registerForPushNotifications } from "../src/services/notifications/pushNotifications";
 
 SplashScreen.preventAutoHideAsync();
@@ -27,8 +30,29 @@ export default function RootLayout() {
   const segments = useSegments();
   const router = useRouter();
   const pendingDeepLink = useRef<string | null>(null);
+  const appState = useRef<AppStateStatus>(AppState.currentState);
 
   const [fontsLoaded] = useFonts(fontAssets);
+
+  // Handle app state changes to prevent unwanted navigation on background/foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
+      if (
+        appState.current.match(/inactive|background/) &&
+        nextAppState === "active"
+      ) {
+        // App has come to the foreground
+        console.log("[AppState] App has come to the foreground");
+        // Don't trigger any automatic navigation - let the user stay where they were
+      }
+
+      appState.current = nextAppState;
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, []);
 
   // Handle deep links: store pending URL if not authenticated
   useEffect(() => {
@@ -82,10 +106,13 @@ export default function RootLayout() {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
 
-      // Check onboarding status and load stored role
+      // Check onboarding status and restore persisted session
       const initialize = async () => {
         try {
-          // Load stored role from SecureStore
+          // 1. Restore wallet connection from AsyncStorage (survives Activity restarts)
+          await useWalletStore.getState().restorePersistedWallet();
+
+          // 2. Restore auth role (only succeeds if wallet was restored above)
           await loadStoredRole();
 
           // Check if user has completed onboarding
@@ -159,9 +186,35 @@ export default function RootLayout() {
   return (
     <ErrorBoundary>
       <SafeAreaProvider>
-        <StatusBar style="light" />
-        <OfflineBanner />
-        <Slot />
+        <AlertNotificationRoot
+          theme="dark"
+          colors={[
+            {
+              card: "#141829",
+              label: "#FFFFFF",
+              overlay: "rgba(10, 14, 26, 0.9)",
+              success: "#00FFA3",
+              danger: "#FF4757",
+              warning: "#FFA502",
+              info: "#6C5CE7",
+            },
+            {
+              card: "#141829",
+              label: "#FFFFFF",
+              overlay: "rgba(10, 14, 26, 0.9)",
+              success: "#00FFA3",
+              danger: "#FF4757",
+              warning: "#FFA502",
+              info: "#6C5CE7",
+            },
+          ]}
+        >
+          <ConfirmDialogProvider>
+            <StatusBar style="light" />
+            <OfflineBanner />
+            <Slot />
+          </ConfirmDialogProvider>
+        </AlertNotificationRoot>
       </SafeAreaProvider>
     </ErrorBoundary>
   );

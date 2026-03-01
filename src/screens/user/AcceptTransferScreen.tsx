@@ -6,7 +6,6 @@ import {
   ScrollView,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -21,6 +20,8 @@ import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
 import { shortenAddress, formatSOL } from "../../utils/formatters";
+import { showSuccess, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 export function AcceptTransferScreen() {
   const router = useRouter();
@@ -106,38 +107,30 @@ export function AcceptTransferScreen() {
       await verifyTransfer();
       await refreshBalance();
       await fetchMyTickets();
-      Alert.alert(
+      showSuccess(
         "Transfer Confirmed!",
         verified
           ? "The ticket is in your wallet. View it in My Passes."
-          : "The transfer may still be processing. Check My Passes shortly.",
-        [
-          {
-            text: "View My Passes",
-            onPress: () => router.replace("/(user)/my-passes"),
-          },
-        ]
+          : "The transfer may still be processing. Check My Passes shortly."
       );
+      router.replace("/(user)/my-passes");
     } catch (error: any) {
-      Alert.alert("Error", error.message ?? "Failed to verify transfer");
+      showError("Error", error.message ?? "Failed to verify transfer");
     } finally {
       setAccepting(false);
     }
   };
 
   const handleDecline = () => {
-    Alert.alert(
-      "Decline Transfer?",
-      "The ticket will remain with the sender.",
-      [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Decline",
-          style: "destructive",
-          onPress: () => router.back(),
-        },
-      ]
-    );
+    confirm({
+      title: "Decline Transfer?",
+      message: "The ticket will remain with the sender.",
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
+        { text: "Decline", style: "destructive", onPress: () => router.back() },
+      ],
+    });
   };
 
   return (

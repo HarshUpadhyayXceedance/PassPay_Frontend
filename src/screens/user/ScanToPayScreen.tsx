@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useRouter } from "expo-router";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { AppButton } from "../../components/ui/AppButton";
@@ -15,7 +15,9 @@ import { useLoyalty } from "../../hooks/useLoyalty";
 import { apiPayMerchant } from "../../services/api/merchantApi";
 import { PaymentQRPayload } from "../../utils/qrPayload";
 import { formatSOL } from "../../utils/formatters";
+import { showSuccess, showError } from "../../utils/alerts";
 import { useTickets } from "../../hooks/useTickets";
+import { usePurchaseStore } from "../../store/purchaseStore";
 import { DiscountPill } from "../../components/loyalty/DiscountPill";
 
 export function ScanToPayScreen() {
@@ -24,6 +26,8 @@ export function ScanToPayScreen() {
   const { refreshBalance } = useWallet();
   const { loyaltyBenefits, fetchLoyaltyBenefits } = useLoyalty();
   const { tickets } = useTickets();
+  const { publicKey } = useWallet();
+  const addPurchase = usePurchaseStore((s) => s.addPurchase);
   const [paying, setPaying] = useState(false);
 
   const payment = lastScan?.type === "payment" ? (lastScan as PaymentQRPayload) : null;
@@ -43,23 +47,37 @@ export function ScanToPayScreen() {
 
     const myTicket = tickets.find((t) => t.eventKey === payment.eventKey);
     if (!myTicket) {
-      Alert.alert("Error", "You don't have a ticket for this event");
+      showError("Error", "You don't have a ticket for this event");
       return;
     }
 
     setPaying(true);
     try {
-      await apiPayMerchant({
+      const txSig = await apiPayMerchant({
         eventPda: payment.eventKey,
         merchantAuthority: payment.merchantAuthority,
         amount: finalAmount,
       });
       await refreshBalance();
-      Alert.alert("Success", `Paid ${formatSOL(finalAmount)} SOL`, [
-        { text: "Done", onPress: () => { reset(); router.back(); } },
-      ]);
+
+      // Save purchase receipt for ShopScreen
+      addPurchase({
+        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+        productName: payment.productName ?? "Payment",
+        merchantName: payment.merchantAuthority,
+        merchantAuthority: payment.merchantAuthority,
+        eventKey: payment.eventKey,
+        amount: finalAmount,
+        buyer: publicKey ?? "",
+        timestamp: Date.now(),
+        txSignature: typeof txSig === "string" ? txSig : undefined,
+      });
+
+      showSuccess("Success", `Paid ${formatSOL(finalAmount)} SOL`);
+      reset();
+      router.back();
     } catch (error: any) {
-      Alert.alert("Error", error.message ?? "Payment failed");
+      showError("Error", error.message ?? "Payment failed");
     } finally {
       setPaying(false);
     }

@@ -13,6 +13,7 @@ import {
   Animated,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { useWallet } from "../../hooks/useWallet";
@@ -137,7 +138,7 @@ export function HomeScreen() {
       })
       .sort((a, b) => {
         if (sortBy === "date") {
-          return a.eventDate.getTime() - b.eventDate.getTime();
+          return b.eventDate.getTime() - a.eventDate.getTime(); // Newest first
         } else if (sortBy === "price") {
           return getEventPrice(a) - getEventPrice(b);
         } else {
@@ -152,7 +153,7 @@ export function HomeScreen() {
   const featuredEvents = useMemo(() => {
     return filteredEvents
       .filter((e) => e.eventDate > new Date())
-      .slice(0, 6);
+      .slice(0, 4);
   }, [filteredEvents]);
 
   // Auto-play featured carousel
@@ -239,7 +240,6 @@ export function HomeScreen() {
       <TouchableOpacity
         activeOpacity={0.85}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           router.push({ pathname: "/(user)/event-details", params: { eventKey: item.publicKey } });
         }}
         style={styles.featuredCardWrapper}
@@ -312,7 +312,6 @@ export function HomeScreen() {
         key={event.publicKey}
         activeOpacity={0.8}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           router.push({ pathname: "/(user)/event-details", params: { eventKey: event.publicKey } });
         }}
         style={styles.upcomingCard}
@@ -370,7 +369,7 @@ export function HomeScreen() {
             onPress={(e) => {
               e.stopPropagation();
               if (!event.isSoldOut) {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 router.push({ pathname: "/(user)/buy-ticket", params: { eventKey: event.publicKey } });
               }
             }}
@@ -404,8 +403,8 @@ export function HomeScreen() {
           <RefreshControl
             refreshing={isLoading}
             onRefresh={onRefresh}
-            tintColor="#00CEC9"
-            colors={["#00CEC9"]}
+            tintColor={colors.accent}
+            colors={[colors.accent]}
           />
         }
       >
@@ -431,14 +430,14 @@ export function HomeScreen() {
 
         {/* ========== SEARCH BAR ========== */}
         <View style={styles.searchContainer}>
-          <Text style={styles.searchIcon}>&#x1F50D;</Text>
+          <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
             style={styles.searchInput}
             placeholder="Find events, artists..."
-            placeholderTextColor="#4A5068"
+            placeholderTextColor={colors.textMuted}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            selectionColor="#00CEC9"
+            selectionColor={colors.accent}
             accessibilityLabel="Search events"
             accessibilityHint="Type to filter events by name or venue"
           />
@@ -447,7 +446,7 @@ export function HomeScreen() {
               onPress={() => setSearchQuery("")}
               style={styles.clearButton}
             >
-              <Text style={styles.clearButtonText}>x</Text>
+              <Ionicons name="close" size={14} color={colors.textSecondary} />
             </TouchableOpacity>
           )}
         </View>
@@ -536,10 +535,7 @@ export function HomeScreen() {
                 <TouchableOpacity
                   key={cat}
                   style={[styles.chip, isActive && styles.chipActive]}
-                  onPress={() => {
-                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                    setActiveCategory(cat);
-                  }}
+                  onPress={() => setActiveCategory(cat)}
                   activeOpacity={0.7}
                   accessibilityRole="tab"
                   accessibilityState={{ selected: isActive }}
@@ -559,7 +555,6 @@ export function HomeScreen() {
           <TouchableOpacity
             style={styles.sortButton}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
               // Cycle through sort options
               if (sortBy === "date") setSortBy("price");
               else if (sortBy === "price") setSortBy("popularity");
@@ -570,7 +565,7 @@ export function HomeScreen() {
             accessibilityLabel={`Sort by ${sortBy === "date" ? "date" : sortBy === "price" ? "price" : "popularity"}`}
             accessibilityHint="Tap to change sort order"
           >
-            <Text style={styles.sortIcon}>⬍</Text>
+            <Ionicons name="swap-vertical" size={16} color={colors.accent} />
             <Text style={styles.sortText}>
               {sortBy === "date" ? "Date" : sortBy === "price" ? "Price" : "Popular"}
             </Text>
@@ -580,7 +575,7 @@ export function HomeScreen() {
         {/* ========== NETWORK ERROR ========== */}
         {error && !isLoading && (
           <View style={styles.errorBanner}>
-            <Text style={styles.errorBannerIcon}>⚠️</Text>
+            <Ionicons name="warning" size={20} color={colors.error} />
             <View style={styles.errorBannerContent}>
               <Text style={styles.errorBannerTitle}>Connection Error</Text>
               <Text style={styles.errorBannerMessage} numberOfLines={2}>
@@ -604,10 +599,7 @@ export function HomeScreen() {
             {allUpcomingEvents.length > 8 && (
               <TouchableOpacity
                 activeOpacity={0.6}
-                onPress={() => {
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  setShowAllUpcoming((prev) => !prev);
-                }}
+                onPress={() => setShowAllUpcoming((prev) => !prev)}
               >
                 <Text style={styles.seeAllText}>
                   {showAllUpcoming ? "Show Less" : `See All (${allUpcomingEvents.length})`}
@@ -689,9 +681,9 @@ const styles = StyleSheet.create({
   balancePill: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(0, 206, 201, 0.08)",
+    backgroundColor: colors.accentMuted,
     borderWidth: 1,
-    borderColor: "rgba(0, 206, 201, 0.35)",
+    borderColor: colors.accent + "59",
     borderRadius: 20,
     paddingHorizontal: 14,
     paddingVertical: 8,
@@ -701,12 +693,12 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#00CEC9",
+    backgroundColor: colors.accent,
   },
   balanceText: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#00CEC9",
+    color: colors.accent,
     letterSpacing: 0.2,
   },
 
@@ -714,23 +706,21 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     borderRadius: 14,
     marginHorizontal: 20,
     marginBottom: 24,
     paddingHorizontal: 16,
     height: 50,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.surfaceLight,
   },
   searchIcon: {
-    fontSize: 16,
     marginRight: 10,
-    opacity: 0.5,
   },
   searchInput: {
     flex: 1,
-    color: "#FFFFFF",
+    color: colors.text,
     fontSize: 15,
     fontWeight: "500",
     height: 50,
@@ -739,15 +729,11 @@ const styles = StyleSheet.create({
     width: 24,
     height: 24,
     borderRadius: 12,
-    backgroundColor: "#1E2235",
+    backgroundColor: colors.surfaceLight,
     justifyContent: "center",
     alignItems: "center",
   },
-  clearButtonText: {
-    color: "#8F95B2",
-    fontSize: 13,
-    fontWeight: "600",
-  },
+  // clearButtonText removed — using Ionicons close icon
 
   /* ---- Sections ---- */
   section: {
@@ -769,14 +755,14 @@ const styles = StyleSheet.create({
   sectionTitleBar: {
     width: 24,
     height: 3,
-    backgroundColor: "#00CEC9",
+    backgroundColor: colors.accent,
     borderRadius: 2,
     marginLeft: 8,
   },
   seeAllText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#00CEC9",
+    color: colors.accent,
   },
 
   /* ---- Featured Cards ---- */
@@ -793,7 +779,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
     overflow: "hidden",
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.surfaceLight,
   },
   featuredImage: {
     ...StyleSheet.absoluteFillObject,
@@ -830,7 +816,7 @@ const styles = StyleSheet.create({
   featuredEventName: {
     fontSize: 18,
     fontFamily: fonts.heading,
-    color: "#FFFFFF",
+    color: colors.text,
     marginBottom: 8,
     letterSpacing: -0.2,
   },
@@ -845,7 +831,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.75)",
   },
   featuredPricePill: {
-    backgroundColor: "rgba(0, 206, 201, 0.2)",
+    backgroundColor: colors.accent + "33",
     borderRadius: 10,
     paddingHorizontal: 10,
     paddingVertical: 4,
@@ -853,7 +839,7 @@ const styles = StyleSheet.create({
   featuredPrice: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#00CEC9",
+    color: colors.accent,
   },
 
   /* ---- Pagination Dots ---- */
@@ -868,11 +854,11 @@ const styles = StyleSheet.create({
     width: 6,
     height: 6,
     borderRadius: 3,
-    backgroundColor: "#1E2235",
+    backgroundColor: colors.surfaceLight,
   },
   dotActive: {
     width: 20,
-    backgroundColor: "#00CEC9",
+    backgroundColor: colors.accent,
   },
 
   /* ---- Badge ---- */
@@ -886,18 +872,18 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
   },
   badge: {
-    backgroundColor: "rgba(0, 206, 201, 0.9)",
+    backgroundColor: colors.accent + "E6",
     borderRadius: 8,
     paddingHorizontal: 10,
     paddingVertical: 4,
   },
   badgeSoldOut: {
-    backgroundColor: "rgba(214, 48, 49, 0.9)",
+    backgroundColor: colors.error + "E6",
   },
   badgeText: {
     fontSize: 10,
     fontWeight: "800",
-    color: "#FFFFFF",
+    color: colors.text,
     letterSpacing: 1,
   },
 
@@ -920,55 +906,52 @@ const styles = StyleSheet.create({
     top: 0,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.surfaceLight,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 10,
     gap: 6,
   },
-  sortIcon: {
-    fontSize: 14,
-    color: "#00CEC9",
-  },
+  // sortIcon removed — using Ionicons swap-vertical
   sortText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#8F95B2",
+    color: colors.textSecondary,
   },
   chip: {
     paddingHorizontal: 18,
     paddingVertical: 10,
     borderRadius: 12,
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.surfaceLight,
   },
   chipActive: {
-    backgroundColor: "rgba(0, 206, 201, 0.12)",
-    borderColor: "#00CEC9",
+    backgroundColor: colors.accentMuted,
+    borderColor: colors.accent,
   },
   chipText: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#8F95B2",
+    color: colors.textSecondary,
   },
   chipTextActive: {
-    color: "#00CEC9",
+    color: colors.accent,
   },
 
   /* ---- Upcoming Cards ---- */
   upcomingCard: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     marginHorizontal: 20,
     marginBottom: 12,
     borderRadius: 16,
     padding: 12,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.surfaceLight,
   },
   upcomingThumb: {
     width: UPCOMING_THUMB_SIZE,
@@ -997,13 +980,13 @@ const styles = StyleSheet.create({
   upcomingVenue: {
     fontSize: 13,
     fontWeight: "500",
-    color: "#8F95B2",
+    color: colors.textSecondary,
     marginBottom: 3,
   },
   upcomingDate: {
     fontSize: 12,
     fontWeight: "500",
-    color: "#555B74",
+    color: colors.textMuted,
   },
   upcomingRight: {
     alignItems: "flex-end",
@@ -1017,24 +1000,24 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
   buyButton: {
-    backgroundColor: "rgba(0, 206, 201, 0.12)",
+    backgroundColor: colors.accentMuted,
     borderWidth: 1,
-    borderColor: "#00CEC9",
+    borderColor: colors.accent,
     borderRadius: 10,
     paddingHorizontal: 18,
     paddingVertical: 6,
   },
   buyButtonDisabled: {
-    borderColor: "#1E2235",
-    backgroundColor: "rgba(30, 34, 53, 0.5)",
+    borderColor: colors.surfaceLight,
+    backgroundColor: colors.surfaceLight + "80",
   },
   buyButtonText: {
     fontSize: 13,
     fontWeight: "700",
-    color: "#00CEC9",
+    color: colors.accent,
   },
   buyButtonTextDisabled: {
-    color: "#555B74",
+    color: colors.textMuted,
   },
 
   /* ---- Empty States ---- */
@@ -1043,60 +1026,58 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     marginHorizontal: 20,
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.surfaceLight,
   },
   emptyUpcoming: {
     height: 120,
     justifyContent: "center",
     alignItems: "center",
     marginHorizontal: 20,
-    backgroundColor: "#141829",
+    backgroundColor: colors.surface,
     borderRadius: 16,
     borderWidth: 1,
-    borderColor: "#1E2235",
+    borderColor: colors.surfaceLight,
   },
   emptyText: {
     fontSize: 14,
     fontWeight: "500",
-    color: "#555B74",
+    color: colors.textMuted,
   },
 
   /* ---- Error Banner ---- */
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "rgba(255,71,87,0.1)",
+    backgroundColor: colors.errorLight,
     borderWidth: 1,
-    borderColor: "rgba(255,71,87,0.3)",
+    borderColor: colors.error + "4D",
     borderRadius: 14,
     marginHorizontal: 20,
     marginBottom: 20,
     padding: 14,
     gap: 10,
   },
-  errorBannerIcon: {
-    fontSize: 20,
-  },
+  // errorBannerIcon removed — using Ionicons warning
   errorBannerContent: {
     flex: 1,
   },
   errorBannerTitle: {
     fontSize: 14,
     fontWeight: "700",
-    color: "#FF4757",
+    color: colors.error,
     marginBottom: 2,
     fontFamily: fonts.bodySemiBold,
   },
   errorBannerMessage: {
     fontSize: 12,
-    color: "rgba(255,71,87,0.8)",
+    color: colors.error + "CC",
     fontFamily: fonts.body,
   },
   retryButton: {
-    backgroundColor: "rgba(255,71,87,0.2)",
+    backgroundColor: colors.error + "33",
     paddingHorizontal: 14,
     paddingVertical: 8,
     borderRadius: 10,
@@ -1104,7 +1085,7 @@ const styles = StyleSheet.create({
   retryButtonText: {
     fontSize: 13,
     fontWeight: "600",
-    color: "#FF4757",
+    color: colors.error,
     fontFamily: fonts.bodySemiBold,
   },
 });

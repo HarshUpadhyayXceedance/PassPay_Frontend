@@ -76,10 +76,7 @@ export function TicketQRScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.back();
-            }}
+            onPress={() => router.back()}
           >
             <Text style={styles.backIcon}>×</Text>
           </TouchableOpacity>
@@ -105,10 +102,7 @@ export function TicketQRScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
+          onPress={() => router.back()}
         >
           <Text style={styles.backIcon}>×</Text>
         </TouchableOpacity>

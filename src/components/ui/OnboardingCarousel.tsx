@@ -10,7 +10,6 @@ import {
   Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
-import * as Haptics from "expo-haptics";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 
@@ -67,8 +66,6 @@ export function OnboardingCarousel({
   const isLastSlide = currentIndex === SLIDES.length - 1;
 
   const handleNext = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-
     if (isLastSlide) {
       onComplete();
     } else {
@@ -79,7 +76,6 @@ export function OnboardingCarousel({
   };
 
   const handleSkip = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     onComplete();
   };
 

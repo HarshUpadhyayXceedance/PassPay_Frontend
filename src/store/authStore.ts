@@ -4,6 +4,7 @@ import * as SecureStore from "expo-secure-store";
 import { UserRole } from "../types/navigation";
 import { detectUserRole } from "../services/roleDetection";
 import { DEVNET_RPC } from "../solana/config/constants";
+import { useWalletStore } from "./walletStore";
 
 const ROLE_STORAGE_KEY = "user_role";
 const WALLET_STORAGE_KEY = "user_wallet";
@@ -84,8 +85,29 @@ export const useAuthStore = create<AuthState>((set) => ({
   loadStoredRole: async () => {
     set({ isLoading: true });
     try {
-      // Don't restore isAuthenticated — requires active wallet connection.
-      // The cached role is used by detectRole() for fast re-auth after reconnect.
+      // Restore auth ONLY if walletStore already restored its persisted state.
+      // This prevents the old redirect loop (isAuthenticated=true but
+      // isConnected=false) because restorePersistedWallet() must run first.
+      const { publicKey, isConnected } = useWalletStore.getState();
+      if (!isConnected || !publicKey) {
+        set({ isLoading: false });
+        return;
+      }
+
+      const storedWallet = await SecureStore.getItemAsync(WALLET_STORAGE_KEY);
+      const storedRole = await SecureStore.getItemAsync(ROLE_STORAGE_KEY);
+
+      if (storedWallet === publicKey && storedRole) {
+        console.log("📦 Restored auth from cache:", storedRole);
+        set({
+          role: storedRole as UserRole,
+          isAuthenticated: true,
+          isLoading: false,
+        });
+        return;
+      }
+
+      // Wallet connected but no matching cache — will need detectRole() on next connect
       set({ isLoading: false });
     } catch (error) {
       console.error("❌ Failed during startup:", error);

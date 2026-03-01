@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   RefreshControl,
 } from "react-native";
 import * as Haptics from "expo-haptics";
@@ -16,6 +15,7 @@ import { useLoyalty } from "../../hooks/useLoyalty";
 import { useWallet } from "../../hooks/useWallet";
 import { apiClaimBadge } from "../../services/api/eventApi";
 import { BadgeTier, TIER_NAMES } from "../../types/loyalty";
+import { showSuccess, showWarning, showError } from "../../utils/alerts";
 import { getAssociatedTokenAddress } from "../../solana/utils/tokenUtils";
 import { DEVNET_RPC } from "../../solana/config/constants";
 import { colors } from "../../theme/colors";
@@ -100,7 +100,7 @@ export function BadgeCollectionScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setTimeout(() => setShowConfetti(false), 3000);
 
-      Alert.alert(
+      showSuccess(
         "Badge Claimed!",
         `Your ${TIER_NAMES[badgeTier]} soulbound NFT badge has been minted to your wallet.`
       );
@@ -108,9 +108,9 @@ export function BadgeCollectionScreen() {
       const msg = error.message || "Failed to claim badge";
       if (msg.includes("BadgeAlreadyClaimed")) {
         setClaimedTiers((prev) => new Set([...prev, badgeTier]));
-        Alert.alert("Already Claimed", "You've already claimed this badge.");
+        showWarning("Already Claimed", "You've already claimed this badge.");
       } else {
-        Alert.alert("Claim Failed", msg);
+        showError("Claim Failed", msg);
       }
     } finally {
       setClaimingTier(null);

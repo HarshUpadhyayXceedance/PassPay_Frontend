@@ -1,9 +1,11 @@
 import React from "react";
 import { View, Text, StyleSheet } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { AppCard } from "../ui/AppCard";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
-import { spacing } from "../../theme/spacing";
+import { spacing, borderRadius } from "../../theme/spacing";
+import { fonts } from "../../theme/fonts";
 import { EventDisplay } from "../../types/event";
 import { formatDate, formatSOL } from "../../utils/formatters";
 
@@ -13,52 +15,82 @@ interface EventCardProps {
 }
 
 export function EventCard({ event, onPress }: EventCardProps) {
+  const isCancelled = (event as any).isCancelled;
+
   return (
     <AppCard onPress={onPress} style={styles.card}>
       <View style={styles.header}>
         <Text style={styles.name} numberOfLines={1}>
           {event.name}
         </Text>
-        {event.isActive ? (
+        {isCancelled ? (
+          <View style={styles.cancelledBadge}>
+            <View style={[styles.statusDot, { backgroundColor: colors.error }]} />
+            <Text style={[styles.badgeText, { color: colors.error }]}>Cancelled</Text>
+          </View>
+        ) : event.isActive ? (
           <View style={styles.activeBadge}>
-            <Text style={styles.badgeText}>Active</Text>
+            <View style={[styles.statusDot, { backgroundColor: colors.primary }]} />
+            <Text style={[styles.badgeText, { color: colors.primary }]}>Active</Text>
           </View>
         ) : (
           <View style={styles.inactiveBadge}>
-            <Text style={styles.badgeText}>Closed</Text>
+            <View style={[styles.statusDot, { backgroundColor: colors.textMuted }]} />
+            <Text style={[styles.badgeText, { color: colors.textMuted }]}>Closed</Text>
           </View>
         )}
       </View>
 
-      <Text style={styles.venue} numberOfLines={1}>
-        {event.venue}
-      </Text>
+      <View style={styles.venueRow}>
+        <Ionicons name="location-outline" size={13} color={colors.textMuted} />
+        <Text style={styles.venue} numberOfLines={1}>
+          {event.venue}
+        </Text>
+      </View>
+
+      <View style={styles.divider} />
 
       <View style={styles.details}>
         <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Date</Text>
-          <Text style={styles.detailValue}>
-            {formatDate(event.eventDate)}
-          </Text>
+          <View style={[styles.detailIconWrap, { backgroundColor: colors.accentMuted }]}>
+            <Ionicons name="calendar-outline" size={14} color={colors.accent} />
+          </View>
+          <View>
+            <Text style={styles.detailLabel}>Date</Text>
+            <Text style={styles.detailValue}>
+              {formatDate(event.eventDate)}
+            </Text>
+          </View>
         </View>
         <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Price</Text>
-          <Text style={styles.detailValue}>
-            {(event.currentTicketPrice || event.ticketPrice) > 0.0001
-              ? `${formatSOL(event.currentTicketPrice || event.ticketPrice)} SOL`
-              : "Tier-based"}
-          </Text>
+          <View style={[styles.detailIconWrap, { backgroundColor: colors.primaryMuted }]}>
+            <Ionicons name="pricetag-outline" size={14} color={colors.primary} />
+          </View>
+          <View>
+            <Text style={styles.detailLabel}>Price</Text>
+            <Text style={styles.detailValue}>
+              {(event.currentTicketPrice || event.ticketPrice) > 0.0001
+                ? `${formatSOL(event.currentTicketPrice || event.ticketPrice)} SOL`
+                : "Tier-based"}
+            </Text>
+          </View>
         </View>
         <View style={styles.detailItem}>
-          <Text style={styles.detailLabel}>Sold</Text>
-          <Text style={styles.detailValue}>
-            {event.ticketsSold}
-          </Text>
+          <View style={[styles.detailIconWrap, { backgroundColor: colors.secondaryMuted }]}>
+            <Ionicons name="ticket-outline" size={14} color={colors.secondary} />
+          </View>
+          <View>
+            <Text style={styles.detailLabel}>Sold</Text>
+            <Text style={styles.detailValue}>
+              {event.ticketsSold}
+            </Text>
+          </View>
         </View>
       </View>
 
       {event.isSoldOut && (
         <View style={styles.soldOutBanner}>
+          <Ionicons name="alert-circle" size={14} color={colors.error} />
           <Text style={styles.soldOutText}>SOLD OUT</Text>
         </View>
       )}
@@ -82,54 +114,95 @@ const styles = StyleSheet.create({
     flex: 1,
     marginRight: spacing.sm,
   },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
   activeBadge: {
-    backgroundColor: colors.success + "30",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.primaryMuted,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
   },
   inactiveBadge: {
-    backgroundColor: colors.textMuted + "30",
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.surfaceLight,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+  },
+  cancelledBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: colors.errorLight,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
   },
   badgeText: {
-    ...typography.small,
-    color: colors.text,
+    fontSize: 11,
+    fontFamily: fonts.bodySemiBold,
+  },
+  venueRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    marginBottom: spacing.sm,
   },
   venue: {
-    ...typography.caption,
+    ...typography.bodySm,
     color: colors.textSecondary,
-    marginBottom: spacing.md,
+    flex: 1,
+  },
+  divider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginBottom: spacing.sm,
   },
   details: {
     flexDirection: "row",
     justifyContent: "space-between",
   },
   detailItem: {
+    flexDirection: "row",
     alignItems: "center",
+    gap: spacing.xs,
+  },
+  detailIconWrap: {
+    width: 28,
+    height: 28,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
   },
   detailLabel: {
     ...typography.small,
     color: colors.textMuted,
-    marginBottom: 2,
   },
   detailValue: {
-    ...typography.caption,
+    fontSize: 13,
+    fontFamily: fonts.bodySemiBold,
     color: colors.text,
-    fontWeight: "600",
   },
   soldOutBanner: {
-    backgroundColor: colors.error + "20",
-    marginTop: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: 8,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    backgroundColor: colors.errorLight,
+    marginTop: spacing.sm,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.sm,
   },
   soldOutText: {
-    ...typography.small,
+    ...typography.tag,
     color: colors.error,
-    fontWeight: "700",
   },
 });

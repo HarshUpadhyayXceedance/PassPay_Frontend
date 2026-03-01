@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { spacing } from "../../theme/spacing";
@@ -26,8 +27,14 @@ export function AppHeader({
     <View style={styles.container}>
       <View style={styles.left}>
         {onBack && (
-          <TouchableOpacity onPress={onBack} style={styles.backButton}>
-            <Text style={styles.backText}>{"<"}</Text>
+          <TouchableOpacity
+            onPress={onBack}
+            style={styles.backButton}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+            accessibilityRole="button"
+            accessibilityLabel="Go back"
+          >
+            <Ionicons name="chevron-back" size={24} color={colors.text} />
           </TouchableOpacity>
         )}
       </View>
@@ -53,6 +60,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     height: 56,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
   },
   left: {
     width: 48,
@@ -67,11 +76,12 @@ const styles = StyleSheet.create({
     alignItems: "flex-end",
   },
   backButton: {
-    padding: spacing.xs,
-  },
-  backText: {
-    ...typography.h3,
-    color: colors.text,
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   title: {
     ...typography.bodyBold,

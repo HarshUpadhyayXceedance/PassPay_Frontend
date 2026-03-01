@@ -6,7 +6,6 @@ import {
   Dimensions,
   TouchableOpacity,
   ActivityIndicator,
-  Alert,
   Linking,
   Animated,
   Image,
@@ -19,6 +18,8 @@ import { useWalletStore } from "../../store/walletStore";
 import { useAuthStore } from "../../store/authStore";
 import { SuccessAnimation } from "../../components/animations/SuccessAnimation";
 import { RoleDetectionLoader } from "../../components/ui/RoleDetectionLoader";
+import { showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 const { width, height } = Dimensions.get("window");
 
@@ -87,8 +88,7 @@ export function WelcomeScreen() {
   }, []);
 
   const handleConnectPhantom = async () => {
-    // Haptic feedback on press
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     setIsConnecting(true);
     try {
@@ -124,22 +124,17 @@ export function WelcomeScreen() {
         error.message?.includes("No wallet") ||
         error.message?.includes("not installed")
       ) {
-        Alert.alert(
-          "Phantom Wallet Required",
-          "You need to install Phantom wallet to use PassPay. Would you like to download it?",
-          [
-            { text: "Cancel", style: "cancel" },
-            {
-              text: "Download",
-              onPress: () => Linking.openURL("https://phantom.app/download"),
-            },
-          ]
-        );
+        confirm({
+          title: "Phantom Wallet Required",
+          message: "You need to install Phantom wallet to use PassPay. Would you like to download it?",
+          type: "info",
+          buttons: [
+            { text: "Cancel", style: "cancel", onPress: () => {} },
+            { text: "Download", style: "default", onPress: () => Linking.openURL("https://phantom.app/download") },
+          ],
+        });
       } else {
-        Alert.alert(
-          "Connection Failed",
-          error.message || "Failed to connect to Phantom wallet. Please try again."
-        );
+        showError("Connection Failed", error.message || "Failed to connect to Phantom wallet. Please try again.");
       }
     } finally {
       setIsConnecting(false);

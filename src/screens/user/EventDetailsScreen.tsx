@@ -105,7 +105,7 @@ export function EventDetailsScreen() {
   const finalPrice = startingPrice - discountAmount;
 
   const handleBuyTicket = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({ pathname: "/(user)/buy-ticket", params: { eventKey: event.publicKey } });
   };
 
@@ -298,8 +298,8 @@ export function EventDetailsScreen() {
           </View>
         </View>
 
-        {/* Spacer for bottom bar */}
-        <View style={{ height: 110 }} />
+        {/* Spacer for bottom bar (accounts for badges + safe area) */}
+        <View style={{ height: 170 }} />
       </Animated.ScrollView>
 
       {/* ============ BOTTOM STICKY BAR ============ */}

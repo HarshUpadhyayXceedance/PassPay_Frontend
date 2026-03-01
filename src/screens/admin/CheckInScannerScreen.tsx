@@ -1,5 +1,5 @@
 import React, { useState } from "react";
-import { View, Text, StyleSheet, Alert } from "react-native";
+import { View, Text, StyleSheet } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
 import { AppHeader } from "../../components/ui/AppHeader";
@@ -17,6 +17,8 @@ import { TicketQRPayload } from "../../utils/qrPayload";
 import { getAssociatedTokenAddress } from "../../solana/utils/tokenUtils";
 import { PublicKey } from "@solana/web3.js";
 import { shortenAddress } from "../../utils/formatters";
+import { showSuccess, showWarning, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 export function CheckInScannerScreen() {
   const router = useRouter();
@@ -36,15 +38,12 @@ export function CheckInScannerScreen() {
 
     // Validate required fields before creating PublicKey objects
     if (!ticket.mint || !ticket.owner) {
-      Alert.alert(
-        "Invalid Ticket QR",
-        "This QR code is missing required data. Please ask the attendee to regenerate their QR code."
-      );
+      showWarning("Invalid Ticket QR", "This QR code is missing required data. Please ask the attendee to regenerate their QR code.");
       return;
     }
 
     if (!resolvedEventKey) {
-      Alert.alert("Error", "No event found. The ticket QR is missing event data.");
+      showError("Error", "No event found. The ticket QR is missing event data.");
       return;
     }
 
@@ -71,21 +70,23 @@ export function CheckInScannerScreen() {
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowConfetti(true);
 
-      Alert.alert(
-        "Check-in Successful!",
-        `Attendee ${shortenAddress(ticket.owner, 4)} has been checked in. Attendance and loyalty tier updated on-chain.`,
-        [
+      confirm({
+        title: "Check-in Successful!",
+        message: `Attendee ${shortenAddress(ticket.owner, 4)} has been checked in. Attendance and loyalty tier updated on-chain.`,
+        type: "success",
+        buttons: [
           {
             text: "Scan Next",
+            style: "default",
             onPress: () => {
               reset();
               setShowConfetti(false);
             },
           },
-        ]
-      );
+        ],
+      });
     } catch (error: any) {
-      Alert.alert("Check-in Failed", error.message ?? "Unknown error");
+      showError("Check-in Failed", error.message ?? "Unknown error");
     } finally {
       setCheckingIn(false);
     }

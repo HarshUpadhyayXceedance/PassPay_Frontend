@@ -6,7 +6,6 @@ import {
   StyleSheet,
   RefreshControl,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { PublicKey } from "@solana/web3.js";
@@ -23,6 +22,8 @@ import { useMerchants } from "../../hooks/useMerchants";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
+import { showSuccess, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 type RefundStatusKey = "Pending" | "Approved" | "Rejected";
 
@@ -154,7 +155,7 @@ export function RefundManagementScreen() {
       console.error("Failed to fetch refunds:", err);
       const errorMsg = err.message || "Failed to load refund requests";
       setError(errorMsg);
-      Alert.alert("Error Loading Refunds", errorMsg);
+      showError("Error Loading Refunds", errorMsg);
     } finally {
       setLoading(false);
     }
@@ -205,13 +206,15 @@ export function RefundManagementScreen() {
 
   const handleApprove = useCallback(
     (item: RefundItem) => {
-      Alert.alert(
-        "Approve Refund",
-        `Approve refund of ${(item.amount / 1_000_000_000).toFixed(4)} SOL to ${shortenAddress(item.holder)}?`,
-        [
-          { text: "Cancel", style: "cancel" },
+      confirm({
+        title: "Approve Refund",
+        message: `Approve refund of ${(item.amount / 1_000_000_000).toFixed(4)} SOL to ${shortenAddress(item.holder)}?`,
+        type: "default",
+        buttons: [
+          { text: "Cancel", style: "cancel", onPress: () => {} },
           {
             text: "Approve",
+            style: "default",
             onPress: async () => {
               setProcessingId(item.publicKey);
               try {
@@ -222,28 +225,29 @@ export function RefundManagementScreen() {
                   holder: item.holder,
                   seatTierPda,
                 });
-                Alert.alert("Approved", "Refund has been approved and SOL transferred.");
+                showSuccess("Approved", "Refund has been approved and SOL transferred.");
                 await fetchRefunds();
               } catch (err: any) {
-                Alert.alert("Error", err.message || "Failed to approve refund");
+                showError("Error", err.message || "Failed to approve refund");
               } finally {
                 setProcessingId(null);
               }
             },
           },
-        ]
-      );
+        ],
+      });
     },
     [fetchRefunds, resolveSeatTierPda]
   );
 
   const handleReject = useCallback(
     (item: RefundItem) => {
-      Alert.alert(
-        "Reject Refund",
-        `Reject refund request from ${shortenAddress(item.holder)}?`,
-        [
-          { text: "Cancel", style: "cancel" },
+      confirm({
+        title: "Reject Refund",
+        message: `Reject refund request from ${shortenAddress(item.holder)}?`,
+        type: "danger",
+        buttons: [
+          { text: "Cancel", style: "cancel", onPress: () => {} },
           {
             text: "Reject",
             style: "destructive",
@@ -254,17 +258,17 @@ export function RefundManagementScreen() {
                   eventPda: item.event,
                   ticketMint: item.ticketMint,
                 });
-                Alert.alert("Rejected", "Refund request has been rejected.");
+                showSuccess("Rejected", "Refund request has been rejected.");
                 await fetchRefunds();
               } catch (err: any) {
-                Alert.alert("Error", err.message || "Failed to reject refund");
+                showError("Error", err.message || "Failed to reject refund");
               } finally {
                 setProcessingId(null);
               }
             },
           },
-        ]
-      );
+        ],
+      });
     },
     [fetchRefunds]
   );

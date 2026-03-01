@@ -5,7 +5,6 @@ import {
   TextInput,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   ActivityIndicator,
   Share,
@@ -17,6 +16,8 @@ import { useTickets } from "../../hooks/useTickets";
 import { useWallet } from "../../hooks/useWallet";
 import { apiTransferTicket } from "../../services/api/eventApi";
 import { formatSOL, shortenAddress } from "../../utils/formatters";
+import { showWarning, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
@@ -61,15 +62,16 @@ export function TransferTicketScreen() {
     if (!ticket || !addressValid) return;
 
     if (recipientAddress === ticket.owner) {
-      Alert.alert("Invalid Recipient", "You cannot transfer a ticket to yourself.");
+      showWarning("Invalid Recipient", "You cannot transfer a ticket to yourself.");
       return;
     }
 
-    Alert.alert(
-      "Confirm Transfer",
-      `Transfer this ticket to ${shortenAddress(recipientAddress, 6)}?\n\nThis action is irreversible.`,
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: "Confirm Transfer",
+      message: `Transfer this ticket to ${shortenAddress(recipientAddress, 6)}?\n\nThis action is irreversible.`,
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Transfer",
           style: "destructive",
@@ -84,12 +86,14 @@ export function TransferTicketScreen() {
 
               const deepLink = `passpay://accept-transfer?ticketMint=${ticket.mint}&eventKey=${ticket.eventKey}&from=${publicKey}`;
 
-              Alert.alert(
-                "Transfer Successful",
-                `Your ticket has been transferred to ${shortenAddress(recipientAddress, 6)}.`,
-                [
+              confirm({
+                title: "Transfer Successful",
+                message: `Your ticket has been transferred to ${shortenAddress(recipientAddress, 6)}.`,
+                type: "success",
+                buttons: [
                   {
                     text: "Share Link",
+                    style: "default",
                     onPress: async () => {
                       try {
                         await Share.share({
@@ -99,11 +103,11 @@ export function TransferTicketScreen() {
                       router.back();
                     },
                   },
-                  { text: "Done", onPress: () => router.back() },
-                ]
-              );
+                  { text: "Done", style: "cancel", onPress: () => router.back() },
+                ],
+              });
             } catch (error: any) {
-              Alert.alert(
+              showError(
                 "Transfer Failed",
                 error.message ?? "Failed to transfer ticket. Please try again."
               );
@@ -112,8 +116,8 @@ export function TransferTicketScreen() {
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   if (!ticket) {

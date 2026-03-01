@@ -5,7 +5,6 @@ import {
   StyleSheet,
   FlatList,
   TouchableOpacity,
-  Alert,
   RefreshControl,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -19,6 +18,8 @@ import { AppHeader } from "../../components/ui/AppHeader";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
+import { showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 export function ManageProductsScreen() {
   const router = useRouter();
@@ -55,13 +56,15 @@ export function ManageProductsScreen() {
     if (!myMerchant || !resolvedEventKey) return;
 
     const newStatus = !product.isAvailable;
-    Alert.alert(
-      newStatus ? "Make Available" : "Make Unavailable",
-      `${newStatus ? "Enable" : "Disable"} "${product.name}"?`,
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: newStatus ? "Make Available" : "Make Unavailable",
+      message: `${newStatus ? "Enable" : "Disable"} "${product.name}"?`,
+      type: "default",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Confirm",
+          style: "default",
           onPress: async () => {
             try {
               await apiUpdateProduct({
@@ -71,12 +74,12 @@ export function ManageProductsScreen() {
               });
               fetchProducts(myMerchant.publicKey);
             } catch (error: any) {
-              Alert.alert("Error", error.message ?? "Failed to update product");
+              showError("Error", error.message ?? "Failed to update product");
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const renderProduct = ({ item }: { item: MerchantProductDisplay }) => (

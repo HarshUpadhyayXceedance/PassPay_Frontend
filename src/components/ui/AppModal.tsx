@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Pressable,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { borderRadius, spacing } from "../../theme/spacing";
@@ -33,10 +34,17 @@ export function AppModal({
     >
       <Pressable style={styles.overlay} onPress={onClose}>
         <Pressable style={styles.content} onPress={(e) => e.stopPropagation()}>
+          <View style={styles.handle} />
           <View style={styles.header}>
             {title && <Text style={styles.title}>{title}</Text>}
-            <TouchableOpacity onPress={onClose} style={styles.closeButton}>
-              <Text style={styles.closeText}>X</Text>
+            <TouchableOpacity
+              onPress={onClose}
+              style={styles.closeButton}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+              accessibilityRole="button"
+              accessibilityLabel="Close"
+            >
+              <Ionicons name="close" size={20} color={colors.textSecondary} />
             </TouchableOpacity>
           </View>
           <View style={styles.body}>{children}</View>
@@ -49,16 +57,26 @@ export function AppModal({
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.6)",
+    backgroundColor: colors.overlay,
     justifyContent: "center",
     alignItems: "center",
     padding: spacing.lg,
   },
   content: {
     backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     width: "100%",
     maxHeight: "80%",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  handle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderLight,
+    alignSelf: "center",
+    marginTop: spacing.sm,
   },
   header: {
     flexDirection: "row",
@@ -74,11 +92,12 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   closeButton: {
-    padding: spacing.xs,
-  },
-  closeText: {
-    ...typography.body,
-    color: colors.textSecondary,
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    backgroundColor: colors.surfaceLight,
+    alignItems: "center",
+    justifyContent: "center",
   },
   body: {
     padding: spacing.md,

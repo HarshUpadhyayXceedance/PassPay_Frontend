@@ -1,4 +1,5 @@
-import { Alert, Linking } from "react-native";
+import { Linking } from "react-native";
+import { showInfo } from "../../utils/alerts";
 import { PublicKey, Transaction } from "@solana/web3.js";
 import { Buffer } from "buffer";
 import * as Clipboard from "expo-clipboard";
@@ -136,7 +137,7 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
         "✅ Connected via clipboard (dev mode):",
         this._publicKey.toBase58()
       );
-      Alert.alert(
+      showInfo(
         "Dev Mode",
         `Connected with address from clipboard:\n${this._publicKey.toBase58().slice(0, 8)}...\n\nRead-only mode — transactions require a development build.`
       );
@@ -252,6 +253,17 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
 
   getPublicKey(): PublicKey | null {
     return this._publicKey;
+  }
+
+  /**
+   * Restore a previously-connected public key without a full MWA session.
+   * Used after Activity restarts (e.g. orientation change on Android) to
+   * keep the user authenticated for read-only operations. The next
+   * transaction will trigger a fresh MWA authorize/reauthorize prompt.
+   */
+  restorePublicKey(key: PublicKey): void {
+    this._publicKey = key;
+    // _authToken stays null → next signTransaction triggers full authorize
   }
 }
 

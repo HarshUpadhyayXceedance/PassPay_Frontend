@@ -5,11 +5,12 @@ import {
   Image,
   StyleSheet,
   TouchableOpacity,
-  Alert,
   ActivityIndicator,
 } from "react-native";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
+import { showWarning } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
@@ -32,7 +33,7 @@ export function ImagePickerButton({
   const handlePickerCamera = async () => {
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
+      showWarning(
         "Permission needed",
         "Camera permission is required to take photos."
       );
@@ -53,7 +54,7 @@ export function ImagePickerButton({
     const { status } =
       await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (status !== "granted") {
-      Alert.alert(
+      showWarning(
         "Permission needed",
         "Gallery permission is required to pick photos."
       );
@@ -71,11 +72,16 @@ export function ImagePickerButton({
   };
 
   const handlePress = () => {
-    Alert.alert("Select Image", "Choose a source", [
-      { text: "Camera", onPress: handlePickerCamera },
-      { text: "Gallery", onPress: handlePickerGallery },
-      { text: "Cancel", style: "cancel" },
-    ]);
+    confirm({
+      title: "Select Image",
+      message: "Choose a source",
+      type: "default",
+      buttons: [
+        { text: "Camera", style: "default", onPress: handlePickerCamera },
+        { text: "Gallery", style: "default", onPress: handlePickerGallery },
+        { text: "Cancel", style: "cancel", onPress: () => {} },
+      ],
+    });
   };
 
   return (

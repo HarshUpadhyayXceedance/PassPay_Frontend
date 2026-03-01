@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   Switch,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
@@ -17,6 +16,8 @@ import { formatSOL } from "../../utils/formatters";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
+import { showWarning, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 const TIER_PRESETS = [
   { name: "Bronze", level: 0 },
@@ -96,12 +97,18 @@ export function AddSeatTierScreen() {
         isRestricted,
       });
 
-      Alert.alert(
-        "Tier Added",
-        `"${tierName}" tier has been created with ${totalSeats} seats at ${price} SOL each.`,
-        [
+      // Fetch updated tiers immediately after creation
+      await fetchSeatTiers(eventKey);
+
+      confirm({
+        title: "Tier Added",
+        message: `"${tierName}" tier has been created with ${totalSeats} seats at ${price} SOL each.`,
+        type: "success",
+        buttons: [
+          { text: "Done", style: "cancel", onPress: () => router.back() },
           {
             text: "Add Another",
+            style: "default",
             onPress: () => {
               setTierName("");
               setPrice("");
@@ -109,18 +116,16 @@ export function AddSeatTierScreen() {
               setTierLevel(Math.min(tierLevel + 1, 3));
               setIsRestricted(false);
               setErrors({});
-              fetchSeatTiers(eventKey);
             },
           },
-          { text: "Done", onPress: () => router.back() },
-        ]
-      );
+        ],
+      });
     } catch (error: any) {
       const msg = error.message ?? "Failed to add tier";
       if (msg.includes("already in use")) {
-        Alert.alert("Tier Exists", `A tier named "${tierName}" already exists for this event.`);
+        showWarning("Tier Exists", `A tier named "${tierName}" already exists for this event.`);
       } else {
-        Alert.alert("Error", msg);
+        showError("Error", msg);
       }
     } finally {
       setCreating(false);
@@ -174,15 +179,22 @@ export function AddSeatTierScreen() {
             const alreadyExists = eventTiers.some(
               (t) => t.name.toLowerCase() === preset.name.toLowerCase()
             );
+            const isSelected = tierName === preset.name;
+            const buttonStyle = {
+              ...styles.presetButton,
+              ...(alreadyExists ? styles.presetDisabled : {}),
+              ...(isSelected ? styles.selectedButton : {}),
+            };
             return (
               <AppButton
                 key={preset.name}
                 title={preset.name}
-                variant={tierName === preset.name ? "primary" : "outline"}
+                variant="outline"
+                selected={isSelected}
                 size="sm"
                 onPress={() => applyPreset(preset)}
                 disabled={alreadyExists}
-                style={alreadyExists ? { ...styles.presetButton, ...styles.presetDisabled } : styles.presetButton}
+                style={buttonStyle}
               />
             );
           })}
@@ -220,16 +232,24 @@ export function AddSeatTierScreen() {
         <View style={styles.levelSection}>
           <Text style={styles.levelLabel}>Tier Level</Text>
           <View style={styles.levelRow}>
-            {[0, 1, 2, 3].map((level) => (
-              <AppButton
-                key={level}
-                title={TIER_PRESETS[level].name}
-                variant={tierLevel === level ? "primary" : "outline"}
-                size="sm"
-                onPress={() => setTierLevel(level)}
-                style={styles.levelButton}
-              />
-            ))}
+            {[0, 1, 2, 3].map((level) => {
+              const isSelected = tierLevel === level;
+              const buttonStyle = {
+                ...styles.levelButton,
+                ...(isSelected ? styles.selectedButton : {}),
+              };
+              return (
+                <AppButton
+                  key={level}
+                  title={TIER_PRESETS[level].name}
+                  variant="outline"
+                  selected={isSelected}
+                  size="sm"
+                  onPress={() => setTierLevel(level)}
+                  style={buttonStyle}
+                />
+              );
+            })}
           </View>
           <Text style={styles.levelHint}>
             Higher tiers display first in the ticket purchase flow
@@ -333,6 +353,14 @@ const styles = StyleSheet.create({
   },
   presetDisabled: {
     opacity: 0.3,
+  },
+  selectedButton: {
+    shadowColor: colors.secondary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.5,
+    shadowRadius: 6,
+    elevation: 6,
+    transform: [{ scale: 1.03 }],
   },
   levelSection: {
     marginBottom: spacing.md,

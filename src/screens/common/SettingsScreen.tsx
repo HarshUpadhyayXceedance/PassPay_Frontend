@@ -5,10 +5,10 @@ import {
   StyleSheet,
   TouchableOpacity,
   ScrollView,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { AppHeader } from "../../components/ui/AppHeader";
+import { showInfo } from "../../utils/alerts";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 import { spacing, borderRadius } from "../../theme/spacing";
@@ -41,7 +41,7 @@ export function SettingsScreen() {
         <SettingRow
           label="About"
           value=""
-          onPress={() => Alert.alert("Navigate", "Navigate to About screen")}
+          onPress={() => showInfo("About", "PassPay - Solana Event Ticketing & Payments")}
         />
       </ScrollView>
     </View>

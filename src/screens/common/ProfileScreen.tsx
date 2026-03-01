@@ -6,7 +6,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Alert,
 } from "react-native";
 import { useRouter } from "expo-router";
 import * as Clipboard from "expo-clipboard";
@@ -18,6 +17,8 @@ import { useAuthStore } from "../../store/authStore";
 import { useLoyalty } from "../../hooks/useLoyalty";
 import { useTickets } from "../../hooks/useTickets";
 import { shortenAddress, formatSOL, lamportsToSOL } from "../../utils/formatters";
+import { showSuccess } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { TierBadge } from "../../components/loyalty/TierBadge";
 import { TierProgressBar } from "../../components/loyalty/TierProgressBar";
 import { BadgeTier } from "../../types/loyalty";
@@ -51,23 +52,24 @@ export function ProfileScreen() {
     if (publicKey) {
       await Clipboard.setStringAsync(publicKey);
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-      Alert.alert("Copied", "Wallet address copied to clipboard");
+      showSuccess("Copied", "Wallet address copied to clipboard");
     }
   };
 
   const handleDisconnect = () => {
-    Alert.alert(
-      "Disconnect Wallet",
-      "This will remove your wallet from this device. Make sure you have backed up your keys.",
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: "Disconnect Wallet",
+      message: "This will remove your wallet from this device. Make sure you have backed up your keys.",
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Disconnect",
           style: "destructive",
           onPress: disconnect,
         },
-      ]
-    );
+      ],
+    });
   };
 
   return (

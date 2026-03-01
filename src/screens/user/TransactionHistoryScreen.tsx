@@ -12,7 +12,6 @@ import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { LinearGradient } from "expo-linear-gradient";
 import { PublicKey } from "@solana/web3.js";
-import * as Haptics from "expo-haptics";
 import { useTickets } from "../../hooks/useTickets";
 import { useWallet } from "../../hooks/useWallet";
 import { useMerchants } from "../../hooks/useMerchants";
@@ -203,7 +202,6 @@ export function TransactionHistoryScreen() {
   }), [tickets, payments]);
 
   const openExplorer = useCallback((item: TransactionItem) => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     if (item.signature) {
       Linking.openURL(getTxUrl(item.signature));
     } else if (item.mint) {
@@ -323,10 +321,7 @@ export function TransactionHistoryScreen() {
             <TouchableOpacity
               key={f.key}
               style={[styles.filterTab, isActive && styles.filterTabActive]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setActiveFilter(f.key);
-              }}
+              onPress={() => setActiveFilter(f.key)}
               activeOpacity={0.7}
               accessibilityRole="tab"
               accessibilityState={{ selected: isActive }}
@@ -350,10 +345,7 @@ export function TransactionHistoryScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
+          onPress={() => router.back()}
           accessibilityRole="button"
           accessibilityLabel="Go back"
         >

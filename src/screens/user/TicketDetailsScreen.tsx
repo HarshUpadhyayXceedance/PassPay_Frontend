@@ -8,7 +8,6 @@ import {
   Dimensions,
   Animated,
   Linking,
-  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
@@ -16,6 +15,8 @@ import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import { useTickets } from "../../hooks/useTickets";
 import { formatDate, formatSOL } from "../../utils/formatters";
+import { showInfo } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 
@@ -67,10 +68,7 @@ export function TicketDetailsScreen() {
         <View style={styles.header}>
           <TouchableOpacity
             style={styles.backButton}
-            onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-              router.back();
-            }}
+            onPress={() => router.back()}
           >
             <Text style={styles.backIcon}>←</Text>
           </TouchableOpacity>
@@ -89,22 +87,21 @@ export function TicketDetailsScreen() {
   const isPastEvent = eventDate < new Date();
 
   const handleShowQR = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({ pathname: "/(user)/ticket-qr", params: { ticketKey: ticket.publicKey } });
   };
 
   const handleTransfer = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     router.push({ pathname: "/(user)/transfer-ticket", params: { ticketKey: ticket.publicKey } });
   };
 
   const handleRefund = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-    Alert.alert(
-      "Request Refund",
-      "Are you sure you want to request a refund for this ticket?",
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: "Request Refund",
+      message: "Are you sure you want to request a refund for this ticket?",
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Request Refund",
           style: "destructive",
@@ -112,18 +109,16 @@ export function TicketDetailsScreen() {
             router.push({ pathname: "/(user)/refund", params: { ticketKey: ticket.publicKey } });
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleViewOnExplorer = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const url = `https://explorer.solana.com/address/${ticket.mint}?cluster=devnet`;
     Linking.openURL(url);
   };
 
   const handleAddToCalendar = () => {
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
     const startDate = eventDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
     const endDate = new Date(eventDate.getTime() + 2 * 60 * 60 * 1000)
       .toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
@@ -137,7 +132,7 @@ export function TicketDetailsScreen() {
   const handleCopyMint = async () => {
     await Clipboard.setStringAsync(ticket.mint);
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    Alert.alert("Copied", "Mint address copied to clipboard");
+    showInfo("Copied", "Mint address copied to clipboard");
   };
 
   return (
@@ -146,10 +141,7 @@ export function TicketDetailsScreen() {
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.back();
-          }}
+          onPress={() => router.back()}
         >
           <Text style={styles.backIcon}>←</Text>
         </TouchableOpacity>

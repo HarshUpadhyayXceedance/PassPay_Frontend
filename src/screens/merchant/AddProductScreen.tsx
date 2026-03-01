@@ -4,7 +4,6 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
 } from "react-native";
 import { useRouter, useLocalSearchParams, useFocusEffect } from "expo-router";
 import { AppButton } from "../../components/ui/AppButton";
@@ -16,6 +15,8 @@ import { apiAddProduct } from "../../services/api/eventApi";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing } from "../../theme/spacing";
+import { showWarning, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 export function AddProductScreen() {
   const router = useRouter();
@@ -87,25 +88,31 @@ export function AddProductScreen() {
         imageUrl,
       });
 
-      Alert.alert("Product Added", `"${name}" has been added to your catalog.`, [
-        {
-          text: "Add Another",
-          onPress: () => {
-            setName("");
-            setDescription("");
-            setPrice("");
-            setImageUri("");
-            setErrors({});
+      confirm({
+        title: "Product Added",
+        message: `"${name}" has been added to your catalog.`,
+        type: "success",
+        buttons: [
+          {
+            text: "Add Another",
+            style: "default",
+            onPress: () => {
+              setName("");
+              setDescription("");
+              setPrice("");
+              setImageUri("");
+              setErrors({});
+            },
           },
-        },
-        { text: "Done", onPress: () => router.back() },
-      ]);
+          { text: "Done", style: "cancel", onPress: () => router.back() },
+        ],
+      });
     } catch (error: any) {
       const msg = error.message ?? "Failed to add product";
       if (msg.includes("already in use")) {
-        Alert.alert("Product Exists", `A product named "${name}" already exists.`);
+        showWarning("Product Exists", `A product named "${name}" already exists.`);
       } else {
-        Alert.alert("Error", msg);
+        showError("Error", msg);
       }
     } finally {
       setCreating(false);

@@ -85,7 +85,6 @@ export function MyTicketsScreen() {
 
   const handleTabSwitch = (tab: TabKey) => {
     if (tab !== activeTab) {
-      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
       setActiveTab(tab);
     }
   };
@@ -123,7 +122,6 @@ export function MyTicketsScreen() {
       <TouchableOpacity
         style={styles.card}
         onPress={() => {
-          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
           router.push({ pathname: "/(user)/ticket-details", params: { ticketKey: item.publicKey } });
         }}
         activeOpacity={0.9}
@@ -237,7 +235,7 @@ export function MyTicketsScreen() {
                 style={styles.refundButton}
                 onPress={(e) => {
                   e.stopPropagation();
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push({ pathname: "/(user)/refund", params: { ticketKey: item.publicKey } });
                 }}
                 activeOpacity={0.8}
@@ -249,7 +247,7 @@ export function MyTicketsScreen() {
                 style={styles.qrButton}
                 onPress={(e) => {
                   e.stopPropagation();
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                   router.push({ pathname: "/(user)/ticket-qr", params: { ticketKey: item.publicKey } });
                 }}
                 activeOpacity={0.8}
@@ -264,7 +262,6 @@ export function MyTicketsScreen() {
               style={styles.shareButton}
               onPress={async (e) => {
                 e.stopPropagation();
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 try {
                   await Share.share({
                     message: `Check out my ticket for ${item.eventName}!\n\nDate: ${formatDate(item.eventDate)}\nVenue: ${item.eventVenue}\nSeat: #${item.seatNumber}\n\nVerified NFT ticket on Solana`,
@@ -288,10 +285,7 @@ export function MyTicketsScreen() {
         <Text style={styles.headerTitle}>My Passes</Text>
         <TouchableOpacity
           style={styles.historyButton}
-          onPress={() => {
-            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-            router.push("/(user)/transaction-history" as any);
-          }}
+          onPress={() => router.push("/(user)/transaction-history" as any)}
           activeOpacity={0.7}
         >
           <Text style={styles.historyIcon}>🕘</Text>

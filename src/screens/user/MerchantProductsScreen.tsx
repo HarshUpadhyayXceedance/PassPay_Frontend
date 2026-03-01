@@ -7,7 +7,6 @@ import {
   TouchableOpacity,
   RefreshControl,
   Image,
-  Alert,
   ActivityIndicator,
   Modal,
 } from "react-native";
@@ -18,9 +17,12 @@ import QRCode from "react-native-qrcode-svg";
 import { useMerchants } from "../../hooks/useMerchants";
 import { useLoyalty } from "../../hooks/useLoyalty";
 import { useWallet } from "../../hooks/useWallet";
+import { usePurchaseStore } from "../../store/purchaseStore";
 import { MerchantProductDisplay } from "../../types/merchant";
 import { apiBuyProduct } from "../../services/api/eventApi";
 import { formatSOL } from "../../utils/formatters";
+import { showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { EmptyState } from "../../components/ui/EmptyState";
 import { colors } from "../../theme/colors";
@@ -45,6 +47,7 @@ export function MerchantProductsScreen() {
   const { merchants, products, fetchProducts, isLoading } = useMerchants();
   const { loyaltyBenefits } = useLoyalty();
   const { publicKey } = useWallet();
+  const addPurchase = usePurchaseStore((s) => s.addPurchase);
   const [buyingProduct, setBuyingProduct] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<PurchaseReceipt | null>(null);
 
@@ -67,7 +70,7 @@ export function MerchantProductsScreen() {
   const handleBuy = async (product: MerchantProductDisplay) => {
     if (!merchant || !eventKey) return;
 
-    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
 
     const discountedPrice =
       merchantDiscount > 0
@@ -79,13 +82,15 @@ export function MerchantProductsScreen() {
         ? `${formatSOL(discountedPrice)} SOL (${merchantDiscount}% discount)`
         : `${formatSOL(product.price)} SOL`;
 
-    Alert.alert(
-      `Buy ${product.name}?`,
-      `Pay ${displayPrice} to ${merchant.name}`,
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: `Buy ${product.name}?`,
+      message: `Pay ${displayPrice} to ${merchant.name}`,
+      type: "default",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Confirm Purchase",
+          style: "default",
           onPress: async () => {
             setBuyingProduct(product.publicKey);
             try {
@@ -99,13 +104,24 @@ export function MerchantProductsScreen() {
                 Haptics.NotificationFeedbackType.Success
               );
 
-              // Generate a unique purchase receipt for delivery QR
               const purchaseId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-              setReceipt({
+              const receiptData = {
                 productName: product.name,
                 merchantName: merchant.name,
                 price: discountedPrice,
                 purchaseId,
+                timestamp: Date.now(),
+              };
+              setReceipt(receiptData);
+
+              addPurchase({
+                id: purchaseId,
+                productName: product.name,
+                merchantName: merchant.name,
+                merchantAuthority: merchant.authority,
+                eventKey: eventKey!,
+                amount: discountedPrice,
+                buyer: publicKey ?? "",
                 timestamp: Date.now(),
               });
 
@@ -114,17 +130,14 @@ export function MerchantProductsScreen() {
               Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Error
               );
-              Alert.alert(
-                "Purchase Failed",
-                error.message ?? "Something went wrong"
-              );
+              showError("Purchase Failed", error.message ?? "Something went wrong");
             } finally {
               setBuyingProduct(null);
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const receiptQRData = receipt

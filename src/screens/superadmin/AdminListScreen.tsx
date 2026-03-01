@@ -5,10 +5,11 @@ import {
   StyleSheet,
   FlatList,
   RefreshControl,
-  Alert,
   TouchableOpacity,
 } from "react-native";
 import { PublicKey, Connection } from "@solana/web3.js";
+import { showSuccess, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { AnchorProvider } from "@coral-xyz/anchor";
 import { AppCard } from "../../components/ui/AppCard";
 import { AppButton } from "../../components/ui/AppButton";
@@ -69,7 +70,7 @@ export function AdminListScreen() {
       console.log(`✅ Loaded ${adminsData.length} active admins`);
     } catch (error: any) {
       console.error("❌ Failed to fetch admins:", error);
-      Alert.alert("Error", "Failed to load admins. Please try again.");
+      showError("Error", "Failed to load admins. Please try again.");
     } finally {
       setIsLoading(false);
       setIsRefreshing(false);
@@ -87,15 +88,16 @@ export function AdminListScreen() {
 
   const handleDeactivateAdmin = async (admin: AdminAccount) => {
     if (!publicKey) {
-      Alert.alert("Error", "Wallet not connected");
+      showError("Error", "Wallet not connected");
       return;
     }
 
-    Alert.alert(
-      "Deactivate Admin",
-      `Are you sure you want to deactivate "${admin.name}"?\n\nThey will lose access to admin features.`,
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: "Deactivate Admin",
+      message: `Are you sure you want to deactivate "${admin.name}"?\n\nThey will lose access to admin features.`,
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Deactivate",
           style: "destructive",
@@ -111,21 +113,21 @@ export function AdminListScreen() {
               );
 
               console.log("✅ Admin deactivated:", signature);
-              Alert.alert("Success", `Admin "${admin.name}" has been deactivated`);
+              showSuccess("Success", `Admin "${admin.name}" has been deactivated`);
 
               // Refresh the list
               fetchAdmins();
             } catch (error: any) {
               console.error("❌ Failed to deactivate admin:", error);
-              Alert.alert(
+              showError(
                 "Failed to Deactivate",
                 error.message || "An unknown error occurred"
               );
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const renderAdmin = ({ item }: { item: AdminAccount }) => (

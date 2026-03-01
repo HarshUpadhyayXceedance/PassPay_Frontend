@@ -1,12 +1,18 @@
 import React from "react";
 import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { colors } from "../../theme/colors";
-import { fonts } from "../../theme/fonts";
+import { typography } from "../../theme/typography";
+import { spacing, borderRadius } from "../../theme/spacing";
+
+type IoniconsName = keyof typeof Ionicons.glyphMap;
 
 interface EmptyStateViewProps {
   title: string;
   message: string;
   icon?: string;
+  ionicon?: IoniconsName;
   actionLabel?: string;
   onAction?: () => void;
 }
@@ -14,14 +20,19 @@ interface EmptyStateViewProps {
 export function EmptyStateView({
   title,
   message,
-  icon = "🔍",
+  icon,
+  ionicon,
   actionLabel,
   onAction,
 }: EmptyStateViewProps) {
   return (
     <View style={styles.container}>
       <View style={styles.iconCircle}>
-        <Text style={styles.icon}>{icon}</Text>
+        {ionicon ? (
+          <Ionicons name={ionicon} size={36} color={colors.textMuted} />
+        ) : (
+          <Text style={styles.icon}>{icon ?? "🔍"}</Text>
+        )}
       </View>
 
       <Text style={styles.title}>{title}</Text>
@@ -32,8 +43,17 @@ export function EmptyStateView({
           style={styles.actionButton}
           onPress={onAction}
           activeOpacity={0.8}
+          accessibilityRole="button"
+          accessibilityLabel={actionLabel}
         >
-          <Text style={styles.actionText}>{actionLabel}</Text>
+          <LinearGradient
+            colors={colors.gradientPrimary as unknown as [string, string]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.actionGradient}
+          >
+            <Text style={styles.actionText}>{actionLabel}</Text>
+          </LinearGradient>
         </TouchableOpacity>
       )}
     </View>
@@ -45,47 +65,51 @@ const styles = StyleSheet.create({
     flex: 1,
     justifyContent: "center",
     alignItems: "center",
-    paddingHorizontal: 40,
-    paddingVertical: 60,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.xxl,
   },
   iconCircle: {
     width: 80,
     height: 80,
     borderRadius: 40,
     backgroundColor: colors.surface,
-    borderWidth: 2,
+    borderWidth: 1,
     borderColor: colors.border,
     justifyContent: "center",
     alignItems: "center",
-    marginBottom: 20,
+    marginBottom: spacing.lg,
   },
   icon: {
     fontSize: 36,
   },
   title: {
-    fontSize: 20,
-    fontFamily: fonts.heading,
+    ...typography.h3,
     color: colors.text,
-    marginBottom: 8,
+    marginBottom: spacing.sm,
     textAlign: "center",
   },
   message: {
-    fontSize: 14,
-    fontFamily: fonts.body,
+    ...typography.bodySm,
     color: colors.textSecondary,
     textAlign: "center",
-    lineHeight: 20,
-    marginBottom: 24,
+    marginBottom: spacing.lg,
   },
   actionButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    paddingVertical: 12,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
+    overflow: "hidden",
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  actionGradient: {
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: borderRadius.md,
   },
   actionText: {
-    fontSize: 15,
-    fontFamily: fonts.bodySemiBold,
+    ...typography.button,
     color: colors.background,
   },
 });

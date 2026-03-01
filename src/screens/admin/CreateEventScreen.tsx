@@ -4,18 +4,19 @@ import {
   Text,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
   Modal,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
+import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { AppButton } from "../../components/ui/AppButton";
 import { AppInput } from "../../components/ui/AppInput";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { ImagePickerButton } from "../../components/ui/ImagePickerButton";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
-import { spacing } from "../../theme/spacing";
+import { spacing, borderRadius } from "../../theme/spacing";
 import { fonts } from "../../theme/fonts";
 import { PublicKey } from "@solana/web3.js";
 import { apiCreateEvent } from "../../services/api/eventApi";
@@ -23,6 +24,8 @@ import { uploadMetadata } from "../../services/api/uploadApi";
 import { uploadImageToCloudinary } from "../../services/cloudinary/uploadImage";
 import { useWallet } from "../../hooks/useWallet";
 import { findEventPda } from "../../solana/pda";
+import { showWarning, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import {
   validateEventName,
   validateVenue,
@@ -180,40 +183,36 @@ export function CreateEventScreen() {
       const [eventPda] = findEventPda(adminPubkey, name);
       const eventPdaStr = eventPda.toBase58();
 
-      Alert.alert(
-        "Event Created!",
-        "Now add seat tiers (Bronze, Silver, Gold, VIP) with different prices and capacities.",
-        [
+      confirm({
+        title: "Event Created!",
+        message: "Now add seat tiers (Bronze, Silver, Gold, VIP) with different prices and capacities.",
+        type: "success",
+        buttons: [
+          { text: "Later", style: "cancel", onPress: () => router.back() },
           {
             text: "Add Seat Tiers",
+            style: "default",
             onPress: () =>
               router.replace({
                 pathname: "/(admin)/add-seat-tier",
                 params: { eventKey: eventPdaStr, eventName: name },
               }),
           },
-          { text: "Later", style: "cancel", onPress: () => router.back() },
-        ]
-      );
+        ],
+      });
     } catch (error: any) {
       const msg = error.message ?? "Failed to create event";
       if (
         msg.includes("Cancelled") ||
         msg.includes("CancellationException")
       ) {
-        Alert.alert("Cancelled", "Transaction was cancelled.");
+        showWarning("Cancelled", "Transaction was cancelled.");
       } else if (msg.includes("already in use")) {
-        Alert.alert(
-          "Event Already Exists",
-          `An event named "${name}" already exists for your admin account. Please use a different name.`
-        );
+        showWarning("Event Already Exists", `An event named "${name}" already exists for your admin account. Please use a different name.`);
       } else if (msg.includes("AccountNotInitialized")) {
-        Alert.alert(
-          "Admin Not Initialized",
-          "Your admin account needs to be initialized first. Please contact a super admin."
-        );
+        showError("Admin Not Initialized", "Your admin account needs to be initialized first. Please contact a super admin.");
       } else {
-        Alert.alert("Error", msg);
+        showError("Error", msg);
       }
     } finally {
       setCreating(false);
@@ -228,46 +227,63 @@ export function CreateEventScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
+        showsVerticalScrollIndicator={false}
       >
-        <AppInput
-          label="Event Name"
-          value={name}
-          onChangeText={setName}
-          placeholder="e.g. Solana Hackathon 2025"
-          error={errors.name ?? undefined}
-          maxLength={64}
-        />
+        {/* Section: Event Details */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIconWrap, { backgroundColor: colors.primaryMuted }]}>
+              <Ionicons name="document-text" size={16} color={colors.primary} />
+            </View>
+            <Text style={styles.sectionTitle}>Event Details</Text>
+          </View>
 
-        <AppInput
-          label="Venue"
-          value={venue}
-          onChangeText={setVenue}
-          placeholder="e.g. San Francisco, CA"
-          error={errors.venue ?? undefined}
-          maxLength={128}
-        />
+          <AppInput
+            label="Event Name"
+            value={name}
+            onChangeText={setName}
+            placeholder="e.g. Solana Hackathon 2026"
+            error={errors.name ?? undefined}
+            maxLength={64}
+          />
 
-        <AppInput
-          label="Description"
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Describe your event..."
-          error={errors.description ?? undefined}
-          maxLength={256}
-          multiline
-          numberOfLines={3}
-        />
+          <AppInput
+            label="Venue"
+            value={venue}
+            onChangeText={setVenue}
+            placeholder="e.g. San Francisco, CA"
+            error={errors.venue ?? undefined}
+            maxLength={128}
+          />
 
-        {/* Date & Time Picker */}
-        <View style={styles.dateSection}>
-          <Text style={styles.dateLabel}>Event Date & Time</Text>
+          <AppInput
+            label="Description"
+            value={description}
+            onChangeText={setDescription}
+            placeholder="Describe your event..."
+            error={errors.description ?? undefined}
+            maxLength={256}
+            multiline
+            numberOfLines={3}
+          />
+        </View>
+
+        {/* Section: Date & Time */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIconWrap, { backgroundColor: colors.accentMuted }]}>
+              <Ionicons name="calendar" size={16} color={colors.accent} />
+            </View>
+            <Text style={styles.sectionTitle}>Date & Time</Text>
+          </View>
+
           <View style={styles.dateRow}>
             <TouchableOpacity
               style={styles.dateButton}
               onPress={openDatePicker}
               activeOpacity={0.7}
             >
-              <Text style={styles.dateIcon}>📅</Text>
+              <Ionicons name="calendar-outline" size={18} color={colors.accent} />
               <Text style={styles.dateText}>
                 {formatDisplayDate(eventDate)}
               </Text>
@@ -278,7 +294,7 @@ export function CreateEventScreen() {
               onPress={openTimePicker}
               activeOpacity={0.7}
             >
-              <Text style={styles.dateIcon}>🕐</Text>
+              <Ionicons name="time-outline" size={18} color={colors.accent} />
               <Text style={styles.dateText}>
                 {formatDisplayTime(eventDate)}
               </Text>
@@ -287,6 +303,33 @@ export function CreateEventScreen() {
           {errors.eventDate ? (
             <Text style={styles.dateError}>{errors.eventDate}</Text>
           ) : null}
+        </View>
+
+        {/* Section: Event Image */}
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionHeader}>
+            <View style={[styles.sectionIconWrap, { backgroundColor: colors.secondaryMuted }]}>
+              <Ionicons name="image" size={16} color={colors.secondary} />
+            </View>
+            <Text style={styles.sectionTitle}>Event Image</Text>
+          </View>
+
+          <ImagePickerButton
+            label="Event Image"
+            imageUri={imageUri || undefined}
+            onImageSelected={setImageUri}
+            uploading={uploading}
+          />
+        </View>
+
+        {/* Tier Hint */}
+        <View style={styles.tierHintCard}>
+          <View style={styles.tierHintIcon}>
+            <Ionicons name="information-circle" size={20} color={colors.primary} />
+          </View>
+          <Text style={styles.tierHintText}>
+            Pricing and seat capacity will be configured in the next step when you add seat tiers (Bronze, Silver, Gold, VIP).
+          </Text>
         </View>
 
         {/* Custom Date/Time Picker Modal */}
@@ -298,6 +341,7 @@ export function CreateEventScreen() {
         >
           <View style={styles.modalOverlay}>
             <View style={styles.modalContent}>
+              <View style={styles.modalHandle} />
               <Text style={styles.modalTitle}>
                 {pickerMode === "date" ? "Select Date" : "Select Time"}
               </Text>
@@ -309,7 +353,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempMonth((m) => (m + 11) % 12)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▲</Text>
+                      <Ionicons name="chevron-up" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerValue}>
                       {MONTH_NAMES[tempMonth]}
@@ -318,7 +362,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempMonth((m) => (m + 1) % 12)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▼</Text>
+                      <Ionicons name="chevron-down" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerLabel}>Month</Text>
                   </View>
@@ -331,7 +375,7 @@ export function CreateEventScreen() {
                       }}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▲</Text>
+                      <Ionicons name="chevron-up" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerValue}>{tempDay}</Text>
                     <TouchableOpacity
@@ -341,7 +385,7 @@ export function CreateEventScreen() {
                       }}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▼</Text>
+                      <Ionicons name="chevron-down" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerLabel}>Day</Text>
                   </View>
@@ -355,14 +399,14 @@ export function CreateEventScreen() {
                       }
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▲</Text>
+                      <Ionicons name="chevron-up" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerValue}>{tempYear}</Text>
                     <TouchableOpacity
                       onPress={() => setTempYear((y) => y + 1)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▼</Text>
+                      <Ionicons name="chevron-down" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerLabel}>Year</Text>
                   </View>
@@ -376,7 +420,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempHour((h) => (h + 23) % 24)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▲</Text>
+                      <Ionicons name="chevron-up" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerValue}>
                       {formatHour12(tempHour)}
@@ -385,7 +429,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempHour((h) => (h + 1) % 24)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▼</Text>
+                      <Ionicons name="chevron-down" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerLabel}>Hour</Text>
                   </View>
@@ -397,7 +441,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempMinute((m) => (m + 55) % 60)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▲</Text>
+                      <Ionicons name="chevron-up" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerValue}>
                       {String(tempMinute).padStart(2, "0")}
@@ -406,7 +450,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempMinute((m) => (m + 5) % 60)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▼</Text>
+                      <Ionicons name="chevron-down" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerLabel}>Min</Text>
                   </View>
@@ -416,7 +460,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempHour((h) => (h + 12) % 24)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▲</Text>
+                      <Ionicons name="chevron-up" size={24} color={colors.primary} />
                     </TouchableOpacity>
                     <Text style={styles.pickerValue}>
                       {tempHour < 12 ? "AM" : "PM"}
@@ -425,7 +469,7 @@ export function CreateEventScreen() {
                       onPress={() => setTempHour((h) => (h + 12) % 24)}
                       style={styles.pickerArrow}
                     >
-                      <Text style={styles.arrowText}>▼</Text>
+                      <Ionicons name="chevron-down" size={24} color={colors.primary} />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -442,31 +486,25 @@ export function CreateEventScreen() {
                   onPress={confirmPicker}
                   style={styles.modalConfirmBtn}
                 >
-                  <Text style={styles.modalConfirmText}>Done</Text>
+                  <LinearGradient
+                    colors={colors.gradientPrimary as unknown as [string, string]}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.modalConfirmGradient}
+                  >
+                    <Text style={styles.modalConfirmText}>Done</Text>
+                  </LinearGradient>
                 </TouchableOpacity>
               </View>
             </View>
           </View>
         </Modal>
 
-        <ImagePickerButton
-          label="Event Image"
-          imageUri={imageUri || undefined}
-          onImageSelected={setImageUri}
-          uploading={uploading}
-        />
-
-        {/* Note: Ticket price and seat capacity are configured per seat tier */}
-        <View style={styles.tierHintCard}>
-          <Text style={styles.tierHintText}>
-            Pricing and seat capacity will be configured in the next step when you add seat tiers (Bronze, Silver, Gold, VIP).
-          </Text>
-        </View>
-
         <AppButton
           title="Create Event"
           onPress={handleCreate}
           loading={creating}
+          icon="add-circle"
           size="lg"
           style={styles.createButton}
         />
@@ -490,27 +528,55 @@ const styles = StyleSheet.create({
   createButton: {
     marginTop: spacing.lg,
   },
+
+  // Section Cards
+  sectionCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+  },
+  sectionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.md,
+  },
+  sectionIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    marginRight: spacing.sm,
+  },
+  sectionTitle: {
+    ...typography.bodyBold,
+    color: colors.text,
+  },
+
+  // Tier Hint
   tierHintCard: {
+    flexDirection: "row",
+    alignItems: "flex-start",
     backgroundColor: colors.primaryMuted,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
     padding: spacing.md,
     marginBottom: spacing.sm,
+    gap: spacing.sm,
+  },
+  tierHintIcon: {
+    marginTop: 1,
   },
   tierHintText: {
-    fontFamily: fonts.body,
-    fontSize: 13,
+    flex: 1,
+    ...typography.bodySm,
     color: colors.primary,
     lineHeight: 20,
   },
-  dateSection: {
-    marginBottom: spacing.md,
-  },
-  dateLabel: {
-    fontFamily: fonts.bodySemiBold,
-    fontSize: 14,
-    color: colors.textSecondary,
-    marginBottom: spacing.xs,
-  },
+
+  // Date section
   dateRow: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -519,27 +585,24 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceLight,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 8,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
   timeButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: colors.surface,
+    backgroundColor: colors.surfaceLight,
     borderWidth: 1,
     borderColor: colors.border,
-    borderRadius: 12,
-    paddingHorizontal: 14,
-    paddingVertical: 14,
-    gap: 8,
-  },
-  dateIcon: {
-    fontSize: 16,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
+    gap: spacing.sm,
   },
   dateText: {
     fontFamily: fonts.bodyMedium,
@@ -547,27 +610,37 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
   dateError: {
-    fontFamily: fonts.body,
-    fontSize: 12,
+    ...typography.small,
     color: colors.error,
     marginTop: spacing.xs,
   },
-  // Custom date/time picker modal
+
+  // Picker modal
   modalOverlay: {
     flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
+    backgroundColor: colors.overlay,
     justifyContent: "flex-end",
   },
   modalContent: {
     backgroundColor: colors.surface,
-    borderTopLeftRadius: 20,
-    borderTopRightRadius: 20,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
     padding: spacing.lg,
     paddingBottom: 40,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderBottomWidth: 0,
+  },
+  modalHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.borderLight,
+    alignSelf: "center",
+    marginBottom: spacing.md,
   },
   modalTitle: {
-    fontFamily: fonts.heading,
-    fontSize: 20,
+    ...typography.h3,
     color: colors.text,
     textAlign: "center",
     marginBottom: spacing.lg,
@@ -586,10 +659,6 @@ const styles = StyleSheet.create({
   pickerArrow: {
     padding: spacing.sm,
   },
-  arrowText: {
-    fontSize: 22,
-    color: colors.primary,
-  },
   pickerValue: {
     fontFamily: fonts.heading,
     fontSize: 28,
@@ -597,10 +666,9 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
   },
   pickerLabel: {
-    fontFamily: fonts.body,
-    fontSize: 12,
+    ...typography.small,
     color: colors.textSecondary,
-    marginTop: 4,
+    marginTop: spacing.xs,
   },
   pickerColon: {
     fontFamily: fonts.heading,
@@ -615,7 +683,7 @@ const styles = StyleSheet.create({
   modalCancelBtn: {
     flex: 1,
     paddingVertical: 14,
-    borderRadius: 12,
+    borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
     alignItems: "center",
@@ -627,14 +695,17 @@ const styles = StyleSheet.create({
   },
   modalConfirmBtn: {
     flex: 1,
+    borderRadius: borderRadius.md,
+    overflow: "hidden",
+  },
+  modalConfirmGradient: {
     paddingVertical: 14,
-    borderRadius: 12,
-    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
     alignItems: "center",
   },
   modalConfirmText: {
-    fontFamily: fonts.bodyMedium,
+    fontFamily: fonts.bodySemiBold,
     fontSize: 16,
-    color: "#fff",
+    color: colors.background,
   },
 });

@@ -5,7 +5,6 @@ import {
   Image,
   StyleSheet,
   ScrollView,
-  Alert,
   TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
@@ -27,6 +26,8 @@ import { apiCancelEvent } from "../../services/api/eventApi";
 import { createProvider } from "../../solana/wallet/walletSession";
 import { phantomWalletAdapter } from "../../solana/wallet/phantomWalletAdapter";
 import { EventDisplay } from "../../types/event";
+import { showSuccess, showWarning, showError } from "../../utils/alerts";
+import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
 interface EventDetailsAdminScreenProps {
   event: EventDisplay;
@@ -81,21 +82,22 @@ export function EventDetailsAdminScreen({
       const eventPubkey = new PublicKey(event.publicKey);
 
       const sig = await updateDynamicPrice(callerPubkey, eventPubkey);
-      Alert.alert("Price Updated", `New price calculated.\n\nSig: ${sig.slice(0, 8)}...`);
+      showSuccess("Price Updated", `New price calculated.\n\nSig: ${sig.slice(0, 8)}...`);
       onRefresh?.();
     } catch (error: any) {
-      Alert.alert("Error", error.message || "Failed to update price");
+      showError("Error", error.message || "Failed to update price");
     } finally {
       setIsUpdatingPrice(false);
     }
   };
 
   const handleCloseEvent = () => {
-    Alert.alert(
-      "Close Event",
-      `Are you sure you want to close "${event.name}"?\n\nThis will deactivate the event and prevent further ticket sales.`,
-      [
-        { text: "Cancel", style: "cancel" },
+    confirm({
+      title: "Close Event",
+      message: `Are you sure you want to close "${event.name}"?\n\nThis will deactivate the event and prevent further ticket sales.`,
+      type: "danger",
+      buttons: [
+        { text: "Cancel", style: "cancel", onPress: () => {} },
         {
           text: "Close Event",
           style: "destructive",
@@ -106,25 +108,26 @@ export function EventDetailsAdminScreen({
               const provider = createProvider(phantomWalletAdapter);
               const eventPubkey = new PublicKey(event.publicKey);
               const sig = await closeEvent(provider, eventPubkey);
-              Alert.alert("Event Closed", `"${event.name}" has been closed.\n\nSig: ${sig.slice(0, 8)}...`);
+              showSuccess("Event Closed", `"${event.name}" has been closed.\n\nSig: ${sig.slice(0, 8)}...`);
               onRefresh?.();
             } catch (error: any) {
-              Alert.alert("Error", error.message || "Failed to close event");
+              showError("Error", error.message || "Failed to close event");
             } finally {
               setIsClosingEvent(false);
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   const handleCancelEvent = () => {
-    Alert.alert(
-      "Cancel Event",
-      `Are you sure you want to CANCEL "${event.name}"?\n\nThis will:\n- Stop all ticket sales\n- Open a 30-day refund window for all holders\n- Block fund release until refund window closes\n\nThis action cannot be undone.`,
-      [
-        { text: "Go Back", style: "cancel" },
+    confirm({
+      title: "Cancel Event",
+      message: `Are you sure you want to CANCEL "${event.name}"?\n\nThis will:\n- Stop all ticket sales\n- Open a 30-day refund window for all holders\n- Block fund release until refund window closes\n\nThis action cannot be undone.`,
+      type: "danger",
+      buttons: [
+        { text: "Go Back", style: "cancel", onPress: () => {} },
         {
           text: "Cancel Event",
           style: "destructive",
@@ -134,25 +137,22 @@ export function EventDetailsAdminScreen({
               const sig = await apiCancelEvent({
                 eventPda: event.publicKey,
               });
-              Alert.alert(
-                "Event Cancelled",
-                `"${event.name}" has been cancelled. A 30-day refund window is now open for all ticket holders.\n\nSig: ${sig.slice(0, 8)}...`
-              );
+              showSuccess("Event Cancelled", `"${event.name}" has been cancelled. A 30-day refund window is now open for all ticket holders.\n\nSig: ${sig.slice(0, 8)}...`);
               onRefresh?.();
             } catch (error: any) {
               const msg = error.message || "Failed to cancel event";
               if (msg.includes("EventAlreadyCancelled")) {
-                Alert.alert("Already Cancelled", "This event has already been cancelled.");
+                showWarning("Already Cancelled", "This event has already been cancelled.");
               } else {
-                Alert.alert("Error", msg);
+                showError("Error", msg);
               }
             } finally {
               setIsCancellingEvent(false);
             }
           },
         },
-      ]
-    );
+      ],
+    });
   };
 
   return (
