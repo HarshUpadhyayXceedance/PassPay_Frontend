@@ -13,19 +13,17 @@ import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import AsyncStorage from "@react-native-async-storage/async-storage";
 import QRCode from "react-native-qrcode-svg";
 import { useTickets } from "../../hooks/useTickets";
 import { useEvents } from "../../hooks/useEvents";
 import { useMerchants } from "../../hooks/useMerchants";
-import { usePurchaseStore, PurchaseReceipt } from "../../store/purchaseStore";
+import { useWallet } from "../../hooks/useWallet";
+import { usePurchaseStore, ProductPurchaseDisplay } from "../../store/purchaseStore";
 import { EventDisplay } from "../../types/event";
 import { formatSOL, shortenAddress } from "../../utils/formatters";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
-
-const REDEEMED_PURCHASES_KEY = "redeemed_purchases";
 
 const GRADIENT_PALETTES: [string, string][] = [
   ["#6C5CE7", "#a855f7"],
@@ -37,52 +35,67 @@ const GRADIENT_PALETTES: [string, string][] = [
 
 export function ShopScreen() {
   const router = useRouter();
+  const { publicKey } = useWallet();
   const { tickets, fetchMyTickets, isLoading: ticketsLoading } = useTickets();
   const { events, fetchEvents, isLoading: eventsLoading } = useEvents();
-  const { merchants, fetchMerchants } = useMerchants();
-  const { purchases, loadPurchases, isLoaded: purchasesLoaded } = usePurchaseStore();
-  const [selectedReceipt, setSelectedReceipt] = useState<PurchaseReceipt | null>(null);
-  const [isReceiptUsed, setIsReceiptUsed] = useState(false);
-
-  // Check if a purchase ID has been redeemed
-  const checkIfRedeemed = useCallback(async (purchaseId: string): Promise<boolean> => {
-    try {
-      const stored = await AsyncStorage.getItem(REDEEMED_PURCHASES_KEY);
-      if (!stored) return false;
-      const redeemedSet = new Set<string>(JSON.parse(stored));
-      return redeemedSet.has(purchaseId);
-    } catch (error) {
-      console.error("Error checking redemption status:", error);
-      return false;
-    }
-  }, []);
-
-  // Check redemption status when receipt is selected
-  useEffect(() => {
-    if (selectedReceipt) {
-      checkIfRedeemed(selectedReceipt.id).then(setIsReceiptUsed);
-    } else {
-      setIsReceiptUsed(false);
-    }
-  }, [selectedReceipt, checkIfRedeemed]);
+  const { merchants, products, fetchMerchants } = useMerchants();
+  const { purchases, fetchPurchases, isLoading: purchasesLoading } = usePurchaseStore();
+  const [selectedReceipt, setSelectedReceipt] = useState<ProductPurchaseDisplay | null>(null);
 
   useEffect(() => {
     fetchMyTickets();
     fetchEvents();
     fetchMerchants();
-    loadPurchases();
-  }, []);
+    if (publicKey) fetchPurchases(publicKey);
+  }, [publicKey]);
 
   const isLoading = ticketsLoading || eventsLoading;
 
   const onRefresh = useCallback(async () => {
-    await Promise.all([fetchMyTickets(), fetchEvents(), fetchMerchants(), loadPurchases()]);
-  }, []);
+    await Promise.all([
+      fetchMyTickets(),
+      fetchEvents(),
+      fetchMerchants(),
+      publicKey ? fetchPurchases(publicKey) : Promise.resolve(),
+    ]);
+  }, [publicKey]);
+
+  // Resolve product name from the products store using the product PDA
+  const getProductName = useCallback(
+    (productPda: string): string => {
+      const product = products.find((p) => p.publicKey === productPda);
+      return product?.name ?? shortenAddress(productPda, 4);
+    },
+    [products]
+  );
+
+  // Resolve merchant authority + event PDA from merchant store
+  const getMerchantDetails = useCallback(
+    (merchantPda: string) => {
+      const merchant = merchants.find((m) => m.publicKey === merchantPda);
+      return {
+        authority: merchant?.authority ?? "",
+        eventKey: merchant?.eventKey ?? "",
+        name: merchant?.name ?? "",
+      };
+    },
+    [merchants]
+  );
+
+  // Get event name for a merchant PDA
+  const getEventName = useCallback(
+    (merchantPda: string): string => {
+      const merchant = merchants.find((m) => m.publicKey === merchantPda);
+      if (!merchant) return "";
+      const event = events.find((e) => e.publicKey === merchant.eventKey);
+      return event?.name ?? "";
+    },
+    [merchants, events]
+  );
 
   // Get unique event keys from user's tickets
   const myEventKeys = [...new Set(tickets.map((t) => t.eventKey))];
 
-  // Get event details for each, and count merchants per event
   const myEvents = myEventKeys
     .map((eventKey) => {
       const event = events.find((e) => e.publicKey === eventKey);
@@ -104,17 +117,19 @@ export function ShopScreen() {
     router.push("/(user)/scan");
   }, [router]);
 
-  const getReceiptQR = (receipt: PurchaseReceipt) =>
-    JSON.stringify({
+  const getReceiptQR = (purchase: ProductPurchaseDisplay) => {
+    const merchantDetails = getMerchantDetails(purchase.merchant);
+    return JSON.stringify({
       type: "delivery",
-      purchaseId: receipt.id,
-      productName: receipt.productName,
-      buyer: receipt.buyer,
-      merchant: receipt.merchantAuthority,
-      amount: receipt.amount,
-      timestamp: receipt.timestamp,
-      txSignature: receipt.txSignature,
+      purchaseRecord: purchase.publicKey,
+      productName: getProductName(purchase.product),
+      buyer: purchase.buyer,
+      merchant: merchantDetails.authority,
+      eventPda: merchantDetails.eventKey,
+      amount: purchase.amount,
+      timestamp: purchase.purchasedAt,
     });
+  };
 
   const renderEventCard = ({
     item,
@@ -215,7 +230,7 @@ export function ShopScreen() {
         ]}
         refreshControl={
           <RefreshControl
-            refreshing={isLoading}
+            refreshing={isLoading || purchasesLoading}
             onRefresh={onRefresh}
             tintColor={colors.primary}
           />
@@ -256,16 +271,15 @@ export function ShopScreen() {
                   Show the QR code to the merchant to collect your item
                 </Text>
                 {purchases.slice(0, 10).map((purchase) => {
-                  const eventName = events.find(
-                    (e) => e.publicKey === purchase.eventKey
-                  )?.name;
-                  const dateStr = new Date(purchase.timestamp).toLocaleDateString(
+                  const productName = getProductName(purchase.product);
+                  const eventName = getEventName(purchase.merchant);
+                  const dateStr = new Date(purchase.purchasedAt).toLocaleDateString(
                     "en-US",
                     { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" }
                   );
                   return (
                     <TouchableOpacity
-                      key={purchase.id}
+                      key={purchase.publicKey}
                       style={styles.purchaseCard}
                       activeOpacity={0.7}
                       onPress={() => setSelectedReceipt(purchase)}
@@ -275,17 +289,24 @@ export function ShopScreen() {
                       </View>
                       <View style={styles.purchaseInfo}>
                         <Text style={styles.purchaseProduct} numberOfLines={1}>
-                          {purchase.productName}
+                          {productName}
                         </Text>
                         <Text style={styles.purchaseMeta} numberOfLines={1}>
-                          {eventName ?? shortenAddress(purchase.merchantAuthority)} · {dateStr}
+                          {eventName || shortenAddress(purchase.merchant)} · {dateStr}
                         </Text>
                       </View>
                       <View style={styles.purchaseRight}>
                         <Text style={styles.purchaseAmount}>
                           {formatSOL(purchase.amount)} SOL
                         </Text>
-                        <Ionicons name="qr-code-outline" size={16} color={colors.primary} />
+                        {purchase.isCollected ? (
+                          <View style={styles.collectedBadge}>
+                            <Ionicons name="checkmark" size={10} color={colors.textMuted} />
+                            <Text style={styles.collectedText}>Collected</Text>
+                          </View>
+                        ) : (
+                          <Ionicons name="qr-code-outline" size={16} color={colors.primary} />
+                        )}
                       </View>
                     </TouchableOpacity>
                   );
@@ -359,18 +380,18 @@ export function ShopScreen() {
             {/* Status Badge */}
             <View style={[
               styles.statusBadge,
-              isReceiptUsed ? styles.statusBadgeUsed : styles.statusBadgeValid
+              selectedReceipt?.isCollected ? styles.statusBadgeUsed : styles.statusBadgeValid
             ]}>
               <Ionicons
-                name={isReceiptUsed ? "ban" : "checkmark-circle"}
+                name={selectedReceipt?.isCollected ? "ban" : "checkmark-circle"}
                 size={16}
-                color={isReceiptUsed ? colors.error : colors.success}
+                color={selectedReceipt?.isCollected ? colors.error : colors.success}
               />
               <Text style={[
                 styles.statusBadgeText,
-                { color: isReceiptUsed ? colors.error : colors.success }
+                { color: selectedReceipt?.isCollected ? colors.error : colors.success }
               ]}>
-                {isReceiptUsed ? "USED" : "VALID"}
+                {selectedReceipt?.isCollected ? "COLLECTED" : "VALID"}
               </Text>
             </View>
 
@@ -389,7 +410,9 @@ export function ShopScreen() {
               <View style={styles.receiptDetails}>
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>Product</Text>
-                  <Text style={styles.receiptValue}>{selectedReceipt.productName}</Text>
+                  <Text style={styles.receiptValue}>
+                    {getProductName(selectedReceipt.product)}
+                  </Text>
                 </View>
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>Amount</Text>
@@ -400,7 +423,7 @@ export function ShopScreen() {
                 <View style={styles.receiptRow}>
                   <Text style={styles.receiptLabel}>Date</Text>
                   <Text style={styles.receiptValue}>
-                    {new Date(selectedReceipt.timestamp).toLocaleDateString("en-US", {
+                    {new Date(selectedReceipt.purchasedAt).toLocaleDateString("en-US", {
                       month: "short",
                       day: "numeric",
                       year: "numeric",
@@ -605,8 +628,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     color: colors.text,
   },
-
-  // ── Purchases Section ──────────────────────────────────
   purchasesSection: {
     marginBottom: spacing.lg,
   },
@@ -653,8 +674,16 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
     color: colors.secondary,
   },
-
-  // ── Receipt Modal ──────────────────────────────────────
+  collectedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 2,
+  },
+  collectedText: {
+    fontSize: 10,
+    fontFamily: fonts.body,
+    color: colors.textMuted,
+  },
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",

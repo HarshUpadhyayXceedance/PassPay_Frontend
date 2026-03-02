@@ -20,6 +20,8 @@ import { useWallet } from "../../hooks/useWallet";
 import { usePurchaseStore } from "../../store/purchaseStore";
 import { MerchantProductDisplay } from "../../types/merchant";
 import { apiBuyProduct } from "../../services/api/eventApi";
+import { findMerchantPda, findProductPda, findProductPurchasePda } from "../../solana/pda";
+import { PublicKey } from "@solana/web3.js";
 import { formatSOL } from "../../utils/formatters";
 import { showError } from "../../utils/alerts";
 import { confirm } from "../../components/ui/ConfirmDialogProvider";
@@ -33,7 +35,7 @@ interface PurchaseReceipt {
   productName: string;
   merchantName: string;
   price: number;
-  purchaseId: string;
+  purchaseRecordPda: string;
   timestamp: number;
 }
 
@@ -47,7 +49,7 @@ export function MerchantProductsScreen() {
   const { merchants, products, fetchProducts, isLoading } = useMerchants();
   const { loyaltyBenefits } = useLoyalty();
   const { publicKey } = useWallet();
-  const addPurchase = usePurchaseStore((s) => s.addPurchase);
+  const fetchPurchases = usePurchaseStore((s) => s.fetchPurchases);
   const [buyingProduct, setBuyingProduct] = useState<string | null>(null);
   const [receipt, setReceipt] = useState<PurchaseReceipt | null>(null);
 
@@ -98,32 +100,35 @@ export function MerchantProductsScreen() {
                 eventPda: eventKey,
                 merchantAuthority: merchant.authority,
                 productName: product.name,
+                currentTotalSold: product.totalSold,
               });
 
               Haptics.notificationAsync(
                 Haptics.NotificationFeedbackType.Success
               );
 
-              const purchaseId = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
-              const receiptData = {
+              // Compute the purchase record PDA (seeds: product PDA + totalSold before increment)
+              const [merchantPda] = findMerchantPda(
+                new PublicKey(eventKey),
+                new PublicKey(merchant.authority)
+              );
+              const [productPda] = findProductPda(merchantPda, product.name);
+              const [purchaseRecordPda] = findProductPurchasePda(
+                productPda,
+                product.totalSold
+              );
+
+              const receiptData: PurchaseReceipt = {
                 productName: product.name,
                 merchantName: merchant.name,
                 price: discountedPrice,
-                purchaseId,
+                purchaseRecordPda: purchaseRecordPda.toBase58(),
                 timestamp: Date.now(),
               };
               setReceipt(receiptData);
 
-              addPurchase({
-                id: purchaseId,
-                productName: product.name,
-                merchantName: merchant.name,
-                merchantAuthority: merchant.authority,
-                eventKey: eventKey!,
-                amount: discountedPrice,
-                buyer: publicKey ?? "",
-                timestamp: Date.now(),
-              });
+              // Refresh on-chain purchases
+              if (publicKey) fetchPurchases(publicKey);
 
               fetchProducts(merchantKey);
             } catch (error: any) {
@@ -143,10 +148,11 @@ export function MerchantProductsScreen() {
   const receiptQRData = receipt
     ? JSON.stringify({
         type: "delivery",
-        purchaseId: receipt.purchaseId,
+        purchaseRecord: receipt.purchaseRecordPda,
         productName: receipt.productName,
         buyer: publicKey,
         merchant: merchant?.authority,
+        eventPda: eventKey,
         amount: receipt.price,
         timestamp: receipt.timestamp,
       })
@@ -371,8 +377,6 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     marginBottom: spacing.sm,
   },
-
-  // Product card
   productCard: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
@@ -457,8 +461,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
     color: "#fff",
   },
-
-  // Receipt Modal
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",

@@ -41,9 +41,12 @@ export default function RootLayout() {
         appState.current.match(/inactive|background/) &&
         nextAppState === "active"
       ) {
-        // App has come to the foreground
+        // App has come to the foreground — refresh wallet balance
         console.log("[AppState] App has come to the foreground");
-        // Don't trigger any automatic navigation - let the user stay where they were
+        const ws = useWalletStore.getState();
+        if (ws.isConnected && ws.publicKey) {
+          ws.refreshBalance().catch(() => {});
+        }
       }
 
       appState.current = nextAppState;
@@ -110,10 +113,15 @@ export default function RootLayout() {
       const initialize = async () => {
         try {
           // 1. Restore wallet connection from AsyncStorage (survives Activity restarts)
-          await useWalletStore.getState().restorePersistedWallet();
+          const walletRestored = await useWalletStore.getState().restorePersistedWallet();
 
           // 2. Restore auth role (only succeeds if wallet was restored above)
           await loadStoredRole();
+
+          // 3. If wallet was restored, refresh balance from network
+          if (walletRestored) {
+            useWalletStore.getState().refreshBalance().catch(() => {});
+          }
 
           // Check if user has completed onboarding
           const onboardingCompleted = await AsyncStorage.getItem(

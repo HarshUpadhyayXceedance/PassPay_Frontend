@@ -17,7 +17,6 @@ import { PaymentQRPayload } from "../../utils/qrPayload";
 import { formatSOL } from "../../utils/formatters";
 import { showSuccess, showError } from "../../utils/alerts";
 import { useTickets } from "../../hooks/useTickets";
-import { usePurchaseStore } from "../../store/purchaseStore";
 import { DiscountPill } from "../../components/loyalty/DiscountPill";
 
 export function ScanToPayScreen() {
@@ -26,8 +25,6 @@ export function ScanToPayScreen() {
   const { refreshBalance } = useWallet();
   const { loyaltyBenefits, fetchLoyaltyBenefits } = useLoyalty();
   const { tickets } = useTickets();
-  const { publicKey } = useWallet();
-  const addPurchase = usePurchaseStore((s) => s.addPurchase);
   const [paying, setPaying] = useState(false);
 
   const payment = lastScan?.type === "payment" ? (lastScan as PaymentQRPayload) : null;
@@ -59,19 +56,6 @@ export function ScanToPayScreen() {
         amount: finalAmount,
       });
       await refreshBalance();
-
-      // Save purchase receipt for ShopScreen
-      addPurchase({
-        id: `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
-        productName: payment.productName ?? "Payment",
-        merchantName: payment.merchantAuthority,
-        merchantAuthority: payment.merchantAuthority,
-        eventKey: payment.eventKey,
-        amount: finalAmount,
-        buyer: publicKey ?? "",
-        timestamp: Date.now(),
-        txSignature: typeof txSig === "string" ? txSig : undefined,
-      });
 
       showSuccess("Success", `Paid ${formatSOL(finalAmount)} SOL`);
       reset();

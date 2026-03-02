@@ -4,34 +4,46 @@ import {
   Text,
   StyleSheet,
   TouchableOpacity,
-  Linking,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, useFocusEffect } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { Connection, PublicKey } from "@solana/web3.js";
 import { AppHeader } from "../../components/ui/AppHeader";
 import { QRScanner } from "../../components/qr/QRScanner";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
 import { formatSOL, shortenAddress } from "../../utils/formatters";
-import { getTxUrl } from "../../solana/utils/explorer";
 import { useWallet } from "../../hooks/useWallet";
-import { showWarning, showError } from "../../utils/alerts";
+import { showWarning, showError, showSuccess } from "../../utils/alerts";
+import { apiCollectProduct } from "../../services/api/eventApi";
+import { DEVNET_RPC } from "../../solana/config/constants";
 
 interface DeliveryPayload {
   type: "delivery";
-  purchaseId: string;
+  purchaseRecord: string; // on-chain PDA address
   productName: string;
   buyer: string;
   merchant: string;
+  eventPda: string;
   amount: number;
   timestamp: number;
-  txSignature?: string;
 }
 
-const REDEEMED_PURCHASES_KEY = "redeemed_purchases";
+/** Check is_collected byte at offset 112 in the ProductPurchase account */
+async function checkOnChainCollected(purchaseRecord: string): Promise<boolean> {
+  try {
+    const connection = new Connection(DEVNET_RPC, "confirmed");
+    const info = await connection.getAccountInfo(new PublicKey(purchaseRecord));
+    if (!info || info.data.length < 130) return false;
+    // is_collected is at offset 8 + 32 + 32 + 32 + 8 = 112
+    return info.data[112] !== 0;
+  } catch {
+    return false;
+  }
+}
 
 export function VerifyPurchaseScreen() {
   const router = useRouter();
@@ -39,59 +51,37 @@ export function VerifyPurchaseScreen() {
   const [result, setResult] = useState<DeliveryPayload | null>(null);
   const [verified, setVerified] = useState(false);
   const [isAlreadyUsed, setIsAlreadyUsed] = useState(false);
+  const [isCollecting, setIsCollecting] = useState(false);
 
-  // Reset screen state when re-focused (prevents stale "VALID" result
-  // persisting across tab navigations — expo-router doesn't unmount screens)
+  // Reset screen state when re-focused
   useFocusEffect(
     useCallback(() => {
       setResult(null);
       setVerified(false);
       setIsAlreadyUsed(false);
+      setIsCollecting(false);
     }, [])
   );
-
-  // Check if a purchase ID has been redeemed
-  const checkIfRedeemed = useCallback(async (purchaseId: string): Promise<boolean> => {
-    try {
-      const stored = await AsyncStorage.getItem(REDEEMED_PURCHASES_KEY);
-      if (!stored) return false;
-      const redeemedSet = new Set<string>(JSON.parse(stored));
-      return redeemedSet.has(purchaseId);
-    } catch (error) {
-      console.error("Error checking redemption status:", error);
-      return false;
-    }
-  }, []);
-
-  // Mark a purchase ID as redeemed
-  const markAsRedeemed = useCallback(async (purchaseId: string, productName: string) => {
-    try {
-      const stored = await AsyncStorage.getItem(REDEEMED_PURCHASES_KEY);
-      const redeemedSet = new Set<string>(stored ? JSON.parse(stored) : []);
-      redeemedSet.add(purchaseId);
-      await AsyncStorage.setItem(REDEEMED_PURCHASES_KEY, JSON.stringify(Array.from(redeemedSet)));
-      console.log(`Marked purchase ${purchaseId} (${productName}) as redeemed`);
-    } catch (error) {
-      console.error("Error marking as redeemed:", error);
-    }
-  }, []);
 
   const handleScan = useCallback(async (data: string) => {
     try {
       const parsed = JSON.parse(data);
-      if (parsed.type !== "delivery" || !parsed.purchaseId) {
+      if (parsed.type !== "delivery" || !parsed.purchaseRecord) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
         showError("Invalid QR", "This QR code is not a purchase receipt.");
         return;
       }
 
-      // Check if already redeemed
-      const alreadyUsed = await checkIfRedeemed(parsed.purchaseId);
-      if (alreadyUsed) {
+      // Check on-chain if already collected
+      const alreadyCollected = await checkOnChainCollected(parsed.purchaseRecord);
+      if (alreadyCollected) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);
         setIsAlreadyUsed(true);
         setResult(parsed as DeliveryPayload);
-        showWarning("Already Used", "This purchase receipt has already been redeemed and cannot be used again.");
+        showWarning(
+          "Already Collected",
+          "This purchase has already been marked as collected."
+        );
         return;
       }
 
@@ -102,20 +92,42 @@ export function VerifyPurchaseScreen() {
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
       showError("Invalid QR", "Could not read QR code data.");
     }
-  }, [checkIfRedeemed]);
+  }, []);
 
   const handleConfirmDelivery = useCallback(async () => {
     if (!result) return;
 
-    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
-    await markAsRedeemed(result.purchaseId, result.productName);
-    setVerified(true);
-  }, [result, markAsRedeemed]);
+    setIsCollecting(true);
+    try {
+      await apiCollectProduct({
+        eventPda: result.eventPda,
+        merchantAuthority: result.merchant,
+        productName: result.productName,
+        purchaseRecord: result.purchaseRecord,
+      });
+
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+      showSuccess("Collected", "Product marked as collected on-chain.");
+      setVerified(true);
+    } catch (error: any) {
+      Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
+      const msg = error.message ?? "Something went wrong";
+      if (msg.includes("ProductAlreadyCollected") || msg.includes("already been collected")) {
+        setIsAlreadyUsed(true);
+        showWarning("Already Collected", "This purchase was already collected.");
+      } else {
+        showError("Collection Failed", msg);
+      }
+    } finally {
+      setIsCollecting(false);
+    }
+  }, [result]);
 
   const handleReset = useCallback(() => {
     setResult(null);
     setVerified(false);
     setIsAlreadyUsed(false);
+    setIsCollecting(false);
   }, []);
 
   const dateStr = result
@@ -150,7 +162,7 @@ export function VerifyPurchaseScreen() {
             </View>
             <Text style={styles.verifiedTitle}>Delivery Confirmed</Text>
             <Text style={styles.verifiedSubtitle}>
-              Item has been marked as delivered to the customer
+              Item has been marked as collected on-chain
             </Text>
 
             <View style={styles.detailCard}>
@@ -174,9 +186,9 @@ export function VerifyPurchaseScreen() {
             <View style={styles.usedIconWrap}>
               <Ionicons name="close-circle" size={72} color={colors.error} />
             </View>
-            <Text style={styles.usedTitle}>Already Used</Text>
+            <Text style={styles.usedTitle}>Already Collected</Text>
             <Text style={styles.usedSubtitle}>
-              This purchase receipt has already been redeemed
+              This purchase has already been collected
             </Text>
 
             <View style={styles.detailCard}>
@@ -186,7 +198,7 @@ export function VerifyPurchaseScreen() {
               <DetailRow label="Date" value={dateStr} />
               <View style={styles.statusBadge}>
                 <Ionicons name="ban" size={16} color={colors.error} />
-                <Text style={styles.statusBadgeText}>USED</Text>
+                <Text style={styles.statusBadgeText}>COLLECTED</Text>
               </View>
             </View>
 
@@ -220,33 +232,33 @@ export function VerifyPurchaseScreen() {
               <DetailRow label="Amount" value={`${formatSOL(result.amount)} SOL`} accent />
               <DetailRow label="Customer" value={shortenAddress(result.buyer, 6)} />
               <DetailRow label="Date" value={dateStr} />
-              <DetailRow label="Receipt ID" value={result.purchaseId.slice(0, 16)} />
+              <DetailRow
+                label="Record"
+                value={shortenAddress(result.purchaseRecord, 6)}
+              />
             </View>
-
-            {result.txSignature && (
-              <TouchableOpacity
-                style={styles.explorerButton}
-                onPress={() => Linking.openURL(getTxUrl(result.txSignature!))}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="open-outline" size={14} color={colors.primary} />
-                <Text style={styles.explorerButtonText}>View on Explorer</Text>
-              </TouchableOpacity>
-            )}
 
             <View style={styles.actions}>
               <TouchableOpacity
-                style={styles.primaryButton}
+                style={[styles.primaryButton, isCollecting && styles.buttonDisabled]}
                 onPress={handleConfirmDelivery}
+                disabled={isCollecting}
                 activeOpacity={0.8}
               >
-                <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
-                <Text style={styles.primaryButtonText}>Confirm Delivery</Text>
+                {isCollecting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle-outline" size={18} color="#fff" />
+                    <Text style={styles.primaryButtonText}>Confirm Delivery</Text>
+                  </>
+                )}
               </TouchableOpacity>
               <TouchableOpacity
                 style={styles.outlineButton}
                 onPress={handleReset}
                 activeOpacity={0.7}
+                disabled={isCollecting}
               >
                 <Text style={styles.outlineButtonText}>Cancel</Text>
               </TouchableOpacity>
@@ -370,19 +382,6 @@ const styles = StyleSheet.create({
     padding: spacing.md,
     marginBottom: spacing.md,
   },
-  explorerButton: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    gap: 6,
-    paddingVertical: spacing.sm,
-    marginBottom: spacing.md,
-  },
-  explorerButtonText: {
-    fontSize: 13,
-    fontFamily: fonts.bodySemiBold,
-    color: colors.primary,
-  },
   actions: {
     gap: spacing.sm,
     marginTop: spacing.md,
@@ -400,6 +399,9 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: fonts.heading,
     color: "#fff",
+  },
+  buttonDisabled: {
+    opacity: 0.6,
   },
   outlineButton: {
     alignItems: "center",

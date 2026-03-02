@@ -30,6 +30,7 @@ export const ATTENDANCE_SEED = "attendance";
 export const BADGE_AUTHORITY_SEED = "badge_authority";
 export const SEAT_TIER_SEED = "seat_tier";
 export const PRODUCT_SEED = "product";
+export const PRODUCT_PURCHASE_SEED = "product_purchase";
 
 // Limits
 export const MAX_EVENT_NAME_LEN = 64;

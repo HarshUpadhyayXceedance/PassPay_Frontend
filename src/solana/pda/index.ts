@@ -9,3 +9,4 @@ export { findUserAttendancePda } from "./userAttendancePda";
 export { findBadgeCollectionPda } from "./badgeCollectionPda";
 export { findSeatTierPda } from "./seatTierPda";
 export { findProductPda } from "./productPda";
+export { findProductPurchasePda } from "./productPurchasePda";

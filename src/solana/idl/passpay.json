@@ -608,6 +608,44 @@
           }
         },
         {
+          "name": "purchase_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  100,
+                  117,
+                  99,
+                  116,
+                  95,
+                  112,
+                  117,
+                  114,
+                  99,
+                  104,
+                  97,
+                  115,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "product"
+              },
+              {
+                "kind": "account",
+                "path": "product.total_sold",
+                "account": "MerchantProduct"
+              }
+            ]
+          }
+        },
+        {
           "name": "user_attendance_record",
           "docs": [
             "User attendance record (may not exist for new users)"
@@ -1466,6 +1504,91 @@
               }
             ]
           }
+        }
+      ],
+      "args": []
+    },
+    {
+      "name": "collect_product",
+      "discriminator": [
+        84,
+        251,
+        5,
+        186,
+        68,
+        23,
+        40,
+        90
+      ],
+      "accounts": [
+        {
+          "name": "authority",
+          "docs": [
+            "Merchant authority (the merchant wallet owner)"
+          ],
+          "signer": true
+        },
+        {
+          "name": "merchant",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  109,
+                  101,
+                  114,
+                  99,
+                  104,
+                  97,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant.event",
+                "account": "Merchant"
+              },
+              {
+                "kind": "account",
+                "path": "merchant.authority",
+                "account": "Merchant"
+              }
+            ]
+          }
+        },
+        {
+          "name": "product",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  112,
+                  114,
+                  111,
+                  100,
+                  117,
+                  99,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "merchant"
+              },
+              {
+                "kind": "account",
+                "path": "product.name",
+                "account": "MerchantProduct"
+              }
+            ]
+          }
+        },
+        {
+          "name": "purchase_record",
+          "writable": true
         }
       ],
       "args": []
@@ -3617,6 +3740,19 @@
       ]
     },
     {
+      "name": "ProductPurchase",
+      "discriminator": [
+        63,
+        63,
+        31,
+        130,
+        199,
+        201,
+        162,
+        171
+      ]
+    },
+    {
       "name": "RefundRequest",
       "discriminator": [
         40,
@@ -3915,6 +4051,19 @@
         199,
         234,
         235
+      ]
+    },
+    {
+      "name": "ProductCollected",
+      "discriminator": [
+        25,
+        223,
+        251,
+        67,
+        161,
+        231,
+        31,
+        180
       ]
     },
     {
@@ -4338,6 +4487,11 @@
       "code": 6057,
       "name": "ProductDescriptionTooLong",
       "msg": "Product description exceeds maximum length"
+    },
+    {
+      "code": 6058,
+      "name": "ProductAlreadyCollected",
+      "msg": "This product purchase has already been collected"
     }
   ],
   "types": [
@@ -5385,6 +5539,74 @@
       }
     },
     {
+      "name": "ProductCollected",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "purchase_record",
+            "type": "pubkey"
+          },
+          {
+            "name": "product",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "collected_at",
+            "type": "i64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "ProductPurchase",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "buyer",
+            "type": "pubkey"
+          },
+          {
+            "name": "product",
+            "type": "pubkey"
+          },
+          {
+            "name": "merchant",
+            "type": "pubkey"
+          },
+          {
+            "name": "amount",
+            "type": "u64"
+          },
+          {
+            "name": "is_collected",
+            "type": "bool"
+          },
+          {
+            "name": "purchased_at",
+            "type": "i64"
+          },
+          {
+            "name": "collected_at",
+            "type": "i64"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          }
+        ]
+      }
+    },
+    {
       "name": "ProductPurchased",
       "type": {
         "kind": "struct",
@@ -5408,6 +5630,10 @@
           {
             "name": "total_sold",
             "type": "u32"
+          },
+          {
+            "name": "purchase_record",
+            "type": "pubkey"
           }
         ]
       }

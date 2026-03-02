@@ -16,6 +16,7 @@ import { addSeatTier } from "../../solana/actions/addSeatTier";
 import { addProduct } from "../../solana/actions/addProduct";
 import { updateProduct } from "../../solana/actions/updateProduct";
 import { buyProduct } from "../../solana/actions/buyProduct";
+import { collectProduct } from "../../solana/actions/collectProduct";
 import { createAdmin } from "../../solana/actions/createAdmin";
 import { claimBadge } from "../../solana/actions/issueAttendanceBadge";
 import { createBadgeMints, initializeBadgeCollection } from "../../solana/actions/initializeBadgeCollection";
@@ -280,6 +281,7 @@ export async function apiBuyProduct(params: {
   eventPda: string;
   merchantAuthority: string;
   productName: string;
+  currentTotalSold: number;
 }): Promise<string> {
   const wallet = phantomWalletAdapter;
   if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
@@ -288,6 +290,24 @@ export async function apiBuyProduct(params: {
     eventPda: new PublicKey(params.eventPda),
     merchantAuthority: new PublicKey(params.merchantAuthority),
     productName: params.productName,
+    currentTotalSold: params.currentTotalSold,
+  });
+}
+
+export async function apiCollectProduct(params: {
+  eventPda: string;
+  merchantAuthority: string;
+  productName: string;
+  purchaseRecord: string;
+}): Promise<string> {
+  const wallet = phantomWalletAdapter;
+  if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
+  const provider = createProvider(wallet);
+  return collectProduct(provider, {
+    eventPda: new PublicKey(params.eventPda),
+    merchantAuthority: new PublicKey(params.merchantAuthority),
+    productName: params.productName,
+    purchaseRecord: new PublicKey(params.purchaseRecord),
   });
 }
 
