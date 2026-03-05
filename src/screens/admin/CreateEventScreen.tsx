@@ -19,7 +19,7 @@ import { typography } from "../../theme/typography";
 import { spacing, borderRadius } from "../../theme/spacing";
 import { fonts } from "../../theme/fonts";
 import { PublicKey } from "@solana/web3.js";
-import { apiCreateEvent } from "../../services/api/eventApi";
+import { apiCreateEvent, apiAddSeatTier } from "../../services/api/eventApi";
 import { uploadMetadata } from "../../services/api/uploadApi";
 import { uploadImageToCloudinary } from "../../services/cloudinary/uploadImage";
 import { useWallet } from "../../hooks/useWallet";
@@ -31,6 +31,7 @@ import {
   validateVenue,
   validateEventDescription,
 } from "../../utils/validators";
+import { MAX_EVENT_NAME_LEN } from "../../solana/config/constants";
 
 const MONTH_NAMES = [
   "Jan", "Feb", "Mar", "Apr", "May", "Jun",
@@ -51,11 +52,16 @@ export function CreateEventScreen() {
   const { publicKey } = useWallet();
   const [name, setName] = useState("");
   const [venue, setVenue] = useState("");
+  const [isOnline, setIsOnline] = useState(false);
   const [description, setDescription] = useState("");
   const [imageUri, setImageUri] = useState("");
   const [uploading, setUploading] = useState(false);
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
+
+  // Online-only fields
+  const [onlinePrice, setOnlinePrice] = useState("");
+  const [onlineCapacity, setOnlineCapacity] = useState("");
 
   // Date picker state
   const [eventDate, setEventDate] = useState(() => {
@@ -76,11 +82,14 @@ export function CreateEventScreen() {
     useCallback(() => {
       setName("");
       setVenue("");
+      setIsOnline(false);
       setDescription("");
       setImageUri("");
       setErrors({});
       setUploading(false);
       setCreating(false);
+      setOnlinePrice("");
+      setOnlineCapacity("");
       const d = new Date();
       d.setDate(d.getDate() + 7);
       d.setHours(10, 0, 0, 0);
@@ -131,12 +140,28 @@ export function CreateEventScreen() {
   };
 
   const validate = (): boolean => {
+    const priceVal = parseFloat(onlinePrice);
+    const capVal = parseInt(onlineCapacity, 10);
     const newErrors: Record<string, string | null> = {
       name: validateEventName(name),
-      venue: validateVenue(venue),
+      venue: isOnline ? null : validateVenue(venue),
       description: validateEventDescription(description),
       eventDate:
         eventDate <= new Date() ? "Event date must be in the future" : null,
+      onlinePrice: isOnline
+        ? !onlinePrice.trim()
+          ? "Required"
+          : isNaN(priceVal) || priceVal <= 0
+          ? "Must be > 0"
+          : null
+        : null,
+      onlineCapacity: isOnline
+        ? !onlineCapacity.trim()
+          ? "Required"
+          : isNaN(capVal) || capVal <= 0
+          ? "Must be a whole number > 0"
+          : null
+        : null,
     };
     setErrors(newErrors);
     return !Object.values(newErrors).some(Boolean);
@@ -160,12 +185,13 @@ export function CreateEventScreen() {
       // Use placeholder values — actual pricing/capacity comes from seat tiers
       await apiCreateEvent({
         name,
-        venue,
+        venue: isOnline ? "Online" : venue,
         description,
         imageUrl,
         eventDate,
         ticketPrice: 0.000000001, // placeholder — real price comes from seat tiers
         totalSeats: 10000, // placeholder cap — real limits come from seat tiers
+        isOnline,
         metadataUri: await uploadMetadata({
           name: `${name} - Event Collection`,
           symbol: "PASS",
@@ -183,23 +209,44 @@ export function CreateEventScreen() {
       const [eventPda] = findEventPda(adminPubkey, name);
       const eventPdaStr = eventPda.toBase58();
 
-      confirm({
-        title: "Event Created!",
-        message: "Now add seat tiers (Bronze, Silver, Gold, VIP) with different prices and capacities.",
-        type: "success",
-        buttons: [
-          { text: "Later", style: "cancel", onPress: () => router.back() },
-          {
-            text: "Add Seat Tiers",
-            style: "default",
-            onPress: () =>
-              router.replace({
-                pathname: "/(admin)/add-seat-tier",
-                params: { eventKey: eventPdaStr, eventName: name },
-              }),
-          },
-        ],
-      });
+      if (isOnline) {
+        // Auto-create a single "General" tier — no seat concept for online events
+        await apiAddSeatTier({
+          eventPda: eventPdaStr,
+          name: "General",
+          price: Math.round(parseFloat(onlinePrice) * 1_000_000_000),
+          totalSeats: parseInt(onlineCapacity, 10),
+          tierLevel: 0,
+          isRestricted: false,
+        });
+
+        confirm({
+          title: "Event Created!",
+          message: "Your online event is ready. Ticket holders can join the live meeting directly in-app.",
+          type: "success",
+          buttons: [
+            { text: "Done", style: "default", onPress: () => router.back() },
+          ],
+        });
+      } else {
+        confirm({
+          title: "Event Created!",
+          message: "Now add seat tiers (Bronze, Silver, Gold, VIP) with different prices and capacities.",
+          type: "success",
+          buttons: [
+            { text: "Later", style: "cancel", onPress: () => router.back() },
+            {
+              text: "Add Seat Tiers",
+              style: "default",
+              onPress: () =>
+                router.replace({
+                  pathname: "/(admin)/add-seat-tier",
+                  params: { eventKey: eventPdaStr, eventName: name },
+                }),
+            },
+          ],
+        });
+      }
     } catch (error: any) {
       const msg = error.message ?? "Failed to create event";
       if (
@@ -244,17 +291,74 @@ export function CreateEventScreen() {
             onChangeText={setName}
             placeholder="e.g. Solana Hackathon 2026"
             error={errors.name ?? undefined}
-            maxLength={64}
+            maxLength={MAX_EVENT_NAME_LEN}
           />
 
-          <AppInput
-            label="Venue"
-            value={venue}
-            onChangeText={setVenue}
-            placeholder="e.g. San Francisco, CA"
-            error={errors.venue ?? undefined}
-            maxLength={128}
-          />
+          {/* Online / Offline toggle */}
+          <View style={styles.eventModeRow}>
+            <Text style={styles.eventModeLabel}>Event Mode</Text>
+            <View style={styles.eventModeToggle}>
+              <TouchableOpacity
+                style={[styles.modeBtn, !isOnline && styles.modeBtnActive]}
+                onPress={() => setIsOnline(false)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modeBtnText, !isOnline && styles.modeBtnTextActive]}>
+                  📍 Offline
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeBtn, isOnline && styles.modeBtnActive]}
+                onPress={() => setIsOnline(true)}
+                activeOpacity={0.8}
+              >
+                <Text style={[styles.modeBtnText, isOnline && styles.modeBtnTextActive]}>
+                  🌐 Online
+                </Text>
+              </TouchableOpacity>
+            </View>
+            {isOnline && (
+              <Text style={styles.eventModeHint}>
+                Ticket holders can join a live audio meeting in-app
+              </Text>
+            )}
+          </View>
+
+          {isOnline && (
+            <View style={styles.onlineFieldsRow}>
+              <View style={styles.onlineFieldHalf}>
+                <AppInput
+                  label="Ticket Price (SOL)"
+                  value={onlinePrice}
+                  onChangeText={setOnlinePrice}
+                  placeholder="0.05"
+                  keyboardType="decimal-pad"
+                  error={errors.onlinePrice ?? undefined}
+                />
+              </View>
+              <View style={styles.onlineFieldHalf}>
+                <AppInput
+                  label="Max Attendees"
+                  value={onlineCapacity}
+                  onChangeText={setOnlineCapacity}
+                  placeholder="500"
+                  keyboardType="number-pad"
+                  error={errors.onlineCapacity ?? undefined}
+                />
+              </View>
+            </View>
+          )}
+
+          {!isOnline && (
+            <AppInput
+              label="Venue"
+              value={venue}
+              onChangeText={setVenue}
+              placeholder="e.g. San Francisco, CA"
+              error={errors.venue ?? undefined}
+              maxLength={128}
+            />
+          )}
 
           <AppInput
             label="Description"
@@ -527,6 +631,59 @@ const styles = StyleSheet.create({
   },
   createButton: {
     marginTop: spacing.lg,
+  },
+
+  // Online price + capacity fields
+  onlineFieldsRow: {
+    flexDirection: "row",
+    gap: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  onlineFieldHalf: {
+    flex: 1,
+  },
+
+  // Online/Offline toggle
+  eventModeRow: {
+    marginBottom: spacing.sm,
+  },
+  eventModeLabel: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+    color: colors.textSecondary,
+    marginBottom: spacing.xs,
+  },
+  eventModeToggle: {
+    flexDirection: "row",
+    gap: spacing.xs,
+  },
+  modeBtn: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    backgroundColor: colors.background,
+  },
+  modeBtnActive: {
+    borderColor: colors.primary,
+    backgroundColor: `${colors.primary}15`,
+  },
+  modeBtnText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+    color: colors.textMuted,
+  },
+  modeBtnTextActive: {
+    color: colors.primary,
+  },
+  eventModeHint: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: spacing.xs,
+    fontStyle: "italic",
   },
 
   // Section Cards

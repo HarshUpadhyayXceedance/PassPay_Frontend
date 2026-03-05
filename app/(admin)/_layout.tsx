@@ -77,6 +77,7 @@ export default function AdminLayout() {
       <Tabs.Screen name="dynamic-pricing-setup" options={{ href: null }} />
       <Tabs.Screen name="setup-badges" options={{ href: null }} />
       <Tabs.Screen name="add-seat-tier" options={{ href: null }} />
+      <Tabs.Screen name="room" options={{ href: null }} />
     </Tabs>
   );
 }

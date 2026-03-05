@@ -3,8 +3,18 @@ import { Connection, PublicKey, LAMPORTS_PER_SOL } from "@solana/web3.js";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { phantomWalletAdapter } from "../solana/wallet/phantomWalletAdapter";
 import { DEVNET_RPC } from "../solana/config/constants";
+import { clearAuthToken, getAuthToken } from "../utils/backendAuth";
 
 const PERSISTED_WALLET_KEY = "persisted_wallet_pubkey";
+
+// Module-level singleton — avoids creating a new WebSocket connection on every refreshBalance() call
+let _solanaConnection: Connection | null = null;
+function getSolanaConnection(): Connection {
+  if (!_solanaConnection) {
+    _solanaConnection = new Connection(DEVNET_RPC, "confirmed");
+  }
+  return _solanaConnection;
+}
 
 interface WalletState {
   publicKey: string | null;
@@ -52,6 +62,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
 
       // Refresh balance after connection
       await get().refreshBalance();
+
       console.log("✅ Phantom wallet connected:", pubkeyStr);
     } catch (error: any) {
       const errorMessage =
@@ -68,6 +79,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   disconnectPhantom: async () => {
     try {
       await phantomWalletAdapter.disconnect();
+      // Clear backend JWT for this wallet
+      const { publicKey: prevKey } = get();
+      if (prevKey) await clearAuthToken(prevKey).catch(() => {});
+
       set({
         publicKey: null,
         balance: 0,
@@ -81,6 +96,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     } catch (error: any) {
       console.error("❌ Disconnect failed:", error.message);
       // Even if disconnect fails, clear state
+      const { publicKey: failKey } = get();
+      if (failKey) await clearAuthToken(failKey).catch(() => {});
       set({
         publicKey: null,
         balance: 0,
@@ -108,7 +125,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         });
         // Restore the adapter's public key (read-only; MWA re-auth on next tx)
         phantomWalletAdapter.restorePublicKey(new PublicKey(storedKey));
-        console.log("📦 Wallet restored from persistence:", storedKey.slice(0, 8));
+        // Check if a valid JWT is stored — log result for debugging
+        const token = await getAuthToken(storedKey);
+        console.log("📦 Wallet restored from persistence:", storedKey.slice(0, 8), token ? "(JWT valid)" : "(no JWT — will use legacy auth)");
         return true;
       }
     } catch (e) {
@@ -122,15 +141,18 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     if (!publicKey) return;
 
     try {
-      const connection = new Connection(DEVNET_RPC, "confirmed");
+      const connection = getSolanaConnection();
       const pubKey = new PublicKey(publicKey);
       const lamports = await connection.getBalance(pubKey);
       const solBalance = lamports / LAMPORTS_PER_SOL;
 
-      set({ balance: solBalance });
+      set({ balance: solBalance, error: null });
       console.log("💰 Balance refreshed:", solBalance, "SOL");
     } catch (error: any) {
       console.error("❌ Failed to refresh balance:", error.message);
+      // Reset singleton on RPC failure so the next call gets a fresh connection
+      _solanaConnection = null;
+      set({ error: "Unable to fetch balance. Check your connection." });
     }
   },
 

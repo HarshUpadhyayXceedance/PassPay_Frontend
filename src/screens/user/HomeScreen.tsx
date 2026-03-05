@@ -451,6 +451,28 @@ export function HomeScreen() {
           )}
         </View>
 
+        {/* ========== COMMUNITY ROOMS BANNER ========== */}
+        <TouchableOpacity
+          style={styles.roomsBanner}
+          activeOpacity={0.8}
+          onPress={() => router.push("/(user)/community-rooms")}
+        >
+          <LinearGradient
+            colors={["#6C5CE7", "#a855f7"]}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={styles.roomsBannerGradient}
+          >
+            <View style={styles.roomsBannerLeft}>
+              <Text style={styles.roomsBannerTitle}>Community Rooms</Text>
+              <Text style={styles.roomsBannerSub}>
+                Audio + text spaces for Solana users
+              </Text>
+            </View>
+            <Text style={styles.roomsBannerIcon}>🎙️</Text>
+          </LinearGradient>
+        </TouchableOpacity>
+
         {/* ========== FEATURED SECTION ========== */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
@@ -724,6 +746,36 @@ const styles = StyleSheet.create({
     fontSize: 15,
     fontWeight: "500",
     height: 50,
+  },
+  // Community Rooms Banner
+  roomsBanner: {
+    marginHorizontal: spacing.md,
+    marginBottom: spacing.md,
+    borderRadius: 14,
+    overflow: "hidden",
+  },
+  roomsBannerGradient: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+  },
+  roomsBannerLeft: {
+    flex: 1,
+  },
+  roomsBannerTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 16,
+    color: "#FFFFFF",
+    marginBottom: 2,
+  },
+  roomsBannerSub: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.75)",
+  },
+  roomsBannerIcon: {
+    fontSize: 32,
   },
   clearButton: {
     width: 24,

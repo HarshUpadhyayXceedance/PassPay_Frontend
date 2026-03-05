@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
@@ -28,6 +29,7 @@ import { phantomWalletAdapter } from "../../solana/wallet/phantomWalletAdapter";
 import { EventDisplay } from "../../types/event";
 import { showSuccess, showWarning, showError } from "../../utils/alerts";
 import { confirm } from "../../components/ui/ConfirmDialogProvider";
+import { useRooms } from "../../hooks/useRooms";
 
 interface EventDetailsAdminScreenProps {
   event: EventDisplay;
@@ -41,9 +43,11 @@ export function EventDetailsAdminScreen({
   const { publicKey } = useWallet();
   const router = useRouter();
   const { seatTiers, fetchSeatTiers } = useMerchants();
+  const { joinMeeting } = useRooms();
   const [isUpdatingPrice, setIsUpdatingPrice] = useState(false);
   const [isClosingEvent, setIsClosingEvent] = useState(false);
   const [isCancellingEvent, setIsCancellingEvent] = useState(false);
+  const [isJoiningMeeting, setIsJoiningMeeting] = useState(false);
 
   useEffect(() => {
     fetchSeatTiers(event.publicKey);
@@ -154,6 +158,33 @@ export function EventDetailsAdminScreen({
       ],
     });
   };
+
+  const isOnlineEvent = event.eventType === "online";
+
+  const handleStartMeeting = useCallback(async () => {
+    setIsJoiningMeeting(true);
+    try {
+      const result = await joinMeeting(event.publicKey);
+      if (result.token && result.livekitUrl) {
+        router.push({
+          pathname: "/(admin)/room",
+          params: {
+            roomId: `meeting-${event.publicKey}`,
+            title: event.name,
+            token: result.token,
+            livekitUrl: result.livekitUrl,
+            role: result.role,
+            eventPda: event.publicKey,
+            joinTimestamp: String(Date.now()),
+          },
+        });
+      }
+    } catch (err: any) {
+      showError("Meeting Error", err.message ?? "Could not start meeting.");
+    } finally {
+      setIsJoiningMeeting(false);
+    }
+  }, [event, joinMeeting, router]);
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
@@ -285,7 +316,7 @@ export function EventDetailsAdminScreen({
           />
         </View>
         <Text style={styles.capacityText}>
-          {totalSold} / {totalCapacity} seats filled
+          {totalSold} / {totalCapacity} {isOnlineEvent ? "tickets sold" : "seats filled"}
         </Text>
       </AppCard>
 
@@ -294,19 +325,23 @@ export function EventDetailsAdminScreen({
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
             <Ionicons name="layers" size={18} color={colors.accent} />
-            <Text style={styles.cardTitle}>Seat Tiers</Text>
+            <Text style={styles.cardTitle}>
+              {isOnlineEvent ? "Ticket Info" : "Seat Tiers"}
+            </Text>
           </View>
-          <AppButton
-            title="+ Add Tier"
-            variant="outline"
-            size="sm"
-            onPress={() =>
-              router.push({
-                pathname: "/(admin)/add-seat-tier",
-                params: { eventKey: event.publicKey, eventName: event.name },
-              })
-            }
-          />
+          {!isOnlineEvent && (
+            <AppButton
+              title="+ Add Tier"
+              variant="outline"
+              size="sm"
+              onPress={() =>
+                router.push({
+                  pathname: "/(admin)/add-seat-tier",
+                  params: { eventKey: event.publicKey, eventName: event.name },
+                })
+              }
+            />
+          )}
         </View>
 
         {eventTiers.length === 0 ? (
@@ -368,19 +403,49 @@ export function EventDetailsAdminScreen({
           value={event.dynamicPricingEnabled ? "Enabled" : "Disabled"}
           active={event.dynamicPricingEnabled}
         />
-        {event.earlyAccessDate && (
+        {event.earlyAccessDate instanceof Date && event.earlyAccessDate.getTime() > 0 ? (
           <InfoRow
             label="Early Access"
-            value={formatDate(event.earlyAccessDate instanceof Date ? event.earlyAccessDate : new Date(event.earlyAccessDate * 1000))}
+            value={formatDate(event.earlyAccessDate)}
           />
-        )}
-        {event.publicSaleDate && (
-          <InfoRow
-            label="Public Sale"
-            value={formatDate(event.publicSaleDate instanceof Date ? event.publicSaleDate : new Date(event.publicSaleDate * 1000))}
-          />
-        )}
+        ) : null}
+        <InfoRow
+          label="Public Sale"
+          value={
+            event.publicSaleDate instanceof Date && event.publicSaleDate.getTime() > 0
+              ? formatDate(event.publicSaleDate)
+              : "Immediate (open now)"
+          }
+        />
       </AppCard>
+
+      {/* Online Meeting Controls */}
+      {isOnlineEvent && event.isActive && !event.isCancelled && (
+        <AppCard style={styles.card}>
+          <View style={styles.cardTitleRow}>
+            <Ionicons name="videocam" size={18} color="#6C5CE7" />
+            <Text style={styles.cardTitle}>Online Meeting</Text>
+          </View>
+          <Text style={styles.meetingHint}>
+            You are the host. Joining gives you speaker (mic) access. Ticket holders join as listeners.
+          </Text>
+          <TouchableOpacity
+            style={[styles.startMeetingBtn, isJoiningMeeting && styles.startMeetingBtnDisabled]}
+            onPress={handleStartMeeting}
+            disabled={isJoiningMeeting}
+            activeOpacity={0.8}
+          >
+            {isJoiningMeeting ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <>
+                <Ionicons name="mic" size={18} color="#FFFFFF" />
+                <Text style={styles.startMeetingBtnText}>Start / Join Meeting</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </AppCard>
+      )}
 
       {/* Actions */}
       <View style={styles.actions}>
@@ -397,11 +462,13 @@ export function EventDetailsAdminScreen({
             }
           />
         )}
-        <AppButton
-          title="View Merchants"
-          variant="outline"
-          onPress={() => router.push({ pathname: "/(admin)/merchant-list", params: { eventKey: event.publicKey } })}
-        />
+        {!isOnlineEvent && (
+          <AppButton
+            title="View Merchants"
+            variant="outline"
+            onPress={() => router.push({ pathname: "/(admin)/merchant-list", params: { eventKey: event.publicKey } })}
+          />
+        )}
         <AppButton
           title="Manage Refunds"
           variant="outline"
@@ -638,6 +705,30 @@ const styles = StyleSheet.create({
   cancelEventButton: {
     borderColor: colors.error,
     backgroundColor: "rgba(239, 68, 68, 0.08)",
+  },
+  meetingHint: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textMuted,
+    marginBottom: spacing.sm,
+    lineHeight: 18,
+  },
+  startMeetingBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: spacing.xs,
+    backgroundColor: "#6C5CE7",
+    borderRadius: 10,
+    paddingVertical: 12,
+  },
+  startMeetingBtnDisabled: {
+    opacity: 0.6,
+  },
+  startMeetingBtnText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: "#FFFFFF",
   },
   cancelledBadge: {
     flexDirection: "row",

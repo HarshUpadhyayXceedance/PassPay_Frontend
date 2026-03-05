@@ -1,4 +1,5 @@
-import React, { useRef, useEffect } from "react";
+import React, { useRef, useEffect, useCallback } from "react";
+import { useFocusEffect } from "expo-router";
 import {
   View,
   Text,
@@ -9,6 +10,7 @@ import {
   Dimensions,
   Animated,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -39,6 +41,17 @@ export function EventDetailsScreen() {
 
   const scrollY = useRef(new Animated.Value(0)).current;
   const event = getEvent(eventKey as string);
+
+  // Re-fetch seat tiers every time this screen comes into focus.
+  // Only tiers are refreshed (not events) to avoid stale wallet state issues
+  // that could cause unexpected navigation when fetchEvents fails mid-session.
+  useFocusEffect(
+    useCallback(() => {
+      if (eventKey) {
+        fetchSeatTiers(eventKey).catch(() => {});
+      }
+    }, [eventKey])
+  );
 
   useEffect(() => {
     if (eventKey) fetchSeatTiers(eventKey);
@@ -103,6 +116,8 @@ export function EventDetailsScreen() {
     : 0;
   const discountAmount = startingPrice * (discountPercent / 100);
   const finalPrice = startingPrice - discountAmount;
+
+  const isOnline = event?.eventType === "online";
 
   const handleBuyTicket = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -251,7 +266,9 @@ export function EventDetailsScreen() {
         {/* ============ SEAT TIERS ============ */}
         {eventTiers.length > 0 && (
           <View style={styles.section}>
-            <Text style={styles.sectionTitle}>Seat Tiers</Text>
+            <Text style={styles.sectionTitle}>
+              {isOnline ? "Tickets Available" : "Seat Tiers"}
+            </Text>
             <View style={styles.tiersContainer}>
               {eventTiers.map((tier) => {
                 const adjustedPrice = tier.price * dynamicMultiplier;
@@ -272,7 +289,11 @@ export function EventDetailsScreen() {
                         : `${formatSOL(tier.price)} SOL`}
                     </Text>
                     <Text style={styles.tierCardSeats}>
-                      {isSoldOut ? "Sold Out" : `${tier.availableSeats} of ${tier.totalSeats} left`}
+                      {isSoldOut
+                        ? "Sold Out"
+                        : isOnline
+                        ? `${tier.availableSeats} of ${tier.totalSeats} spots left`
+                        : `${tier.availableSeats} of ${tier.totalSeats} seats left`}
                     </Text>
                   </View>
                 );
@@ -292,19 +313,68 @@ export function EventDetailsScreen() {
         {/* ============ LOCATION ============ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Location</Text>
-          <View style={styles.mapPlaceholder}>
-            <Text style={styles.mapPlaceholderIcon}>🗺️</Text>
-            <Text style={styles.mapPlaceholderText}>{event.venue}</Text>
-          </View>
+          {isOnline ? (
+            <View style={styles.onlineCard}>
+              {/* Header row */}
+              <View style={styles.onlineCardHeader}>
+                <View style={styles.onlineIconBg}>
+                  <Ionicons name="globe-outline" size={22} color={colors.primary} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.onlineCardTitle}>ONLINE EVENT</Text>
+                  <Text style={styles.onlineCardPowered}>Powered by PassPay Live</Text>
+                </View>
+                <View style={styles.onlineLiveBadge}>
+                  <View style={styles.onlineLiveDot} />
+                  <Text style={styles.onlineLiveText}>LIVE</Text>
+                </View>
+              </View>
+
+              {/* Divider */}
+              <View style={styles.onlineCardDivider} />
+
+              {/* Description */}
+              <Text style={styles.onlineCardDesc}>
+                This event takes place in a live virtual audio room. Ticket holders can join the meeting directly in-app.
+              </Text>
+
+              {/* Feature chips */}
+              <View style={styles.onlineFeatures}>
+                <View style={styles.onlineFeatureChip}>
+                  <Ionicons name="mic-outline" size={13} color={colors.primary} />
+                  <Text style={styles.onlineFeatureText}>Live Audio</Text>
+                </View>
+                <View style={styles.onlineFeatureChip}>
+                  <Ionicons name="chatbubble-outline" size={13} color={colors.primary} />
+                  <Text style={styles.onlineFeatureText}>Live Chat</Text>
+                </View>
+                <View style={styles.onlineFeatureChip}>
+                  <Ionicons name="shield-checkmark-outline" size={13} color={colors.primary} />
+                  <Text style={styles.onlineFeatureText}>Ticket Verified</Text>
+                </View>
+              </View>
+            </View>
+          ) : (
+            <View style={styles.mapPlaceholder}>
+              <Text style={styles.mapPlaceholderIcon}>🗺️</Text>
+              <Text style={styles.mapPlaceholderText}>{event.venue}</Text>
+            </View>
+          )}
         </View>
 
-        {/* Spacer for bottom bar (accounts for badges + safe area) */}
-        <View style={{ height: 170 }} />
+        {/* Separator line + spacer before the sticky Buy Ticket bar */}
+        <View style={styles.sectionDivider} />
+        <View style={{ height: 180 }} />
       </Animated.ScrollView>
 
       {/* ============ BOTTOM STICKY BAR ============ */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomLeft}>
+          {isOnline && (
+            <View style={styles.onlineBadge}>
+              <Text style={styles.onlineBadgeText}>🌐 Online Event</Text>
+            </View>
+          )}
           {seatsLeft > 0 && (
             <View
               style={[
@@ -318,7 +388,9 @@ export function EventDetailsScreen() {
                   isLowSeats && styles.seatsLeftTextLow,
                 ]}
               >
-                Only {seatsLeft} seats left
+                {isOnline
+                  ? `${seatsLeft} spots left`
+                  : `Only ${seatsLeft} seats left`}
               </Text>
             </View>
           )}
@@ -347,20 +419,22 @@ export function EventDetailsScreen() {
           </Text>
         </View>
 
-        <TouchableOpacity
-          style={[
-            styles.buyButton,
-            (!event.isActive || event.isSoldOut || event.isCancelled) && styles.buyButtonDisabled,
-          ]}
-          activeOpacity={0.8}
-          disabled={!event.isActive || event.isSoldOut || event.isCancelled}
-          onPress={handleBuyTicket}
-          accessibilityRole="button"
-          accessibilityLabel={event.isCancelled ? "Event cancelled" : event.isSoldOut ? "Sold out" : `Buy ticket for ${formatSOL(finalPrice)} SOL`}
-          accessibilityState={{ disabled: !event.isActive || event.isSoldOut || event.isCancelled }}
-        >
-          <Text style={styles.buyButtonText}>{event.isCancelled ? "Cancelled" : "Buy Ticket"}</Text>
-        </TouchableOpacity>
+        <View style={styles.bottomActions}>
+          {/* Buy Ticket — shown for all events; ticket needed for online meeting access too */}
+          <TouchableOpacity
+            style={[
+              styles.buyButton,
+              (!event.isActive || event.isSoldOut || event.isCancelled) && styles.buyButtonDisabled,
+            ]}
+            activeOpacity={0.8}
+            disabled={!event.isActive || event.isSoldOut || event.isCancelled}
+            onPress={handleBuyTicket}
+          >
+            <Text style={styles.buyButtonText}>
+              {event.isCancelled ? "Cancelled" : "Buy Ticket"}
+            </Text>
+          </TouchableOpacity>
+        </View>
       </View>
     </View>
   );
@@ -582,6 +656,108 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
     fontWeight: "500",
   },
+  onlineCard: {
+    width: "100%",
+    backgroundColor: colors.surface,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: `${colors.primary}30`,
+    borderLeftWidth: 4,
+    borderLeftColor: colors.primary,
+    padding: 16,
+    overflow: "hidden",
+  },
+  onlineCardHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
+    marginBottom: 14,
+  },
+  onlineIconBg: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: `${colors.primary}18`,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  onlineCardTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 16,
+    color: colors.text,
+    letterSpacing: 1.2,
+    marginBottom: 2,
+  },
+  onlineCardPowered: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.textMuted,
+  },
+  onlineLiveBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(0,255,163,0.12)",
+    paddingHorizontal: 9,
+    paddingVertical: 4,
+    borderRadius: 10,
+    borderWidth: 1,
+    borderColor: "rgba(0,255,163,0.25)",
+  },
+  onlineLiveDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: "#00FFA3",
+  },
+  onlineLiveText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 10,
+    color: "#00FFA3",
+    letterSpacing: 0.8,
+  },
+  onlineCardDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginBottom: 12,
+  },
+  onlineCardDesc: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textSecondary,
+    lineHeight: 20,
+    marginBottom: 14,
+  },
+  onlineFeatures: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 8,
+  },
+  onlineFeatureChip: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: `${colors.primary}12`,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: `${colors.primary}25`,
+  },
+  onlineFeatureText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 11,
+    color: colors.primary,
+  },
+
+  /* ---- Section Divider ---- */
+  sectionDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginHorizontal: 16,
+    marginTop: 24,
+    opacity: 0.6,
+  },
 
   /* ---- Bottom Bar ---- */
   bottomBar: {
@@ -689,11 +865,29 @@ const styles = StyleSheet.create({
     textDecorationLine: "line-through",
     marginBottom: 2,
   },
+  bottomActions: {
+    flexDirection: "column",
+    gap: 8,
+    alignItems: "stretch",
+  },
+  onlineBadge: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(108,92,231,0.15)",
+    borderRadius: 6,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    marginBottom: 6,
+  },
+  onlineBadgeText: {
+    fontSize: 11,
+    color: "#6C5CE7",
+    fontWeight: "600",
+  },
   buyButton: {
     backgroundColor: colors.primary,
     borderRadius: 12,
-    paddingHorizontal: 28,
-    paddingVertical: 16,
+    paddingHorizontal: 20,
+    paddingVertical: 13,
     alignItems: "center",
     justifyContent: "center",
   },
@@ -701,7 +895,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#2A3050",
   },
   buyButtonText: {
-    fontSize: 15,
+    fontSize: 14,
     color: colors.background,
     fontWeight: "700",
     fontFamily: fonts.bodySemiBold,

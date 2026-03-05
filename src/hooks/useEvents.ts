@@ -42,11 +42,21 @@ export function useEvents() {
             ? data.currentTicketPrice.toNumber()
             : basePrice;
 
+          const venueStr = decodeAccountString(data.venue);
+          // Use on-chain isOnline field if available, fall back to venue-name detection for old accounts
+          const isOnlineOnChain: boolean | undefined = data.isOnline;
+          const eventType: "online" | "offline" =
+            isOnlineOnChain !== undefined
+              ? (isOnlineOnChain ? "online" : "offline")
+              : venueStr.toLowerCase().startsWith("online")
+              ? "online"
+              : "offline";
+
           events.push({
             publicKey: acc.publicKey.toBase58(),
             admin: data.admin.toBase58(),
             name: decodeAccountString(data.name),
-            venue: decodeAccountString(data.venue),
+            venue: venueStr,
             description: decodeAccountString(data.description ?? ""),
             imageUrl: decodeAccountString(data.imageUrl ?? ""),
             eventDate: fromUnixTimestamp(data.eventDate?.toNumber?.() ?? data.eventDate ?? 0),
@@ -70,6 +80,7 @@ export function useEvents() {
             demandFactor: data.demandFactor ?? 0,
             timeFactor: data.timeFactor ?? 0,
             scarcityPremium: data.scarcityPremium ?? 0,
+            eventType,
           });
         } catch (e) {
           // Skip accounts with old schema that can't be deserialized

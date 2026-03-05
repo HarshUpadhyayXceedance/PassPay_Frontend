@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from "react";
+import React, { useEffect, useState, useRef, useCallback } from "react";
 import {
   View,
   Text,
@@ -9,13 +9,16 @@ import {
   Dimensions,
   Animated,
   Share,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import { useTickets } from "../../hooks/useTickets";
+import { useRooms } from "../../hooks/useRooms";
 import { TicketDisplay } from "../../types/ticket";
 import { formatDate } from "../../utils/formatters";
+import { showError } from "../../utils/alerts";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 
@@ -70,7 +73,9 @@ function getTimeUntilEvent(eventDate: Date): string {
 export function MyTicketsScreen() {
   const router = useRouter();
   const { tickets, fetchMyTickets, isLoading } = useTickets();
+  const { joinMeeting } = useRooms();
   const [activeTab, setActiveTab] = useState<TabKey>("upcoming");
+  const [joiningMeetingKey, setJoiningMeetingKey] = useState<string | null>(null);
   const fadeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
@@ -103,6 +108,36 @@ export function MyTicketsScreen() {
 
   const getGradient = (index: number): [string, string] =>
     GRADIENTS[index % GRADIENTS.length];
+
+  const handleJoinMeeting = useCallback(async (item: TicketDisplay) => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setJoiningMeetingKey(item.publicKey);
+    try {
+      const result = await joinMeeting(item.eventKey);
+      if (result.token && result.livekitUrl) {
+        router.push({
+          pathname: "/(user)/room",
+          params: {
+            roomId: `meeting-${item.eventKey}`,
+            title: item.eventName,
+            token: result.token,
+            livekitUrl: result.livekitUrl,
+            role: result.role,
+            eventPda: item.eventKey,
+            ticketMint: item.mint,
+            isAlreadyCheckedIn: String(item.isCheckedIn),
+            eventDate: String(item.eventDate instanceof Date
+              ? item.eventDate.getTime()
+              : new Date(item.eventDate).getTime()),
+          },
+        });
+      }
+    } catch (err: any) {
+      showError("Cannot Join", err.message ?? "Could not join the meeting.");
+    } finally {
+      setJoiningMeetingKey(null);
+    }
+  }, [joinMeeting, router]);
 
   const renderPassCard = ({
     item,
@@ -230,33 +265,92 @@ export function MyTicketsScreen() {
 
           {/* Bottom action row */}
           <View style={styles.actionRow}>
-            {item.eventIsCancelled && !item.isCheckedIn && item.refundStatus === "none" ? (
-              <TouchableOpacity
-                style={styles.refundButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push({ pathname: "/(user)/refund", params: { ticketKey: item.publicKey } });
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.refundButtonText}>Get Refund</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity
-                style={styles.qrButton}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                  router.push({ pathname: "/(user)/ticket-qr", params: { ticketKey: item.publicKey } });
-                }}
-                activeOpacity={0.8}
-              >
-                <Text style={styles.qrButtonText}>
-                  {isPast ? "View QR" : "Show Ticket QR"}
-                </Text>
-              </TouchableOpacity>
-            )}
+            {(() => {
+              const isOnlineEvent = item.eventVenue.toLowerCase().startsWith("online");
+              const isJoiningThis = joiningMeetingKey === item.publicKey;
+
+              // Cancelled + unrequested refund → Refund button
+              if (item.eventIsCancelled && !item.isCheckedIn && item.refundStatus === "none") {
+                return (
+                  <TouchableOpacity
+                    style={styles.refundButton}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                      router.push({ pathname: "/(user)/refund", params: { ticketKey: item.publicKey } });
+                    }}
+                    activeOpacity={0.8}
+                  >
+                    <Text style={styles.refundButtonText}>Get Refund</Text>
+                  </TouchableOpacity>
+                );
+              }
+
+              // Online event → two half-width buttons (valid) or single View Details (used/past)
+              if (isOnlineEvent && !item.eventIsCancelled) {
+                if (item.isCheckedIn || isPast) {
+                  return (
+                    <TouchableOpacity
+                      style={styles.qrButton}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        router.push({ pathname: "/(user)/ticket-details", params: { ticketKey: item.publicKey } });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={styles.qrButtonText}>View Details</Text>
+                    </TouchableOpacity>
+                  );
+                }
+                // Valid ticket: Join Event + View Details side by side
+                return (
+                  <View style={styles.dualButtonRow}>
+                    <TouchableOpacity
+                      style={[styles.halfButton, styles.joinMeetingButton]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        handleJoinMeeting(item);
+                      }}
+                      disabled={isJoiningThis}
+                      activeOpacity={0.8}
+                    >
+                      {isJoiningThis ? (
+                        <ActivityIndicator size="small" color={colors.background} />
+                      ) : (
+                        <Text style={styles.qrButtonText}>Join Event</Text>
+                      )}
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[styles.halfButton, styles.detailsButton]}
+                      onPress={(e) => {
+                        e.stopPropagation();
+                        router.push({ pathname: "/(user)/ticket-details", params: { ticketKey: item.publicKey } });
+                      }}
+                      activeOpacity={0.8}
+                    >
+                      <Text style={[styles.qrButtonText, styles.detailsButtonText]}>View Details</Text>
+                    </TouchableOpacity>
+                  </View>
+                );
+              }
+
+              // Offline event → QR code
+              return (
+                <TouchableOpacity
+                  style={styles.qrButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                    router.push({ pathname: "/(user)/ticket-qr", params: { ticketKey: item.publicKey } });
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={styles.qrButtonText}>
+                    {isPast ? "View QR" : "Show Ticket QR"}
+                  </Text>
+                </TouchableOpacity>
+              );
+            })()}
 
             <TouchableOpacity
               style={styles.shareButton}
@@ -612,6 +706,30 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 12,
+  },
+  joinMeetingButton: {
+    backgroundColor: "#6C5CE7",
+  },
+  dualButtonRow: {
+    flex: 1,
+    flexDirection: "row",
+    gap: 8,
+    marginRight: 12,
+  },
+  halfButton: {
+    flex: 1,
+    paddingVertical: 12,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  detailsButton: {
+    backgroundColor: "transparent",
+    borderWidth: 1.5,
+    borderColor: colors.border,
+  },
+  detailsButtonText: {
+    color: colors.text,
   },
   qrButtonText: {
     fontSize: 15,

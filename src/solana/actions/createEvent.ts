@@ -25,6 +25,7 @@ export interface CreateEventParams {
   totalSeats: number;
   metadataUri: string;
   refundWindowHours?: number; // default 48
+  isOnline?: boolean;
 }
 
 export async function createEvent(
@@ -62,6 +63,7 @@ export async function createEvent(
       totalSeats: params.totalSeats,
       metadataUri: params.metadataUri,
       refundWindowHours: params.refundWindowHours ?? 48,
+      isOnline: params.isOnline ?? false,
     })
     .accounts({
       adminAuthority: adminKey,

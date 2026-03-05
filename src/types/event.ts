@@ -55,4 +55,5 @@ export interface EventDisplay {
   demandFactor: number;
   timeFactor: number;
   scarcityPremium: number;
+  eventType: "online" | "offline";
 }

@@ -1,5 +1,5 @@
 {
-  "address": "EvvNmUExCReSFVovKJsqXumDk7XB1G8TodtVfKQPJ7Xw",
+  "address": "H57pHZjc5xTpRCruvdqtRn1XfQJL3D8gYGssE4wMLDUd",
   "metadata": {
     "name": "passpay",
     "version": "0.1.0",
@@ -3144,6 +3144,124 @@
       "args": []
     },
     {
+      "name": "self_check_in",
+      "docs": [
+        "Self check-in for online events — ticket owner signs, no admin required."
+      ],
+      "discriminator": [
+        62,
+        11,
+        251,
+        179,
+        155,
+        17,
+        102,
+        149
+      ],
+      "accounts": [
+        {
+          "name": "attendee",
+          "docs": [
+            "The ticket owner — signing proves identity, no admin required."
+          ],
+          "writable": true,
+          "signer": true
+        },
+        {
+          "name": "event",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticket",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  116,
+                  105,
+                  99,
+                  107,
+                  101,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event"
+              },
+              {
+                "kind": "account",
+                "path": "ticket_mint"
+              }
+            ]
+          }
+        },
+        {
+          "name": "ticket_mint",
+          "docs": [
+            "Needed for PDA derivation — auth is enforced by `ticket.owner == attendee`."
+          ]
+        },
+        {
+          "name": "user_attendance_record",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  116,
+                  116,
+                  101,
+                  110,
+                  100,
+                  97,
+                  110,
+                  99,
+                  101
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "attendee"
+              }
+            ]
+          }
+        },
+        {
+          "name": "system_program",
+          "address": "11111111111111111111111111111111"
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "transfer_ticket",
       "discriminator": [
         191,
@@ -4492,6 +4610,16 @@
       "code": 6058,
       "name": "ProductAlreadyCollected",
       "msg": "This product purchase has already been collected"
+    },
+    {
+      "code": 6059,
+      "name": "EventNotStarted",
+      "msg": "The event has not started yet — attendance can only be confirmed at event time"
+    },
+    {
+      "code": 6060,
+      "name": "OnlineEventsOnly",
+      "msg": "Self check-in is only available for online events — use QR check-in for in-person events"
     }
   ],
   "types": [
@@ -4874,6 +5002,10 @@
           {
             "name": "refund_window_hours",
             "type": "u32"
+          },
+          {
+            "name": "is_online",
+            "type": "bool"
           }
         ]
       }
@@ -5009,6 +5141,10 @@
           },
           {
             "name": "is_cancelled",
+            "type": "bool"
+          },
+          {
+            "name": "is_online",
             "type": "bool"
           },
           {

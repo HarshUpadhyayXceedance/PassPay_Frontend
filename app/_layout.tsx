@@ -16,6 +16,7 @@ import { OfflineBanner } from "../src/components/ui/OfflineBanner";
 import { AlertNotificationRoot } from "react-native-alert-notification";
 import { ConfirmDialogProvider } from "../src/components/ui/ConfirmDialogProvider";
 import { registerForPushNotifications } from "../src/services/notifications/pushNotifications";
+import { registerAuthExpiredHandler } from "../src/utils/backendAuth";
 
 SplashScreen.preventAutoHideAsync();
 
@@ -122,6 +123,11 @@ export default function RootLayout() {
           if (walletRestored) {
             useWalletStore.getState().refreshBalance().catch(() => {});
           }
+
+              // Register 401 handler: when JWT expires mid-session, force re-auth
+          registerAuthExpiredHandler(() => {
+            useWalletStore.getState().disconnectPhantom().catch(() => {});
+          });
 
           // Check if user has completed onboarding
           const onboardingCompleted = await AsyncStorage.getItem(

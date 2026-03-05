@@ -77,5 +77,16 @@ if (typeof Uint8Array !== "undefined" && !Uint8Array.prototype.readUIntLE) {
   });
 }
 
-// 4. Load the app (this triggers all module loading including @solana/web3.js, uuid, etc.)
+// 4. LiveKit WebRTC globals — must be registered before any Room usage.
+// @livekit/react-native requires this to set up the WebRTC native module globally.
+try {
+  var lkRn = require("@livekit/react-native");
+  if (lkRn && typeof lkRn.registerGlobals === "function") {
+    lkRn.registerGlobals();
+  }
+} catch (_e) {
+  // Not available in Expo Go (dev build required for LiveKit audio)
+}
+
+// 5. Load the app (this triggers all module loading including @solana/web3.js, uuid, etc.)
 require("expo-router/entry");

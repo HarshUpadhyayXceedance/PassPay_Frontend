@@ -1,7 +1,7 @@
 import { PublicKey } from "@solana/web3.js";
 
 export const PROGRAM_ID = new PublicKey(
-  "EvvNmUExCReSFVovKJsqXumDk7XB1G8TodtVfKQPJ7Xw"
+  "H57pHZjc5xTpRCruvdqtRn1XfQJL3D8gYGssE4wMLDUd"
 );
 
 export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
@@ -33,7 +33,8 @@ export const PRODUCT_SEED = "product";
 export const PRODUCT_PURCHASE_SEED = "product_purchase";
 
 // Limits
-export const MAX_EVENT_NAME_LEN = 64;
+// NOTE: Event name is used as a PDA seed — Solana caps each seed at 32 bytes.
+export const MAX_EVENT_NAME_LEN = 32;
 export const MAX_VENUE_LEN = 128;
 export const MAX_MERCHANT_NAME_LEN = 64;
 export const MAX_EVENT_DESCRIPTION_LEN = 256;

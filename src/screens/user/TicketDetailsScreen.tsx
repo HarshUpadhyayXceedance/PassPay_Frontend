@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from "react";
+import React, { useEffect, useRef, useState, useCallback } from "react";
 import {
   View,
   Text,
@@ -8,14 +8,16 @@ import {
   Dimensions,
   Animated,
   Linking,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
 import { useTickets } from "../../hooks/useTickets";
+import { useRooms } from "../../hooks/useRooms";
 import { formatDate, formatSOL } from "../../utils/formatters";
-import { showInfo } from "../../utils/alerts";
+import { showInfo, showError, showSuccess } from "../../utils/alerts";
 import { confirm } from "../../components/ui/ConfirmDialogProvider";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
@@ -40,6 +42,9 @@ export function TicketDetailsScreen() {
   const router = useRouter();
   const { ticketKey } = useLocalSearchParams<{ ticketKey: string }>();
   const { tickets } = useTickets();
+  const { joinMeeting, confirmAttendance } = useRooms();
+  const [isJoiningMeeting, setIsJoiningMeeting] = useState(false);
+  const [isConfirmingAttendance, setIsConfirmingAttendance] = useState(false);
 
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -85,6 +90,7 @@ export function TicketDetailsScreen() {
   const gradient = GRADIENTS[Math.floor(Math.random() * GRADIENTS.length)];
   const eventDate = new Date(ticket.eventDate);
   const isPastEvent = eventDate < new Date();
+  const isOnline = ticket.eventVenue.toLowerCase() === "online";
 
   const handleShowQR = () => {
     Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
@@ -117,6 +123,60 @@ export function TicketDetailsScreen() {
     const url = `https://explorer.solana.com/address/${ticket.mint}?cluster=devnet`;
     Linking.openURL(url);
   };
+
+  const handleJoinMeeting = useCallback(async () => {
+    Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+    setIsJoiningMeeting(true);
+    try {
+      const result = await joinMeeting(ticket.eventKey);
+      if (result.token && result.livekitUrl) {
+        router.push({
+          pathname: "/(user)/room",
+          params: {
+            roomId: `meeting-${ticket.eventKey}`,
+            title: ticket.eventName,
+            token: result.token,
+            livekitUrl: result.livekitUrl,
+            role: result.role,
+            eventPda: ticket.eventKey,
+            ticketMint: ticket.mint,
+            // Tell RoomScreen if attendance was already confirmed — persists across rejoins
+            isAlreadyCheckedIn: String(ticket.isCheckedIn),
+            eventDate: String(ticket.eventDate instanceof Date
+              ? ticket.eventDate.getTime()
+              : new Date(ticket.eventDate).getTime()),
+            // Unique per-join timestamp so RoomScreen resets state even when
+            // expo-router reuses the cached tab component instance on rejoin.
+            joinTimestamp: String(Date.now()),
+          },
+        });
+      }
+    } catch (err: any) {
+      showError("Cannot Join", err.message ?? "Could not join the meeting.");
+    } finally {
+      setIsJoiningMeeting(false);
+    }
+  }, [ticket, joinMeeting, router]);
+
+  // Deferred attendance: confirm on-chain from TicketDetailsScreen
+  // (fallback if the in-meeting strip was missed due to MWA navigation)
+  const handleConfirmAttendanceFromTicket = useCallback(async () => {
+    if (!ticket) return;
+    setIsConfirmingAttendance(true);
+    try {
+      await confirmAttendance(ticket.eventKey, ticket.mint);
+      showSuccess("Attendance Confirmed", "Your attendance has been recorded on-chain!");
+    } catch (err: any) {
+      const msg: string = err?.message ?? "";
+      if (msg.includes("AlreadyCheckedIn")) {
+        showInfo("Already Confirmed", "Your attendance was already recorded.");
+      } else {
+        showError("Confirmation Failed", msg || "Could not confirm attendance.");
+      }
+    } finally {
+      setIsConfirmingAttendance(false);
+    }
+  }, [ticket, confirmAttendance]);
 
   const handleAddToCalendar = () => {
     const startDate = eventDate.toISOString().replace(/[-:]/g, "").split(".")[0] + "Z";
@@ -184,8 +244,8 @@ export function TicketDetailsScreen() {
               </View>
             )}
 
-            {/* Seat tier badge */}
-            {ticket.seatTierName && (
+            {/* Seat tier badge — hidden for online events (no physical tier concept) */}
+            {!isOnline && ticket.seatTierName && (
               <View style={[styles.statusBadge, styles.tierBadge]}>
                 <Text style={styles.statusBadgeText}>{ticket.seatTierName.toUpperCase()}</Text>
               </View>
@@ -345,7 +405,59 @@ export function TicketDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {!ticket.eventIsCancelled && (
+          {/* Join Meeting — online events only, ticket is the entry pass */}
+          {isOnline && !ticket.eventIsCancelled && (
+            <TouchableOpacity
+              style={[styles.joinMeetingButton, isJoiningMeeting && { opacity: 0.6 }]}
+              onPress={handleJoinMeeting}
+              activeOpacity={0.8}
+              disabled={isJoiningMeeting}
+            >
+              {isJoiningMeeting ? (
+                <ActivityIndicator size="small" color="#FFFFFF" />
+              ) : (
+                <>
+                  <Text style={styles.primaryActionIcon}>🎤</Text>
+                  <View style={styles.actionButtonContent}>
+                    <Text style={[styles.primaryActionTitle, { color: "#FFFFFF" }]}>Join Meeting</Text>
+                    <Text style={[styles.primaryActionSubtitle, { color: "rgba(255,255,255,0.75)" }]}>
+                      Enter the live audio room
+                    </Text>
+                  </View>
+                  <Text style={[styles.actionArrow, { color: "#FFFFFF" }]}>→</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Confirm Attendance — online events, not yet checked in.
+              Deferred fallback for users who couldn't confirm during the meeting. */}
+          {isOnline && !ticket.isCheckedIn && !ticket.eventIsCancelled && (
+            <TouchableOpacity
+              style={[styles.secondaryActionButton, isConfirmingAttendance && { opacity: 0.6 }]}
+              onPress={handleConfirmAttendanceFromTicket}
+              activeOpacity={0.8}
+              disabled={isConfirmingAttendance}
+            >
+              {isConfirmingAttendance ? (
+                <ActivityIndicator size="small" color={colors.primary} />
+              ) : (
+                <>
+                  <Text style={styles.secondaryActionIcon}>✅</Text>
+                  <View style={styles.actionButtonContent}>
+                    <Text style={styles.secondaryActionTitle}>Confirm Attendance</Text>
+                    <Text style={styles.secondaryActionSubtitle}>
+                      Record on-chain (opens Phantom)
+                    </Text>
+                  </View>
+                  <Text style={styles.actionArrow}>→</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          )}
+
+          {/* Show QR Code — offline events only (physical check-in) */}
+          {!isOnline && !ticket.eventIsCancelled && (
             <TouchableOpacity
               style={styles.primaryActionButton}
               onPress={handleShowQR}
@@ -675,6 +787,14 @@ const styles = StyleSheet.create({
     color: colors.text,
     marginBottom: 12,
     fontFamily: fonts.headingSemiBold,
+  },
+  joinMeetingButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#00b09b",
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
   },
   primaryActionButton: {
     flexDirection: "row",
