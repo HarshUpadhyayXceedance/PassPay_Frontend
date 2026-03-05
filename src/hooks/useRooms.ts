@@ -13,6 +13,7 @@ import {
 } from "../services/api/roomApi";
 import { CreateRoomBody, JoinRoomResult } from "../types/room";
 import { selfCheckIn } from "../solana/actions/selfCheckIn";
+import { endMeeting as endMeetingOnChain } from "../solana/actions/endMeeting";
 import { createProvider } from "../solana/wallet/walletSession";
 import { phantomWalletAdapter } from "../solana/wallet/phantomWalletAdapter";
 
@@ -93,9 +94,17 @@ export function useRooms() {
     [publicKey]
   );
 
+  /**
+   * End meeting: set is_meeting_ended=true on-chain (wallet signs),
+   * then call backend to clean up LiveKit room + Redis entry.
+   */
   const endMeeting = useCallback(
     async (eventPda: string): Promise<void> => {
       if (!publicKey) throw new Error("Wallet not connected");
+      // 1. On-chain: set is_meeting_ended = true (requires admin wallet signature)
+      const provider = createProvider(phantomWalletAdapter);
+      await endMeetingOnChain(provider, new PublicKey(eventPda));
+      // 2. Backend: clean up LiveKit room + Redis entry
       await apiEndMeeting(eventPda, publicKey);
     },
     [publicKey]

@@ -65,6 +65,7 @@ module.exports = {
       permissions: [
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
+        "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
       ],
     },
     web: {

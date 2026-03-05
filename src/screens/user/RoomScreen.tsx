@@ -14,6 +14,7 @@ import {
   PermissionsAndroid,
   Alert,
   AppState,
+  Dimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -46,19 +47,24 @@ import {
 let Room: any = null;
 let RoomEvent: any = null;
 let AudioSession: any = null;
+let VideoTrackComponent: any = null;
+let TrackEnum: any = null;
 
 try {
   const lk = require("livekit-client");
   Room = lk.Room;
   RoomEvent = lk.RoomEvent;
+  TrackEnum = lk.Track;
   const lkRn = require("@livekit/react-native");
   AudioSession = lkRn.AudioSession;
+  VideoTrackComponent = lkRn.VideoTrack;
   if (lkRn.registerGlobals) lkRn.registerGlobals();
 } catch {
   // Running in Expo Go or native module not available
 }
 
 const LIVEKIT_NATIVE_AVAILABLE = !!(Room && AudioSession);
+const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
 // Deterministic avatar colors per identity
 const AVATAR_COLORS = ["#6C63FF", "#FF6B6B", "#FF8C00", "#00B4D8", "#9B59B6", "#2ECC71", "#E67E22"];
@@ -96,6 +102,31 @@ async function requestMicPermission(): Promise<boolean> {
   } catch {
     return false;
   }
+}
+
+async function requestCameraPermission(): Promise<boolean> {
+  if (Platform.OS !== "android") return true;
+  try {
+    const result = await PermissionsAndroid.request(
+      PermissionsAndroid.PERMISSIONS.CAMERA,
+      {
+        title: "Camera Permission",
+        message: "PassPay needs access to your camera for video in this meeting.",
+        buttonPositive: "Allow",
+        buttonNegative: "Deny",
+      }
+    );
+    return result === PermissionsAndroid.RESULTS.GRANTED;
+  } catch {
+    return false;
+  }
+}
+
+// ── Video track info for rendering ──
+interface VideoTrackInfo {
+  identity: string;
+  trackPublication: any;
+  source: string; // "camera" | "screen_share"
 }
 
 export function RoomScreen() {
@@ -145,6 +176,17 @@ export function RoomScreen() {
   // Ref so the Reconnected handler can read current mic state without stale closure
   const isMicOnRef = useRef(initialRole === "speaker");
   useEffect(() => { isMicOnRef.current = isMicOn; }, [isMicOn]);
+
+  // ── Camera & Screen Share (meetings only) ──────────────────────────────
+  const [isCameraOn, setIsCameraOn] = useState(false);
+  const [isCameraFront, setIsCameraFront] = useState(true);
+  const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const isCameraOnRef = useRef(false);
+  useEffect(() => { isCameraOnRef.current = isCameraOn; }, [isCameraOn]);
+  // Remote video tracks: identity → { trackPublication, source }
+  const [remoteVideoTracks, setRemoteVideoTracks] = useState<VideoTrackInfo[]>([]);
+  // Active screen share from remote participant
+  const [remoteScreenShare, setRemoteScreenShare] = useState<VideoTrackInfo | null>(null);
 
   // ── Chat ──────────────────────────────────────────────────────────────
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -266,6 +308,13 @@ export function RoomScreen() {
     setShowParticipants(false);
     setShowChat(false);
     setInputText("");
+    // Reset video/screenshare state
+    setIsCameraOn(false);
+    isCameraOnRef.current = false;
+    setIsCameraFront(true);
+    setIsScreenSharing(false);
+    setRemoteVideoTracks([]);
+    setRemoteScreenShare(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinTimestamp]);
 
@@ -335,7 +384,7 @@ export function RoomScreen() {
     if (curr > prev) {
       const newest = pendingSpeakRequests[curr - 1];
       const name = newest?.name || "Someone";
-      showInfo("🖐️ Speak Request", `${name} wants to speak. Opening participants…`);
+      showInfo("Speak Request", `${name} wants to speak. Opening participants…`);
       setShowParticipants(true);
     }
     prevSpeakRequestCount.current = curr;
@@ -419,14 +468,40 @@ export function RoomScreen() {
       setActiveSpeakers(new Set(speakers.map((s: any) => s.identity)));
     });
 
-    // Issue 6: Re-enable mic after automatic reconnect if it was on
+    // Issue 6: Re-enable mic/camera after automatic reconnect if they were on
     lkRoom.on(RoomEvent.Reconnected, () => {
       setIsConnected(true);
       updateParticipants();
       if (isMicOnRef.current) {
         lkRoom.localParticipant.setMicrophoneEnabled(true).catch(() => {});
       }
+      if (isCameraOnRef.current) {
+        lkRoom.localParticipant.setCameraEnabled(true).catch(() => {});
+      }
     });
+
+    // ── Track events for video/screenshare (meetings only) ──
+    if (isMeeting && TrackEnum) {
+      lkRoom.on(RoomEvent.TrackSubscribed, (track: any, publication: any, participant: any) => {
+        if (track.source === TrackEnum.Source.Camera) {
+          setRemoteVideoTracks((prev) => {
+            // Avoid duplicates
+            if (prev.some((t) => t.identity === participant.identity && t.source === "camera")) return prev;
+            return [...prev, { identity: participant.identity, trackPublication: publication, source: "camera" }];
+          });
+        } else if (track.source === TrackEnum.Source.ScreenShare) {
+          setRemoteScreenShare({ identity: participant.identity, trackPublication: publication, source: "screen_share" });
+        }
+      });
+
+      lkRoom.on(RoomEvent.TrackUnsubscribed, (track: any, publication: any, participant: any) => {
+        if (track.source === TrackEnum.Source.Camera) {
+          setRemoteVideoTracks((prev) => prev.filter((t) => !(t.identity === participant.identity && t.source === "camera")));
+        } else if (track.source === TrackEnum.Source.ScreenShare) {
+          setRemoteScreenShare((prev) => prev?.identity === participant.identity ? null : prev);
+        }
+      });
+    }
 
     AudioSession.startAudioSession().then(() => {
       lkRoom.connect(livekitUrl, token).catch((err: any) => {
@@ -462,6 +537,57 @@ export function RoomScreen() {
     }
   }, [isMicOn]);
 
+  // ── Camera toggle (meetings only, speakers only) ──────────────────────
+  const toggleCamera = useCallback(async () => {
+    const lkRoom = roomRef.current;
+    if (!lkRoom || !isMeeting) return;
+    const next = !isCameraOn;
+    if (next) {
+      const granted = await requestCameraPermission();
+      if (!granted) {
+        showError("Permission Denied", "Camera permission is required for video.");
+        return;
+      }
+    }
+    try {
+      await lkRoom.localParticipant.setCameraEnabled(next, next ? { facingMode: isCameraFront ? "user" : "environment" } : undefined);
+      setIsCameraOn(next);
+    } catch (err: any) {
+      showError("Camera Error", err.message ?? "Could not toggle camera.");
+    }
+  }, [isCameraOn, isCameraFront, isMeeting]);
+
+  // ── Camera flip (front/back) ──────────────────────────────────────────
+  const flipCamera = useCallback(async () => {
+    const lkRoom = roomRef.current;
+    if (!lkRoom || !isCameraOn) return;
+    const newFront = !isCameraFront;
+    setIsCameraFront(newFront);
+    try {
+      // Disable then re-enable with new facing mode
+      await lkRoom.localParticipant.setCameraEnabled(false);
+      await lkRoom.localParticipant.setCameraEnabled(true, { facingMode: newFront ? "user" : "environment" });
+    } catch (err: any) {
+      showError("Camera Error", err.message ?? "Could not flip camera.");
+    }
+  }, [isCameraOn, isCameraFront]);
+
+  // ── Screen share toggle (meetings only, speakers only) ────────────────
+  const toggleScreenShare = useCallback(async () => {
+    const lkRoom = roomRef.current;
+    if (!lkRoom || !isMeeting) return;
+    const next = !isScreenSharing;
+    try {
+      await lkRoom.localParticipant.setScreenShareEnabled(next);
+      setIsScreenSharing(next);
+    } catch (err: any) {
+      if (next) {
+        // User may have cancelled the system dialog
+        showError("Screen Share", err.message ?? "Could not start screen sharing.");
+      }
+    }
+  }, [isScreenSharing, isMeeting]);
+
   // ── Request speak (attendee submits via Firebase) ─────────────────────
   const handleRequestSpeak = useCallback(async () => {
     if (!publicKey || !roomId) return;
@@ -496,9 +622,6 @@ export function RoomScreen() {
   }, [roomId]);
 
   // ── Attendee gets speaker permission after approval ───────────────────
-  // Issue 1 fix: The backend now calls RoomServiceClient.updateParticipant() to
-  // grant canPublish=true on the EXISTING LiveKit connection server-side.
-  // We no longer disconnect/reconnect — just enable the mic directly.
   const handleSpeakerUpgrade = useCallback(async () => {
     if (!eventPda || !publicKey || isUpgradingToSpeaker) return;
     setIsUpgradingToSpeaker(true);
@@ -533,13 +656,8 @@ export function RoomScreen() {
       showError("Event Not Started", `Attendance can only be confirmed once the event starts. Starts in ${minsLeft} min.`);
       return;
     }
-    // Optimistic update — MWA signing may background the app on Android.
-    // Setting confirmed=true now ensures the strip hides immediately so it
-    // doesn't re-appear if the user is navigated away and comes back.
     setAttendanceConfirmed(true);
     setIsConfirmingAttendance(true);
-    // Signal AppState listener that MWA is in progress so it can auto-return
-    // to the room when Android restores a different screen.
     mwaInProgressRef.current = true;
     try {
       await confirmAttendance(eventPda, ticketMint);
@@ -664,6 +782,50 @@ export function RoomScreen() {
   const localIdentity = publicKey ?? "";
   const localDisplayName = displayName || shortenAddress(localIdentity);
   const isAdminInMeeting = isMeeting && initialRole === "speaker";
+
+  // ── Determine if any video/screenshare is active (for layout) ────────
+  const hasAnyVideo = isMeeting && (isCameraOn || remoteVideoTracks.length > 0 || remoteScreenShare !== null || isScreenSharing);
+  const localCameraTrackRef = isCameraOn && roomRef.current
+    ? roomRef.current.localParticipant?.getTrackPublication?.(TrackEnum?.Source?.Camera)
+    : null;
+
+  // ── Video tile component ──────────────────────────────────────────────
+  const renderVideoTile = (
+    trackPublication: any,
+    identity: string,
+    isLocal: boolean,
+    name: string,
+    tileStyle: any
+  ) => {
+    if (!VideoTrackComponent || !trackPublication) return null;
+    const trackRef = { participant: isLocal ? roomRef.current?.localParticipant : null, publication: trackPublication, source: TrackEnum?.Source?.Camera };
+    // Find the actual participant for remote tracks
+    if (!isLocal && roomRef.current) {
+      const remoteParticipant = roomRef.current.remoteParticipants?.get(identity);
+      if (remoteParticipant) trackRef.participant = remoteParticipant;
+    }
+    return (
+      <View key={identity} style={[styles.videoTile, tileStyle]}>
+        <VideoTrackComponent
+          trackRef={trackRef}
+          style={styles.videoTrackFill}
+          objectFit="cover"
+          mirror={isLocal && isCameraFront}
+        />
+        <View style={styles.videoNameOverlay}>
+          <Text style={styles.videoNameText} numberOfLines={1}>{isLocal ? "You" : name}</Text>
+          {activeSpeakers.has(identity) && (
+            <Ionicons name="mic" size={12} color="#00FFA3" style={{ marginLeft: 4 }} />
+          )}
+        </View>
+        {isLocal && isCameraOn && (
+          <TouchableOpacity style={styles.cameraFlipBtn} onPress={flipCamera}>
+            <Ionicons name="camera-reverse-outline" size={16} color="#FFF" />
+          </TouchableOpacity>
+        )}
+      </View>
+    );
+  };
 
   // ── Name prompt modal ─────────────────────────────────────────────────
   if (nameModalVisible) {
@@ -793,69 +955,151 @@ export function RoomScreen() {
       {isMeeting && ticketMint && attendanceConfirmed && (
         <View style={[styles.attendanceStrip, styles.attendanceStripDone]}>
           <Ionicons name="checkmark-circle" size={15} color="#2ED573" />
-          <Text style={[styles.attendanceStripText, { color: "#2ED573" }]}>Attendance confirmed on-chain ✓</Text>
+          <Text style={[styles.attendanceStripText, { color: "#2ED573" }]}>Attendance confirmed on-chain</Text>
         </View>
       )}
 
       {/* ── Main area ── */}
       <View style={styles.main}>
-        {/* Stage: participant avatars */}
-        <View style={styles.stage}>
-          <Text style={styles.stageLabel}>{getStageStatus()}</Text>
-
-          <View style={styles.avatarsRow}>
-            {/* Local participant */}
-            <View style={styles.avatarWrapper}>
-              <View style={[
-                styles.avatar,
-                { backgroundColor: getAvatarColor(localIdentity) + "50" },
-                activeSpeakers.has(localIdentity) && styles.avatarSpeaking,
-              ]}>
-                <Text style={[styles.avatarInitial, { color: getAvatarColor(localIdentity) }]}>
-                  {getInitial(localDisplayName)}
-                </Text>
-              </View>
-              <Text style={styles.avatarLabel} numberOfLines={1}>You</Text>
+        {/* ── Screen share view (takes priority when active) ── */}
+        {isMeeting && (remoteScreenShare || isScreenSharing) && (
+          <View style={styles.screenShareContainer}>
+            <View style={styles.screenShareBanner}>
+              <Ionicons name="desktop-outline" size={14} color={colors.primary} />
+              <Text style={styles.screenShareBannerText}>
+                {isScreenSharing
+                  ? "You are sharing your screen"
+                  : `${participantNames[remoteScreenShare!.identity] || shortenAddress(remoteScreenShare!.identity)} is sharing their screen`}
+              </Text>
             </View>
+            {isScreenSharing ? (
+              <View style={styles.screenSharePlaceholder}>
+                <Ionicons name="desktop-outline" size={48} color={colors.textMuted} />
+                <Text style={styles.screenSharePlaceholderText}>Your screen is being shared</Text>
+                <TouchableOpacity style={styles.stopShareBtn} onPress={toggleScreenShare}>
+                  <Ionicons name="stop-circle-outline" size={18} color="#FFF" />
+                  <Text style={styles.stopShareBtnText}>Stop Sharing</Text>
+                </TouchableOpacity>
+              </View>
+            ) : remoteScreenShare && VideoTrackComponent ? (
+              <VideoTrackComponent
+                trackRef={{
+                  participant: roomRef.current?.remoteParticipants?.get(remoteScreenShare.identity),
+                  publication: remoteScreenShare.trackPublication,
+                  source: TrackEnum?.Source?.ScreenShare,
+                }}
+                style={styles.screenShareVideo}
+                objectFit="contain"
+              />
+            ) : null}
+          </View>
+        )}
 
-            {/* Remote participants */}
-            {remoteIdentities.slice(0, 4).map((identity) => {
-              const name = participantNames[identity] || shortenAddress(identity);
-              const color = getAvatarColor(identity);
-              const isSpeaking = activeSpeakers.has(identity);
-              return (
-                <View key={identity} style={styles.avatarWrapper}>
-                  <View style={[
-                    styles.avatar,
-                    { backgroundColor: color + "40" },
-                    isSpeaking && styles.avatarSpeaking,
-                    isSpeaking && { borderColor: colors.primary },
-                  ]}>
-                    <Text style={[styles.avatarInitial, { color }]}>
-                      {getInitial(name)}
-                    </Text>
-                  </View>
-                  <Text style={styles.avatarLabel} numberOfLines={1}>
-                    {name.length > 8 ? name.slice(0, 7) + "…" : name}
-                  </Text>
-                </View>
+        {/* ── Video grid (meetings with cameras on) ── */}
+        {isMeeting && hasAnyVideo && !(remoteScreenShare || isScreenSharing) ? (
+          <View style={styles.videoGrid}>
+            {/* Local camera */}
+            {isCameraOn && localCameraTrackRef && renderVideoTile(
+              localCameraTrackRef,
+              localIdentity,
+              true,
+              "You",
+              remoteVideoTracks.length === 0 ? styles.videoTileFull : styles.videoTileHalf
+            )}
+            {/* Remote cameras */}
+            {remoteVideoTracks.slice(0, isCameraOn ? 3 : 4).map((track) => {
+              const name = participantNames[track.identity] || shortenAddress(track.identity);
+              const totalTiles = (isCameraOn ? 1 : 0) + Math.min(remoteVideoTracks.length, isCameraOn ? 3 : 4);
+              return renderVideoTile(
+                track.trackPublication,
+                track.identity,
+                false,
+                name,
+                totalTiles <= 1 ? styles.videoTileFull : styles.videoTileHalf
               );
             })}
-
-            {remoteIdentities.length > 4 && (
-              <View style={styles.avatarWrapper}>
-                <View style={[styles.avatar, styles.avatarOverflow]}>
-                  <Text style={styles.avatarOverflowText}>+{remoteIdentities.length - 4}</Text>
-                </View>
-                <Text style={styles.avatarLabel}>more</Text>
+            {/* Overflow indicator */}
+            {remoteVideoTracks.length > (isCameraOn ? 3 : 4) && (
+              <View style={[styles.videoTile, styles.videoTileHalf, styles.videoTileOverflow]}>
+                <Text style={styles.videoOverflowText}>+{remoteVideoTracks.length - (isCameraOn ? 3 : 4)}</Text>
+                <Text style={styles.videoOverflowSub}>more with video</Text>
               </View>
             )}
           </View>
+        ) : hasAnyVideo && (remoteScreenShare || isScreenSharing) ? (
+          /* Small video tiles row below screen share */
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniVideoRow}>
+            {isCameraOn && localCameraTrackRef && renderVideoTile(
+              localCameraTrackRef,
+              localIdentity,
+              true,
+              "You",
+              styles.videoTileMini
+            )}
+            {remoteVideoTracks.slice(0, 5).map((track) => {
+              const name = participantNames[track.identity] || shortenAddress(track.identity);
+              return renderVideoTile(track.trackPublication, track.identity, false, name, styles.videoTileMini);
+            })}
+          </ScrollView>
+        ) : (
+          /* ── Default: avatar stage (no videos) ── */
+          <View style={styles.stage}>
+            <Text style={styles.stageLabel}>{getStageStatus()}</Text>
 
-          <Text style={styles.participantCountText}>
-            {participantCount} participant{participantCount !== 1 ? "s" : ""}
-          </Text>
-        </View>
+            <View style={styles.avatarsRow}>
+              {/* Local participant */}
+              <View style={styles.avatarWrapper}>
+                <View style={[
+                  styles.avatar,
+                  { backgroundColor: getAvatarColor(localIdentity) + "50" },
+                  activeSpeakers.has(localIdentity) && styles.avatarSpeaking,
+                ]}>
+                  <Text style={[styles.avatarInitial, { color: getAvatarColor(localIdentity) }]}>
+                    {getInitial(localDisplayName)}
+                  </Text>
+                </View>
+                <Text style={styles.avatarLabel} numberOfLines={1}>You</Text>
+              </View>
+
+              {/* Remote participants */}
+              {remoteIdentities.slice(0, 4).map((identity) => {
+                const name = participantNames[identity] || shortenAddress(identity);
+                const color = getAvatarColor(identity);
+                const isSpeaking = activeSpeakers.has(identity);
+                return (
+                  <View key={identity} style={styles.avatarWrapper}>
+                    <View style={[
+                      styles.avatar,
+                      { backgroundColor: color + "40" },
+                      isSpeaking && styles.avatarSpeaking,
+                      isSpeaking && { borderColor: colors.primary },
+                    ]}>
+                      <Text style={[styles.avatarInitial, { color }]}>
+                        {getInitial(name)}
+                      </Text>
+                    </View>
+                    <Text style={styles.avatarLabel} numberOfLines={1}>
+                      {name.length > 8 ? name.slice(0, 7) + "…" : name}
+                    </Text>
+                  </View>
+                );
+              })}
+
+              {remoteIdentities.length > 4 && (
+                <View style={styles.avatarWrapper}>
+                  <View style={[styles.avatar, styles.avatarOverflow]}>
+                    <Text style={styles.avatarOverflowText}>+{remoteIdentities.length - 4}</Text>
+                  </View>
+                  <Text style={styles.avatarLabel}>more</Text>
+                </View>
+              )}
+            </View>
+
+            <Text style={styles.participantCountText}>
+              {participantCount} participant{participantCount !== 1 ? "s" : ""}
+            </Text>
+          </View>
+        )}
 
         {/* Chat */}
         {showChat && (
@@ -871,7 +1115,7 @@ export function RoomScreen() {
               contentContainerStyle={styles.chatList}
               onContentSizeChange={() => chatListRef.current?.scrollToEnd({ animated: true })}
               ListEmptyComponent={
-                <Text style={styles.chatEmpty}>No messages yet. Say hi! 👋</Text>
+                <Text style={styles.chatEmpty}>No messages yet. Say hi!</Text>
               }
             />
             <View style={styles.inputRow}>
@@ -933,6 +1177,34 @@ export function RoomScreen() {
           </TouchableOpacity>
         ) : null}
 
+        {/* Camera (meeting speakers only) */}
+        {isMeeting && role === "speaker" && !livekitUnavailable && !connectionFailed && (
+          <TouchableOpacity
+            style={[styles.controlBtn, isCameraOn && styles.controlBtnActive]}
+            onPress={toggleCamera}
+          >
+            <Ionicons
+              name={isCameraOn ? "videocam" : "videocam-off"}
+              size={22}
+              color={isCameraOn ? colors.background : colors.textMuted}
+            />
+          </TouchableOpacity>
+        )}
+
+        {/* Screen Share (meeting speakers only) */}
+        {isMeeting && role === "speaker" && !livekitUnavailable && !connectionFailed && (
+          <TouchableOpacity
+            style={[styles.controlBtn, isScreenSharing && styles.controlBtnScreenShare]}
+            onPress={toggleScreenShare}
+          >
+            <Ionicons
+              name={isScreenSharing ? "stop-circle-outline" : "share-outline"}
+              size={22}
+              color={isScreenSharing ? "#FFF" : colors.textMuted}
+            />
+          </TouchableOpacity>
+        )}
+
         {/* Chat */}
         <TouchableOpacity
           style={[styles.controlBtn, showChat && styles.controlBtnActive]}
@@ -985,7 +1257,7 @@ export function RoomScreen() {
               {/* Speak requests section (admin only) */}
               {isAdminInMeeting && pendingSpeakRequests.length > 0 && (
                 <View style={styles.speakReqSection}>
-                  <Text style={styles.speakReqSectionTitle}>🖐️ Speak Requests ({pendingSpeakRequests.length})</Text>
+                  <Text style={styles.speakReqSectionTitle}>Speak Requests ({pendingSpeakRequests.length})</Text>
                   {pendingSpeakRequests.map((req) => (
                     <View key={req.pubkey} style={styles.speakReqRow}>
                       <View style={[styles.participantAvatar, { backgroundColor: getAvatarColor(req.pubkey) + "40" }]}>
@@ -1020,6 +1292,8 @@ export function RoomScreen() {
                   <Text style={styles.participantRole}>You · {role}</Text>
                 </View>
                 {isMicOn && <Ionicons name="mic" size={16} color={colors.primary} />}
+                {isCameraOn && <Ionicons name="videocam" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
+                {isScreenSharing && <Ionicons name="desktop-outline" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
                 {activeSpeakers.has(localIdentity) && (
                   <View style={styles.speakingDot} />
                 )}
@@ -1030,6 +1304,8 @@ export function RoomScreen() {
                 const name = participantNames[identity] || shortenAddress(identity);
                 const color = getAvatarColor(identity);
                 const isSpeaking = activeSpeakers.has(identity);
+                const hasVideo = remoteVideoTracks.some((t) => t.identity === identity);
+                const isSharingScreen = remoteScreenShare?.identity === identity;
                 return (
                   <View key={identity} style={styles.participantRow}>
                     <View style={[styles.participantAvatar, { backgroundColor: color + "40" }]}>
@@ -1039,6 +1315,8 @@ export function RoomScreen() {
                       <Text style={styles.participantName}>{name}</Text>
                       <Text style={styles.participantRole}>{isMeeting ? "Attendee" : "Member"}</Text>
                     </View>
+                    {hasVideo && <Ionicons name="videocam" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
+                    {isSharingScreen && <Ionicons name="desktop-outline" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
                     {isSpeaking && <View style={styles.speakingDot} />}
                   </View>
                 );
@@ -1101,7 +1379,7 @@ const styles = StyleSheet.create({
   // Main
   main: { flex: 1 },
 
-  // Stage with avatars
+  // Stage with avatars (audio-only view)
   stage: { alignItems: "center", paddingTop: 36, paddingBottom: 20, paddingHorizontal: spacing.lg },
   stageLabel: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.textMuted, marginBottom: 24, textAlign: "center" },
   avatarsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12, marginBottom: 16 },
@@ -1121,6 +1399,31 @@ const styles = StyleSheet.create({
   avatarOverflowText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textMuted },
   participantCountText: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
 
+  // Video grid
+  videoGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap", padding: 4, gap: 4 },
+  videoTile: { borderRadius: borderRadius.md, overflow: "hidden", backgroundColor: "#111" },
+  videoTileFull: { width: "100%", height: "100%", flex: 1, minHeight: 200 },
+  videoTileHalf: { width: (SCREEN_WIDTH - 16) / 2, height: (SCREEN_WIDTH - 16) / 2 * 0.75 },
+  videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRadius.md, overflow: "hidden", backgroundColor: "#111" },
+  videoTileOverflow: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  videoTrackFill: { width: "100%", height: "100%" },
+  videoNameOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 4, paddingHorizontal: 8, backgroundColor: "rgba(0,0,0,0.55)" },
+  videoNameText: { fontFamily: fonts.bodySemiBold, fontSize: 11, color: "#FFF" },
+  videoOverflowText: { fontFamily: fonts.bodySemiBold, fontSize: 18, color: colors.textMuted },
+  videoOverflowSub: { fontFamily: fonts.body, fontSize: 10, color: colors.textMuted, marginTop: 2 },
+  cameraFlipBtn: { position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
+  miniVideoRow: { height: 140, paddingHorizontal: 6, paddingVertical: 4 },
+
+  // Screen share
+  screenShareContainer: { flex: 1 },
+  screenShareBanner: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: `${colors.primary}15` },
+  screenShareBannerText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.primary },
+  screenShareVideo: { flex: 1, backgroundColor: "#000" },
+  screenSharePlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#111", gap: 12 },
+  screenSharePlaceholderText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
+  stopShareBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FF4757", borderRadius: borderRadius.md },
+  stopShareBtnText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: "#FFF" },
+
   // Chat
   chatContainer: { flex: 1, borderTopWidth: 1, borderTopColor: colors.border },
   chatList: { padding: spacing.sm, paddingBottom: spacing.xs, gap: spacing.xs },
@@ -1138,11 +1441,12 @@ const styles = StyleSheet.create({
   sendBtnDisabled: { opacity: 0.4 },
 
   // Controls
-  controls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.lg, paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
-  controlBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  controls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
+  controlBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   controlBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
   controlBtnPending: { borderColor: colors.primary },
   controlBtnAlert: { borderColor: "#FF4757" },
+  controlBtnScreenShare: { backgroundColor: "#FF4757", borderColor: "#FF4757" },
   unreadBadge: { position: "absolute", top: 0, right: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: "#FF4757", alignItems: "center", justifyContent: "center" },
   unreadBadgeText: { fontFamily: fonts.bodySemiBold, fontSize: 9, color: "#FFFFFF" },
 

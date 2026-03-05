@@ -24,3 +24,4 @@ export { addSeatTier } from "./addSeatTier";
 export { addProduct } from "./addProduct";
 export { updateProduct } from "./updateProduct";
 export { buyProduct } from "./buyProduct";
+export { endMeeting } from "./endMeeting";

@@ -1,5 +1,5 @@
 {
-  "address": "H57pHZjc5xTpRCruvdqtRn1XfQJL3D8gYGssE4wMLDUd",
+  "address": "3NG6FWSQhnA5gsM4pFMft8YE6TExaFmbjmR5Ck2EQkZq",
   "metadata": {
     "name": "passpay",
     "version": "0.1.0",
@@ -2172,6 +2172,75 @@
       ]
     },
     {
+      "name": "end_meeting",
+      "discriminator": [
+        87,
+        75,
+        99,
+        125,
+        38,
+        200,
+        157,
+        216
+      ],
+      "accounts": [
+        {
+          "name": "admin_authority",
+          "signer": true
+        },
+        {
+          "name": "admin",
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  97,
+                  100,
+                  109,
+                  105,
+                  110
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "admin_authority"
+              }
+            ]
+          }
+        },
+        {
+          "name": "event",
+          "writable": true,
+          "pda": {
+            "seeds": [
+              {
+                "kind": "const",
+                "value": [
+                  101,
+                  118,
+                  101,
+                  110,
+                  116
+                ]
+              },
+              {
+                "kind": "account",
+                "path": "event.admin",
+                "account": "Event"
+              },
+              {
+                "kind": "account",
+                "path": "event.name",
+                "account": "Event"
+              }
+            ]
+          }
+        }
+      ],
+      "args": []
+    },
+    {
       "name": "initialize_badge_collection",
       "discriminator": [
         187,
@@ -4081,6 +4150,19 @@
       ]
     },
     {
+      "name": "MeetingEnded",
+      "discriminator": [
+        222,
+        116,
+        216,
+        149,
+        139,
+        215,
+        82,
+        58
+      ]
+    },
+    {
       "name": "MerchantActivated",
       "discriminator": [
         147,
@@ -4620,6 +4702,16 @@
       "code": 6060,
       "name": "OnlineEventsOnly",
       "msg": "Self check-in is only available for online events — use QR check-in for in-person events"
+    },
+    {
+      "code": 6061,
+      "name": "MeetingAlreadyEnded",
+      "msg": "This meeting has already been ended"
+    },
+    {
+      "code": 6062,
+      "name": "NotOnlineEvent",
+      "msg": "Only online events can have meetings ended"
     }
   ],
   "types": [
@@ -5148,6 +5240,10 @@
             "type": "bool"
           },
           {
+            "name": "is_meeting_ended",
+            "type": "bool"
+          },
+          {
             "name": "early_access_date",
             "type": "i64"
           },
@@ -5410,6 +5506,26 @@
           {
             "name": "lifetime_spend",
             "type": "u64"
+          }
+        ]
+      }
+    },
+    {
+      "name": "MeetingEnded",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "event",
+            "type": "pubkey"
+          },
+          {
+            "name": "admin",
+            "type": "pubkey"
+          },
+          {
+            "name": "ended_at",
+            "type": "i64"
           }
         ]
       }
