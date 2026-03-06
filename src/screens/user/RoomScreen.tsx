@@ -123,9 +123,10 @@ async function requestCameraPermission(): Promise<boolean> {
 }
 
 // ── Video track info for rendering ──
+// trackPublication stored only for camera tracks; screen share resolves live
 interface VideoTrackInfo {
   identity: string;
-  trackPublication: any;
+  trackPublication?: any; // optional — screen share resolves from room at render time
   source: string; // "camera" | "screen_share"
 }
 
@@ -363,11 +364,12 @@ export function RoomScreen() {
   }, [roomId]);
 
   // ── Write name to Firebase when pre-supplied (name modal skipped) ─────
+  // joinTimestamp ensures the write re-fires on rejoin (same name + same room)
   useEffect(() => {
     if (paramDisplayName && publicKey && roomId) {
       writeParticipantName(roomId, publicKey, paramDisplayName).catch(() => {});
     }
-  }, [paramDisplayName, publicKey, roomId]);
+  }, [paramDisplayName, publicKey, roomId, joinTimestamp]);
 
   // ── Firebase speak requests — admin side ──────────────────────────────
   useEffect(() => {
@@ -485,20 +487,38 @@ export function RoomScreen() {
       lkRoom.on(RoomEvent.TrackSubscribed, (track: any, publication: any, participant: any) => {
         if (track.source === TrackEnum.Source.Camera) {
           setRemoteVideoTracks((prev) => {
-            // Avoid duplicates
             if (prev.some((t) => t.identity === participant.identity && t.source === "camera")) return prev;
             return [...prev, { identity: participant.identity, trackPublication: publication, source: "camera" }];
           });
         } else if (track.source === TrackEnum.Source.ScreenShare) {
-          setRemoteScreenShare({ identity: participant.identity, trackPublication: publication, source: "screen_share" });
+          setRemoteScreenShare({ identity: participant.identity, source: "screen_share" });
         }
       });
 
-      lkRoom.on(RoomEvent.TrackUnsubscribed, (track: any, publication: any, participant: any) => {
+      lkRoom.on(RoomEvent.TrackUnsubscribed, (track: any, _pub: any, participant: any) => {
         if (track.source === TrackEnum.Source.Camera) {
           setRemoteVideoTracks((prev) => prev.filter((t) => !(t.identity === participant.identity && t.source === "camera")));
         } else if (track.source === TrackEnum.Source.ScreenShare) {
           setRemoteScreenShare((prev) => prev?.identity === participant.identity ? null : prev);
+        }
+      });
+
+      // TrackMuted: remote participant turned camera off (track disabled but not unpublished)
+      lkRoom.on(RoomEvent.TrackMuted, (publication: any, participant: any) => {
+        if (publication?.source === TrackEnum.Source.Camera) {
+          setRemoteVideoTracks((prev) => prev.filter((t) => !(t.identity === participant.identity && t.source === "camera")));
+        } else if (publication?.source === TrackEnum.Source.ScreenShare) {
+          setRemoteScreenShare((prev) => prev?.identity === participant.identity ? null : prev);
+        }
+      });
+
+      // TrackUnmuted: remote participant turned camera back on
+      lkRoom.on(RoomEvent.TrackUnmuted, (publication: any, participant: any) => {
+        if (publication?.source === TrackEnum.Source.Camera) {
+          setRemoteVideoTracks((prev) => {
+            if (prev.some((t) => t.identity === participant.identity && t.source === "camera")) return prev;
+            return [...prev, { identity: participant.identity, trackPublication: publication, source: "camera" }];
+          });
         }
       });
     }
@@ -543,16 +563,25 @@ export function RoomScreen() {
     if (!lkRoom || !isMeeting) return;
     const next = !isCameraOn;
     if (next) {
+      // Mark in-progress BEFORE permission request so AppState handler can
+      // navigate back to room if Android restores a different screen.
+      mwaInProgressRef.current = true;
       const granted = await requestCameraPermission();
+      mwaInProgressRef.current = false;
       if (!granted) {
         showError("Permission Denied", "Camera permission is required for video.");
         return;
       }
     }
+    // Optimistic update — avoids black frame between async call and state change
+    setIsCameraOn(next);
+    isCameraOnRef.current = next;
     try {
       await lkRoom.localParticipant.setCameraEnabled(next, next ? { facingMode: isCameraFront ? "user" : "environment" } : undefined);
-      setIsCameraOn(next);
     } catch (err: any) {
+      // Revert on failure
+      setIsCameraOn(!next);
+      isCameraOnRef.current = !next;
       showError("Camera Error", err.message ?? "Could not toggle camera.");
     }
   }, [isCameraOn, isCameraFront, isMeeting]);
@@ -564,9 +593,15 @@ export function RoomScreen() {
     const newFront = !isCameraFront;
     setIsCameraFront(newFront);
     try {
-      // Disable then re-enable with new facing mode
-      await lkRoom.localParticipant.setCameraEnabled(false);
-      await lkRoom.localParticipant.setCameraEnabled(true, { facingMode: newFront ? "user" : "environment" });
+      // Use restartTrack on the existing camera track for seamless switching
+      const camPub = lkRoom.localParticipant.getTrackPublication(TrackEnum?.Source?.Camera);
+      if (camPub?.track) {
+        await camPub.track.restartTrack({ facingMode: newFront ? "user" : "environment" });
+      } else {
+        // Fallback: disable then re-enable
+        await lkRoom.localParticipant.setCameraEnabled(false);
+        await lkRoom.localParticipant.setCameraEnabled(true, { facingMode: newFront ? "user" : "environment" });
+      }
     } catch (err: any) {
       showError("Camera Error", err.message ?? "Could not flip camera.");
     }
@@ -577,14 +612,20 @@ export function RoomScreen() {
     const lkRoom = roomRef.current;
     if (!lkRoom || !isMeeting) return;
     const next = !isScreenSharing;
+    if (next) {
+      // Android MediaProjection dialog puts app in background briefly.
+      // Set mwaInProgressRef so AppState handler navigates back to room.
+      mwaInProgressRef.current = true;
+    }
     try {
       await lkRoom.localParticipant.setScreenShareEnabled(next);
       setIsScreenSharing(next);
     } catch (err: any) {
       if (next) {
-        // User may have cancelled the system dialog
         showError("Screen Share", err.message ?? "Could not start screen sharing.");
       }
+    } finally {
+      mwaInProgressRef.current = false;
     }
   }, [isScreenSharing, isMeeting]);
 
@@ -632,7 +673,11 @@ export function RoomScreen() {
       await new Promise<void>((resolve) => setTimeout(resolve, 600));
       const lkRoom = roomRef.current;
       if (lkRoom) {
+        // Permission dialog may briefly background the app — set flag so
+        // AppState handler navigates back to room if Android displaces us.
+        mwaInProgressRef.current = true;
         const granted = await requestMicPermission();
+        mwaInProgressRef.current = false;
         if (granted) await lkRoom.localParticipant.setMicrophoneEnabled(true);
         setRole("speaker");
         setIsMicOn(granted);
@@ -641,6 +686,7 @@ export function RoomScreen() {
       if (publicKey && roomId) await removeSpeakRequest(roomId, publicKey).catch(() => {});
       showSuccess("Mic Granted!", "You can now speak. Your mic is on.");
     } catch (err: any) {
+      mwaInProgressRef.current = false;
       showError("Upgrade Failed", err.message ?? "Could not enable your mic.");
     } finally {
       setIsUpgradingToSpeaker(false);
@@ -797,13 +843,19 @@ export function RoomScreen() {
     name: string,
     tileStyle: any
   ) => {
-    if (!VideoTrackComponent || !trackPublication) return null;
-    const trackRef = { participant: isLocal ? roomRef.current?.localParticipant : null, publication: trackPublication, source: TrackEnum?.Source?.Camera };
-    // Find the actual participant for remote tracks
-    if (!isLocal && roomRef.current) {
-      const remoteParticipant = roomRef.current.remoteParticipants?.get(identity);
-      if (remoteParticipant) trackRef.participant = remoteParticipant;
-    }
+    if (!VideoTrackComponent) return null;
+    // For remote: get live publication from participant (avoids stale cached refs)
+    const livePub = isLocal
+      ? trackPublication
+      : roomRef.current?.remoteParticipants?.get(identity)?.getTrackPublication?.(TrackEnum?.Source?.Camera) ?? trackPublication;
+    if (!livePub) return null;
+    const trackRef = {
+      participant: isLocal
+        ? roomRef.current?.localParticipant
+        : roomRef.current?.remoteParticipants?.get(identity) ?? null,
+      publication: livePub,
+      source: TrackEnum?.Source?.Camera,
+    };
     return (
       <View key={identity} style={[styles.videoTile, tileStyle]}>
         <VideoTrackComponent
@@ -981,17 +1033,24 @@ export function RoomScreen() {
                   <Text style={styles.stopShareBtnText}>Stop Sharing</Text>
                 </TouchableOpacity>
               </View>
-            ) : remoteScreenShare && VideoTrackComponent ? (
-              <VideoTrackComponent
-                trackRef={{
-                  participant: roomRef.current?.remoteParticipants?.get(remoteScreenShare.identity),
-                  publication: remoteScreenShare.trackPublication,
-                  source: TrackEnum?.Source?.ScreenShare,
-                }}
-                style={styles.screenShareVideo}
-                objectFit="contain"
-              />
-            ) : null}
+            ) : remoteScreenShare && VideoTrackComponent ? (() => {
+              // Always get fresh participant + publication at render time to avoid
+              // stale reference bugs (track refs change after reconnect)
+              const ssParticipant = roomRef.current?.remoteParticipants?.get(remoteScreenShare.identity);
+              const ssPub = ssParticipant?.getTrackPublication?.(TrackEnum?.Source?.ScreenShare);
+              if (!ssParticipant || !ssPub) return null;
+              return (
+                <VideoTrackComponent
+                  trackRef={{
+                    participant: ssParticipant,
+                    publication: ssPub,
+                    source: TrackEnum?.Source?.ScreenShare,
+                  }}
+                  style={styles.screenShareVideo}
+                  objectFit="contain"
+                />
+              );
+            })() : null}
           </View>
         )}
 

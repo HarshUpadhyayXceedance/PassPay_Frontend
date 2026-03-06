@@ -68,6 +68,7 @@ export function useEvents() {
             availableSeats: totalSeats - ticketsSold,
             isActive: data.isActive,
             isCancelled: data.isCancelled ?? false,
+            isMeetingEnded: data.isMeetingEnded ?? false,
             isSoldOut: ticketsSold >= totalSeats,
             earlyAccessDate: fromUnixTimestamp(data.earlyAccessDate?.toNumber?.() ?? 0),
             publicSaleDate: fromUnixTimestamp(data.publicSaleDate?.toNumber?.() ?? 0),

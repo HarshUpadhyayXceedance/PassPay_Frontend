@@ -16,6 +16,7 @@ interface EventCardProps {
 
 export function EventCard({ event, onPress }: EventCardProps) {
   const isCancelled = (event as any).isCancelled;
+  const isMeetingEnded = event.isMeetingEnded && event.eventType === "online";
 
   return (
     <AppCard onPress={onPress} style={styles.card}>
@@ -27,6 +28,11 @@ export function EventCard({ event, onPress }: EventCardProps) {
           <View style={styles.cancelledBadge}>
             <View style={[styles.statusDot, { backgroundColor: colors.error }]} />
             <Text style={[styles.badgeText, { color: colors.error }]}>Cancelled</Text>
+          </View>
+        ) : isMeetingEnded ? (
+          <View style={styles.meetingEndedBadge}>
+            <View style={[styles.statusDot, { backgroundColor: "#FF6B6B" }]} />
+            <Text style={[styles.badgeText, { color: "#FF6B6B" }]}>Meeting Ended</Text>
           </View>
         ) : event.isActive ? (
           <View style={styles.activeBadge}>
@@ -142,6 +148,15 @@ const styles = StyleSheet.create({
     alignItems: "center",
     gap: 5,
     backgroundColor: colors.errorLight,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 3,
+    borderRadius: borderRadius.full,
+  },
+  meetingEndedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+    backgroundColor: "rgba(255,107,107,0.12)",
     paddingHorizontal: spacing.sm + 2,
     paddingVertical: 3,
     borderRadius: borderRadius.full,

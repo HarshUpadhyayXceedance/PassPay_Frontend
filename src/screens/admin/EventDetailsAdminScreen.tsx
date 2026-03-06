@@ -426,24 +426,33 @@ export function EventDetailsAdminScreen({
             <Ionicons name="videocam" size={18} color="#6C5CE7" />
             <Text style={styles.cardTitle}>Online Meeting</Text>
           </View>
-          <Text style={styles.meetingHint}>
-            You are the host. Joining gives you speaker (mic) access. Ticket holders join as listeners.
-          </Text>
-          <TouchableOpacity
-            style={[styles.startMeetingBtn, isJoiningMeeting && styles.startMeetingBtnDisabled]}
-            onPress={handleStartMeeting}
-            disabled={isJoiningMeeting}
-            activeOpacity={0.8}
-          >
-            {isJoiningMeeting ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <>
-                <Ionicons name="mic" size={18} color="#FFFFFF" />
-                <Text style={styles.startMeetingBtnText}>Start / Join Meeting</Text>
-              </>
-            )}
-          </TouchableOpacity>
+          {event.isMeetingEnded ? (
+            <View style={styles.meetingEndedRow}>
+              <Ionicons name="stop-circle" size={18} color={colors.error} />
+              <Text style={styles.meetingEndedText}>Meeting Ended</Text>
+            </View>
+          ) : (
+            <>
+              <Text style={styles.meetingHint}>
+                You are the host. Joining gives you speaker (mic) access. Ticket holders join as listeners.
+              </Text>
+              <TouchableOpacity
+                style={[styles.startMeetingBtn, isJoiningMeeting && styles.startMeetingBtnDisabled]}
+                onPress={handleStartMeeting}
+                disabled={isJoiningMeeting}
+                activeOpacity={0.8}
+              >
+                {isJoiningMeeting ? (
+                  <ActivityIndicator size="small" color="#FFFFFF" />
+                ) : (
+                  <>
+                    <Ionicons name="mic" size={18} color="#FFFFFF" />
+                    <Text style={styles.startMeetingBtnText}>Start / Join Meeting</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </>
+          )}
         </AppCard>
       )}
 
@@ -712,6 +721,17 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginBottom: spacing.sm,
     lineHeight: 18,
+  },
+  meetingEndedRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    paddingVertical: spacing.sm,
+  },
+  meetingEndedText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.error,
   },
   startMeetingBtn: {
     flexDirection: "row",

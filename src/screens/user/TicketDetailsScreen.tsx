@@ -14,6 +14,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
 import * as Clipboard from "expo-clipboard";
+import { Ionicons } from "@expo/vector-icons";
 import { useTickets } from "../../hooks/useTickets";
 import { useRooms } from "../../hooks/useRooms";
 import { formatDate, formatSOL } from "../../utils/formatters";
@@ -170,8 +171,10 @@ export function TicketDetailsScreen() {
       const msg: string = err?.message ?? "";
       if (msg.includes("AlreadyCheckedIn")) {
         showInfo("Already Confirmed", "Your attendance was already recorded.");
+      } else if (msg.includes("EventNotStarted")) {
+        showError("Cannot Confirm Attendance", "The event has not started yet. Please try again when the event begins.");
       } else {
-        showError("Confirmation Failed", msg || "Could not confirm attendance.");
+        showError("Confirmation Failed", "Could not confirm attendance. Please try again later.");
       }
     } finally {
       setIsConfirmingAttendance(false);
@@ -443,11 +446,11 @@ export function TicketDetailsScreen() {
                 <ActivityIndicator size="small" color={colors.primary} />
               ) : (
                 <>
-                  <Text style={styles.secondaryActionIcon}>✅</Text>
+                  <Ionicons name="checkmark-circle" size={26} color={colors.success} style={{ marginRight: 12 }} />
                   <View style={styles.actionButtonContent}>
                     <Text style={styles.secondaryActionTitle}>Confirm Attendance</Text>
                     <Text style={styles.secondaryActionSubtitle}>
-                      Record on-chain (opens Phantom)
+                      Record on-chain
                     </Text>
                   </View>
                   <Text style={styles.actionArrow}>→</Text>

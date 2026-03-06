@@ -56,4 +56,5 @@ export interface EventDisplay {
   timeFactor: number;
   scarcityPremium: number;
   eventType: "online" | "offline";
+  isMeetingEnded: boolean;
 }
