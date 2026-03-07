@@ -8,6 +8,7 @@ import {
   Dimensions,
 } from "react-native";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 import { Confetti } from "./Confetti";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
@@ -100,15 +101,15 @@ export function TicketPurchaseSuccess({
           {/* Success Icon */}
           <View style={styles.iconContainer}>
             <View style={styles.iconCircle}>
-              <Text style={styles.iconEmoji}>🎫</Text>
+              <Ionicons name="ticket-outline" size={48} color={colors.primary} />
             </View>
             <View style={styles.checkmarkBadge}>
-              <Text style={styles.checkmark}>✓</Text>
+              <Ionicons name="checkmark" size={16} color={colors.text} />
             </View>
           </View>
 
           {/* Title */}
-          <Text style={styles.title}>Ticket Secured! 🎉</Text>
+          <Text style={styles.title}>Ticket Secured!</Text>
 
           {/* Event Name */}
           <Text style={styles.eventName} numberOfLines={2}>
@@ -170,9 +171,6 @@ const styles = StyleSheet.create({
     borderWidth: 3,
     borderColor: colors.primary,
   },
-  iconEmoji: {
-    fontSize: 48,
-  },
   checkmarkBadge: {
     position: "absolute",
     bottom: -4,
@@ -185,11 +183,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderWidth: 3,
     borderColor: colors.surface,
-  },
-  checkmark: {
-    fontSize: 16,
-    color: colors.text,
-    fontWeight: "bold",
   },
   title: {
     fontSize: 26,

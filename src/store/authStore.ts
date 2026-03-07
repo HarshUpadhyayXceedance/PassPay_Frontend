@@ -42,7 +42,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const storedRole = await SecureStore.getItemAsync(ROLE_STORAGE_KEY);
 
       if (storedWallet === walletPublicKey && storedRole) {
-        console.log("📦 Using cached role:", storedRole);
+        console.log("Using cached role:", storedRole);
         set({
           role: storedRole as UserRole,
           isAuthenticated: true,
@@ -55,7 +55,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       const pubKey = new PublicKey(walletPublicKey);
       const connection = new Connection(DEVNET_RPC, "confirmed");
 
-      console.log("🔍 Detecting role for wallet:", walletPublicKey);
+      console.log("Detecting role for wallet:", walletPublicKey);
       const role = await detectUserRole(pubKey, connection);
 
       // Store role and wallet in SecureStore for persistence
@@ -68,7 +68,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isDetectingRole: false,
       });
 
-      console.log("✅ Role detection complete:", role);
+      console.log("Role detection complete:", role);
     } catch (error: any) {
       const errorMessage = error.message || "Failed to detect user role";
       set({
@@ -77,7 +77,7 @@ export const useAuthStore = create<AuthState>((set) => ({
         isAuthenticated: false,
         role: null,
       });
-      console.error("❌ Role detection failed:", errorMessage);
+      console.error("Role detection failed:", errorMessage);
       throw error;
     }
   },
@@ -85,32 +85,22 @@ export const useAuthStore = create<AuthState>((set) => ({
   loadStoredRole: async () => {
     set({ isLoading: true });
     try {
-      // Restore auth ONLY if walletStore already restored its persisted state.
-      // This prevents the old redirect loop (isAuthenticated=true but
-      // isConnected=false) because restorePersistedWallet() must run first.
       const { publicKey, isConnected } = useWalletStore.getState();
       if (!isConnected || !publicKey) {
         set({ isLoading: false });
         return;
       }
 
-      const storedWallet = await SecureStore.getItemAsync(WALLET_STORAGE_KEY);
-      const storedRole = await SecureStore.getItemAsync(ROLE_STORAGE_KEY);
+      // Always re-detect role from chain on cold start — stale cache can show
+      // the wrong role (e.g. admin screen for a user wallet) after the on-chain
+      // role changes or after testing with a different role on the same wallet.
+      await SecureStore.deleteItemAsync(ROLE_STORAGE_KEY);
+      await SecureStore.deleteItemAsync(WALLET_STORAGE_KEY);
 
-      if (storedWallet === publicKey && storedRole) {
-        console.log("📦 Restored auth from cache:", storedRole);
-        set({
-          role: storedRole as UserRole,
-          isAuthenticated: true,
-          isLoading: false,
-        });
-        return;
-      }
-
-      // Wallet connected but no matching cache — will need detectRole() on next connect
+      await get().detectRole(publicKey);
       set({ isLoading: false });
     } catch (error) {
-      console.error("❌ Failed during startup:", error);
+      console.error("Failed during startup:", error);
       set({ isLoading: false });
     }
   },
@@ -132,7 +122,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       await SecureStore.deleteItemAsync(ROLE_STORAGE_KEY);
       await SecureStore.deleteItemAsync(WALLET_STORAGE_KEY);
     } catch (error) {
-      console.error("❌ Failed to clear stored credentials:", error);
+      console.error("Failed to clear stored credentials:", error);
     }
 
     set({

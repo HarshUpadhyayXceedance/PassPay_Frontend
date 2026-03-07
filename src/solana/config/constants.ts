@@ -11,12 +11,10 @@ export const TOKEN_METADATA_PROGRAM_ID = new PublicKey(
 export const DEVNET_RPC = "https://api.devnet.solana.com";
 export const MAINNET_RPC = "https://api.mainnet-beta.solana.com";
 
-// SuperAdmin wallet (hardcoded - can only be set once during deployment)
 export const SUPER_ADMIN_PUBKEY = new PublicKey(
   "LssxRdEeDV3fLd4y4m3akAPfz3HApTBw9yh7TJvFFhP"
 );
 
-// PDA seeds
 export const ADMIN_SEED = "admin";
 export const EVENT_SEED = "event";
 export const TICKET_SEED = "ticket";
@@ -32,8 +30,6 @@ export const SEAT_TIER_SEED = "seat_tier";
 export const PRODUCT_SEED = "product";
 export const PRODUCT_PURCHASE_SEED = "product_purchase";
 
-// Limits
-// NOTE: Event name is used as a PDA seed — Solana caps each seed at 32 bytes.
 export const MAX_EVENT_NAME_LEN = 32;
 export const MAX_VENUE_LEN = 128;
 export const MAX_MERCHANT_NAME_LEN = 64;
@@ -42,5 +38,4 @@ export const MAX_MERCHANT_DESCRIPTION_LEN = 128;
 export const MAX_METADATA_URI_LEN = 200;
 export const MAX_IMAGE_URL_LEN = 200;
 
-// SOL
 export const LAMPORTS_PER_SOL = 1_000_000_000;

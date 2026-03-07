@@ -11,6 +11,7 @@ import {
   Image,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
@@ -111,10 +112,10 @@ export function WelcomeScreen() {
       // Detect user role on-chain
       await detectRole(publicKey);
 
-      console.log("✅ Connection and role detection complete!");
+      console.log("Connection and role detection complete!");
       // Success animation will auto-close and navigation will happen
     } catch (error: any) {
-      console.error("❌ Connection failed:", error);
+      console.error("Connection failed:", error);
 
       // Error haptic
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
@@ -205,9 +206,9 @@ export function WelcomeScreen() {
             },
           ]}
         >
-          <FeatureItem icon="🎫" title="NFT Tickets" desc="Collectible event passes" />
-          <FeatureItem icon="🏆" title="Loyalty Rewards" desc="Tier-based benefits" />
-          <FeatureItem icon="⚡" title="Instant Payments" desc="Scan QR to pay merchants" />
+          <FeatureItem icon="ticket-outline" title="NFT Tickets" desc="Collectible event passes" />
+          <FeatureItem icon="trophy-outline" title="Loyalty Rewards" desc="Tier-based benefits" />
+          <FeatureItem icon="flash-outline" title="Instant Payments" desc="Scan QR to pay merchants" />
         </Animated.View>
 
         <Animated.View
@@ -238,7 +239,7 @@ export function WelcomeScreen() {
               ) : (
                 <View style={styles.buttonContent}>
                   <View style={styles.phantomLogo}>
-                    <Text style={styles.phantomEmoji}>👻</Text>
+                    <Ionicons name="wallet-outline" size={20} color={colors.background} />
                   </View>
                   <Text style={styles.buttonText}>Connect Phantom Wallet</Text>
                 </View>
@@ -282,14 +283,14 @@ function FeatureItem({
   title,
   desc,
 }: {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   desc: string;
 }) {
   return (
     <View style={fStyles.container}>
       <View style={fStyles.iconBox}>
-        <Text style={fStyles.icon}>{icon}</Text>
+        <Ionicons name={icon} size={24} color={colors.primary} />
       </View>
       <View style={fStyles.textBox}>
         <Text style={fStyles.title}>{title}</Text>
@@ -317,9 +318,6 @@ const fStyles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     marginRight: 14,
-  },
-  icon: {
-    fontSize: 24,
   },
   textBox: {
     flex: 1,
@@ -473,9 +471,6 @@ const styles = StyleSheet.create({
     backgroundColor: "rgba(255,255,255,0.1)",
     alignItems: "center",
     justifyContent: "center",
-  },
-  phantomEmoji: {
-    fontSize: 20,
   },
   buttonText: {
     color: colors.background,

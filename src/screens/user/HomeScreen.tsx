@@ -71,10 +71,9 @@ export function HomeScreen() {
   useEffect(() => {
     fetchEvents();
     fetchMyTickets();
-    fetchSeatTiers(); // Fetch all tiers (no eventKey = fetch all)
+    fetchSeatTiers();
   }, []);
 
-  // Debounce search
   useEffect(() => {
     if (searchTimeoutRef.current) {
       clearTimeout(searchTimeoutRef.current);
@@ -94,7 +93,6 @@ export function HomeScreen() {
     await Promise.all([fetchEvents(), fetchMyTickets(), refreshBalance(), fetchSeatTiers()]);
   };
 
-  // Build map: eventKey → min tier price (with dynamic pricing applied)
   const getEventPrice = useCallback((event: EventDisplay): number => {
     const eventTierPrices = seatTiers
       .filter((t) => t.eventKey === event.publicKey)
@@ -102,7 +100,6 @@ export function HomeScreen() {
       .filter((p) => p > 0);
     if (eventTierPrices.length === 0) return event.currentTicketPrice || event.ticketPrice;
     const minPrice = Math.min(...eventTierPrices);
-    // Apply dynamic pricing multiplier
     if (event.dynamicPricingEnabled && event.baseTicketPrice > 0) {
       return minPrice * (event.currentTicketPrice / event.baseTicketPrice);
     }
@@ -138,11 +135,10 @@ export function HomeScreen() {
       })
       .sort((a, b) => {
         if (sortBy === "date") {
-          return b.eventDate.getTime() - a.eventDate.getTime(); // Newest first
+          return b.eventDate.getTime() - a.eventDate.getTime();
         } else if (sortBy === "price") {
           return getEventPrice(a) - getEventPrice(b);
         } else {
-          // popularity = seats sold
           const ratioA = a.totalSeats > 0 ? a.ticketsSold / a.totalSeats : 0;
           const ratioB = b.totalSeats > 0 ? b.ticketsSold / b.totalSeats : 0;
           return ratioB - ratioA;
@@ -156,9 +152,7 @@ export function HomeScreen() {
       .slice(0, 4);
   }, [filteredEvents]);
 
-  // Auto-play featured carousel
   useEffect(() => {
-    // Clear any existing interval first
     if (carouselTimerRef.current) {
       clearInterval(carouselTimerRef.current);
       carouselTimerRef.current = null;
@@ -177,7 +171,7 @@ export function HomeScreen() {
           });
           return nextIndex;
         });
-      }, 5000); // 5 seconds
+      }, 5000);
     }
 
     return () => {
@@ -197,7 +191,6 @@ export function HomeScreen() {
     return showAllUpcoming ? allUpcomingEvents : allUpcomingEvents.slice(0, 8);
   }, [allUpcomingEvents, showAllUpcoming]);
 
-  // Callback for carousel viewability tracking
   const onViewableItemsChanged = useCallback(
     ({ viewableItems }: any) => {
       if (viewableItems.length > 0 && viewableItems[0].index !== null) {
@@ -256,11 +249,8 @@ export function HomeScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.featuredGradient}
           >
-            {/* Decorative circles */}
             {!item.imageUrl && <View style={styles.decoCircleTopRight} />}
             {!item.imageUrl && <View style={styles.decoCircleBottomLeft} />}
-
-            {/* Badge + Dynamic Pricing */}
             <View style={styles.badgeRow}>
               {badge && (
                 <View
@@ -279,7 +269,6 @@ export function HomeScreen() {
               />
             </View>
 
-            {/* Bottom overlay */}
             <LinearGradient
               colors={["transparent", "rgba(0,0,0,0.7)"]}
               style={styles.featuredOverlay}
@@ -318,7 +307,6 @@ export function HomeScreen() {
         accessibilityRole="button"
         accessibilityLabel={`${event.name} at ${event.venue}, ${formatShortDate(event.eventDate)}`}
       >
-        {/* Thumbnail */}
         {event.imageUrl ? (
           <Image
             source={{ uri: event.imageUrl }}
@@ -338,7 +326,6 @@ export function HomeScreen() {
           </LinearGradient>
         )}
 
-        {/* Info */}
         <View style={styles.upcomingInfo}>
           <Text style={styles.upcomingName} numberOfLines={1}>
             {event.name}
@@ -351,7 +338,6 @@ export function HomeScreen() {
           </Text>
         </View>
 
-        {/* Right side: price + dynamic + buy */}
         <View style={styles.upcomingRight}>
           <DynamicPriceIndicator
             isEnabled={event.dynamicPricingEnabled}
@@ -408,7 +394,6 @@ export function HomeScreen() {
           />
         }
       >
-        {/* ========== HEADER ========== */}
         <View style={styles.header}>
           <View style={styles.headerLeft}>
             <Image
@@ -428,7 +413,6 @@ export function HomeScreen() {
           </View>
         </View>
 
-        {/* ========== SEARCH BAR ========== */}
         <View style={styles.searchContainer}>
           <Ionicons name="search" size={18} color={colors.textMuted} style={styles.searchIcon} />
           <TextInput
@@ -451,7 +435,6 @@ export function HomeScreen() {
           )}
         </View>
 
-        {/* ========== COMMUNITY ROOMS BANNER ========== */}
         <TouchableOpacity
           style={styles.roomsBanner}
           activeOpacity={0.8}
@@ -469,11 +452,10 @@ export function HomeScreen() {
                 Audio + text spaces for Solana users
               </Text>
             </View>
-            <Text style={styles.roomsBannerIcon}>🎙️</Text>
+            <Ionicons name="mic" size={32} color="rgba(255,255,255,0.85)" style={styles.roomsBannerIcon} />
           </LinearGradient>
         </TouchableOpacity>
 
-        {/* ========== FEATURED SECTION ========== */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Featured</Text>
@@ -488,7 +470,7 @@ export function HomeScreen() {
           ) : featuredEvents.length === 0 ? (
             <View style={styles.emptyFeatured}>
               <EmptyStateView
-                icon="🎭"
+                ionicon="calendar-outline"
                 title="No Events Found"
                 message={
                   debouncedSearch
@@ -525,7 +507,6 @@ export function HomeScreen() {
                 }}
               />
 
-              {/* Pagination dots */}
               {featuredEvents.length > 1 && (
                 <View style={styles.paginationDots}>
                   {featuredEvents.map((_, index) => (
@@ -543,7 +524,6 @@ export function HomeScreen() {
           )}
         </View>
 
-        {/* ========== CATEGORY CHIPS & SORT ========== */}
         <View style={styles.filterSection}>
           <ScrollView
             horizontal
@@ -573,11 +553,9 @@ export function HomeScreen() {
             })}
           </ScrollView>
 
-          {/* Sort button */}
           <TouchableOpacity
             style={styles.sortButton}
             onPress={() => {
-              // Cycle through sort options
               if (sortBy === "date") setSortBy("price");
               else if (sortBy === "price") setSortBy("popularity");
               else setSortBy("date");
@@ -594,7 +572,6 @@ export function HomeScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* ========== NETWORK ERROR ========== */}
         {error && !isLoading && (
           <View style={styles.errorBanner}>
             <Ionicons name="warning" size={20} color={colors.error} />
@@ -614,7 +591,6 @@ export function HomeScreen() {
           </View>
         )}
 
-        {/* ========== UPCOMING SECTION ========== */}
         <View style={styles.section}>
           <View style={styles.sectionHeader}>
             <Text style={styles.sectionTitle}>Upcoming</Text>
@@ -639,7 +615,7 @@ export function HomeScreen() {
           ) : upcomingEvents.length === 0 ? (
             <View style={styles.emptyUpcoming}>
               <EmptyStateView
-                icon="📅"
+                ionicon="calendar-outline"
                 title="No Upcoming Events"
                 message="There are no upcoming events scheduled. New events will appear here when they're added."
               />
@@ -651,7 +627,6 @@ export function HomeScreen() {
           )}
         </View>
 
-        {/* Bottom spacer for tab bar */}
         <View style={{ height: 100 }} />
       </ScrollView>
     </View>
@@ -670,7 +645,6 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
 
-  /* ---- Header ---- */
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -724,7 +698,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.2,
   },
 
-  /* ---- Search ---- */
   searchContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -747,7 +720,6 @@ const styles = StyleSheet.create({
     fontWeight: "500",
     height: 50,
   },
-  // Community Rooms Banner
   roomsBanner: {
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
@@ -775,7 +747,7 @@ const styles = StyleSheet.create({
     color: "rgba(255,255,255,0.75)",
   },
   roomsBannerIcon: {
-    fontSize: 32,
+    marginLeft: 8,
   },
   clearButton: {
     width: 24,
@@ -785,9 +757,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
   },
-  // clearButtonText removed — using Ionicons close icon
-
-  /* ---- Sections ---- */
   section: {
     marginBottom: 24,
   },
@@ -817,7 +786,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
 
-  /* ---- Featured Cards ---- */
   featuredList: {
     paddingLeft: 20,
     paddingRight: 4,
@@ -894,7 +862,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
 
-  /* ---- Pagination Dots ---- */
   paginationDots: {
     flexDirection: "row",
     justifyContent: "center",
@@ -913,7 +880,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.accent,
   },
 
-  /* ---- Badge ---- */
   badgeRow: {
     position: "absolute",
     top: 12,
@@ -939,7 +905,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1,
   },
 
-  /* ---- Filter Section ---- */
   filterSection: {
     marginBottom: 24,
     paddingRight: 20,
@@ -966,7 +931,6 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     gap: 6,
   },
-  // sortIcon removed — using Ionicons swap-vertical
   sortText: {
     fontSize: 14,
     fontWeight: "600",
@@ -993,7 +957,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
 
-  /* ---- Upcoming Cards ---- */
   upcomingCard: {
     flexDirection: "row",
     alignItems: "center",
@@ -1072,7 +1035,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  /* ---- Empty States ---- */
   emptyFeatured: {
     height: FEATURED_CARD_HEIGHT,
     justifyContent: "center",
@@ -1099,7 +1061,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  /* ---- Error Banner ---- */
   errorBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -1112,7 +1073,6 @@ const styles = StyleSheet.create({
     padding: 14,
     gap: 10,
   },
-  // errorBannerIcon removed — using Ionicons warning
   errorBannerContent: {
     flex: 1,
   },

@@ -32,13 +32,13 @@ class MockWalletAdapterImpl implements MockWalletAdapter {
   private keypair: Keypair | null = null;
 
   async connect(): Promise<PublicKey> {
-    console.log("🔧 Using Mock Wallet Adapter (Development Mode)");
+    console.log("Using Mock Wallet Adapter (Development Mode)");
 
     // Use fixed dev SuperAdmin keypair (always the same for development)
     this.keypair = Keypair.fromSeed(DEV_SUPERADMIN_SEED);
 
-    console.log("📱 Dev SuperAdmin wallet connected:", this.keypair.publicKey.toBase58());
-    console.log("✅ This wallet will be auto-detected as SuperAdmin in dev mode");
+    console.log("Dev SuperAdmin wallet connected:", this.keypair.publicKey.toBase58());
+    console.log("This wallet will be auto-detected as SuperAdmin in dev mode");
 
     // Simulate network delay
     await new Promise((resolve) => setTimeout(resolve, 500));
@@ -48,7 +48,7 @@ class MockWalletAdapterImpl implements MockWalletAdapter {
 
   async disconnect(): Promise<void> {
     this.keypair = null;
-    console.log("📱 Dev SuperAdmin wallet disconnected");
+    console.log("Dev SuperAdmin wallet disconnected");
   }
 
   async signTransaction(transaction: Transaction): Promise<Transaction> {
@@ -58,7 +58,7 @@ class MockWalletAdapterImpl implements MockWalletAdapter {
 
     // Sign the transaction with the mock keypair
     transaction.partialSign(this.keypair);
-    console.log("✍️ Transaction signed with mock wallet");
+    console.log("Transaction signed with mock wallet");
     return transaction;
   }
 
@@ -74,7 +74,7 @@ class MockWalletAdapterImpl implements MockWalletAdapter {
       return tx;
     });
 
-    console.log(`✍️ ${transactions.length} transactions signed with mock wallet`);
+    console.log(`${transactions.length} transactions signed with mock wallet`);
     return signedTxs;
   }
 
@@ -87,7 +87,7 @@ class MockWalletAdapterImpl implements MockWalletAdapter {
 
     // In mock mode, just return a fake signature
     const fakeSignature = "mock_" + Math.random().toString(36).substring(7);
-    console.log("📤 Mock transaction sent:", fakeSignature);
+    console.log("Mock transaction sent:", fakeSignature);
 
     return { signature: fakeSignature };
   }

@@ -42,9 +42,7 @@ export function EventDetailsScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const event = getEvent(eventKey as string);
 
-  // Re-fetch seat tiers every time this screen comes into focus.
-  // Only tiers are refreshed (not events) to avoid stale wallet state issues
-  // that could cause unexpected navigation when fetchEvents fails mid-session.
+  // Only tiers are refreshed here, not events — fetchEvents() can trigger auth guard on wallet state mismatch mid-session.
   useFocusEffect(
     useCallback(() => {
       if (eventKey) {
@@ -59,7 +57,6 @@ export function EventDetailsScreen() {
 
   const eventTiers = seatTiers.filter((t) => t.eventKey === eventKey);
 
-  // Parallax effect for hero image
   const heroTranslateY = scrollY.interpolate({
     inputRange: [0, HERO_HEIGHT],
     outputRange: [0, -HERO_HEIGHT / 2],
@@ -94,23 +91,19 @@ export function EventDetailsScreen() {
     );
   }
 
-  // Derive capacity & pricing from tiers
   const totalCapacity = eventTiers.reduce((sum, t) => sum + t.totalSeats, 0);
   const seatsLeft = eventTiers.reduce((sum, t) => sum + t.availableSeats, 0);
   const isLowSeats = seatsLeft > 0 && seatsLeft < 50;
 
-  // Get cheapest tier price
   const tierPrices = eventTiers.map((t) => t.price).filter((p) => p > 0);
   const minTierPrice = tierPrices.length > 0 ? Math.min(...tierPrices) : 0;
 
-  // Dynamic pricing multiplier
   const dynamicMultiplier =
     event.dynamicPricingEnabled && event.baseTicketPrice > 0
       ? event.currentTicketPrice / event.baseTicketPrice
       : 1;
   const startingPrice = minTierPrice * dynamicMultiplier;
 
-  // Calculate loyalty discount on cheapest tier
   const discountPercent = event.loyaltyDiscountsEnabled && loyaltyBenefits
     ? loyaltyBenefits.ticketDiscount
     : 0;
@@ -126,7 +119,6 @@ export function EventDetailsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Animated sticky header */}
       <Animated.View style={[styles.stickyHeader, { opacity: headerOpacity }]}>
         <LinearGradient
           colors={[colors.surface, colors.background]}
@@ -156,7 +148,6 @@ export function EventDetailsScreen() {
           { useNativeDriver: true }
         )}
       >
-        {/* ============ HERO IMAGE AREA ============ */}
         <Animated.View
           style={[
             styles.heroContainer,
@@ -186,7 +177,6 @@ export function EventDetailsScreen() {
             style={styles.heroGradient}
           />
 
-          {/* Top overlay icons */}
           <View style={styles.heroOverlay}>
             <TouchableOpacity
               style={styles.iconCircle}
@@ -207,7 +197,6 @@ export function EventDetailsScreen() {
             </View>
           </View>
 
-          {/* Event name at bottom of hero */}
           <View style={styles.heroTitleContainer}>
             <Text style={styles.eventName} numberOfLines={2}>
               {event.name}
@@ -225,21 +214,19 @@ export function EventDetailsScreen() {
           </View>
         </Animated.View>
 
-        {/* ============ INFO CHIPS ROW ============ */}
         <View style={styles.chipsRow}>
           <View style={styles.chip}>
-            <Text style={styles.chipIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={13} color={colors.textSecondary} style={styles.chipIcon} />
             <Text style={styles.chipText}>{formatDate(event.eventDate)}</Text>
           </View>
           <View style={styles.chip}>
-            <Text style={styles.chipIcon}>📍</Text>
+            <Ionicons name="location-outline" size={13} color={colors.textSecondary} style={styles.chipIcon} />
             <Text style={styles.chipText} numberOfLines={1}>
               {event.venue}
             </Text>
           </View>
         </View>
 
-        {/* ============ ORGANIZED BY ============ */}
         <View style={styles.section}>
           <View style={styles.organizedCard}>
             <Text style={styles.organizedLabel}>Organized by</Text>
@@ -249,7 +236,6 @@ export function EventDetailsScreen() {
           </View>
         </View>
 
-        {/* ============ STATS ROW ============ */}
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statLabel}>Total Capacity</Text>
@@ -263,7 +249,6 @@ export function EventDetailsScreen() {
           </View>
         </View>
 
-        {/* ============ SEAT TIERS ============ */}
         {eventTiers.length > 0 && (
           <View style={styles.section}>
             <Text style={styles.sectionTitle}>
@@ -302,7 +287,6 @@ export function EventDetailsScreen() {
           </View>
         )}
 
-        {/* ============ ABOUT EVENT ============ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>About Event</Text>
           <Text style={styles.descriptionText}>
@@ -310,12 +294,10 @@ export function EventDetailsScreen() {
           </Text>
         </View>
 
-        {/* ============ LOCATION ============ */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>Location</Text>
           {isOnline ? (
             <View style={styles.onlineCard}>
-              {/* Header row */}
               <View style={styles.onlineCardHeader}>
                 <View style={styles.onlineIconBg}>
                   <Ionicons name="globe-outline" size={22} color={colors.primary} />
@@ -330,15 +312,11 @@ export function EventDetailsScreen() {
                 </View>
               </View>
 
-              {/* Divider */}
               <View style={styles.onlineCardDivider} />
-
-              {/* Description */}
               <Text style={styles.onlineCardDesc}>
                 This event takes place in a live virtual audio room. Ticket holders can join the meeting directly in-app.
               </Text>
 
-              {/* Feature chips */}
               <View style={styles.onlineFeatures}>
                 <View style={styles.onlineFeatureChip}>
                   <Ionicons name="mic-outline" size={13} color={colors.primary} />
@@ -362,12 +340,10 @@ export function EventDetailsScreen() {
           )}
         </View>
 
-        {/* Separator line + spacer before the sticky Buy Ticket bar */}
         <View style={styles.sectionDivider} />
         <View style={{ height: 180 }} />
       </Animated.ScrollView>
 
-      {/* ============ BOTTOM STICKY BAR ============ */}
       <View style={styles.bottomBar}>
         <View style={styles.bottomLeft}>
           {isOnline && (
@@ -420,7 +396,6 @@ export function EventDetailsScreen() {
         </View>
 
         <View style={styles.bottomActions}>
-          {/* Buy Ticket — shown for all events; ticket needed for online meeting access too */}
           <TouchableOpacity
             style={[
               styles.buyButton,
@@ -476,7 +451,6 @@ const styles = StyleSheet.create({
     fontWeight: "600",
   },
 
-  /* ---- Hero ---- */
   heroContainer: {
     width: SCREEN_WIDTH,
     height: HERO_HEIGHT,
@@ -532,7 +506,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
   },
 
-  /* ---- Chips ---- */
   chipsRow: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -551,7 +524,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   chipIcon: {
-    fontSize: 14,
     marginRight: 6,
   },
   chipText: {
@@ -561,7 +533,6 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
 
-  /* ---- Organized by ---- */
   section: {
     paddingHorizontal: 16,
     marginTop: 20,
@@ -589,7 +560,6 @@ const styles = StyleSheet.create({
     fontFamily: "monospace",
   },
 
-  /* ---- Stats ---- */
   statsRow: {
     flexDirection: "row",
     paddingHorizontal: 16,
@@ -621,7 +591,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
   },
 
-  /* ---- About ---- */
   sectionTitle: {
     fontSize: 18,
     fontWeight: "700",
@@ -636,7 +605,6 @@ const styles = StyleSheet.create({
     fontWeight: "400",
   },
 
-  /* ---- Location / Map ---- */
   mapPlaceholder: {
     width: "100%",
     height: 170,
@@ -750,7 +718,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  /* ---- Section Divider ---- */
   sectionDivider: {
     height: 1,
     backgroundColor: colors.border,
@@ -759,7 +726,6 @@ const styles = StyleSheet.create({
     opacity: 0.6,
   },
 
-  /* ---- Bottom Bar ---- */
   bottomBar: {
     position: "absolute",
     bottom: 0,
@@ -773,7 +739,7 @@ const styles = StyleSheet.create({
     borderTopColor: colors.border,
     paddingHorizontal: 20,
     paddingTop: 14,
-    paddingBottom: 34, // safe area
+    paddingBottom: 34,
   },
   bottomLeft: {
     flexShrink: 1,
@@ -942,7 +908,6 @@ const styles = StyleSheet.create({
     width: 36,
   },
 
-  /* ---- Seat Tiers ---- */
   tiersContainer: {
     gap: 10,
   },

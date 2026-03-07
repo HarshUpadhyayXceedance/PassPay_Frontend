@@ -43,16 +43,7 @@ export default function UserLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="scan"
-        options={{
-          title: "Scan",
-          tabBarLabel: "Scan",
-          tabBarIcon: ({ color, size }) => (
-            <Ionicons name="qr-code-outline" size={size} color={color} />
-          ),
-        }}
-      />
+      <Tabs.Screen name="scan" options={{ href: null }} />
       <Tabs.Screen
         name="shop"
         options={{

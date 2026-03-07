@@ -67,9 +67,9 @@ export function AdminListScreen() {
       adminsData.sort((a, b) => a.name.localeCompare(b.name));
 
       setAdmins(adminsData);
-      console.log(`✅ Loaded ${adminsData.length} active admins`);
+      console.log(`Loaded ${adminsData.length} active admins`);
     } catch (error: any) {
-      console.error("❌ Failed to fetch admins:", error);
+      console.error("Failed to fetch admins:", error);
       showError("Error", "Failed to load admins. Please try again.");
     } finally {
       setIsLoading(false);
@@ -103,7 +103,7 @@ export function AdminListScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              console.log("🔧 Deactivating admin:", admin.name);
+              console.log("Deactivating admin:", admin.name);
               const superAdminPubkey = new PublicKey(publicKey);
               const adminPubkey = new PublicKey(admin.authority);
 
@@ -112,13 +112,13 @@ export function AdminListScreen() {
                 adminPubkey
               );
 
-              console.log("✅ Admin deactivated:", signature);
+              console.log("Admin deactivated:", signature);
               showSuccess("Success", `Admin "${admin.name}" has been deactivated`);
 
               // Refresh the list
               fetchAdmins();
             } catch (error: any) {
-              console.error("❌ Failed to deactivate admin:", error);
+              console.error("Failed to deactivate admin:", error);
               showError(
                 "Failed to Deactivate",
                 error.message || "An unknown error occurred"

@@ -57,7 +57,7 @@ export function SuperAdminDashboardScreen() {
       const eventAccounts = await safeFetchAll(connection, program, "Event");
 
       const activeEvents = eventAccounts.filter(
-        (e: any) => e.account.isActive
+        (e: any) => e.account.isActive && !e.account.isCancelled && !e.account.isMeetingEnded
       ).length;
       const totalSold = eventAccounts.reduce(
         (sum: number, e: any) =>

@@ -10,6 +10,7 @@ import {
   Modal,
 } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 
@@ -17,7 +18,7 @@ const { width, height } = Dimensions.get("window");
 
 interface OnboardingSlide {
   id: string;
-  emoji: string;
+  iconName: keyof typeof Ionicons.glyphMap;
   title: string;
   description: string;
   gradient: [string, string];
@@ -26,7 +27,7 @@ interface OnboardingSlide {
 const SLIDES: OnboardingSlide[] = [
   {
     id: "1",
-    emoji: "🎫",
+    iconName: "ticket-outline",
     title: "NFT Event Tickets",
     description:
       "Purchase event tickets as unique NFTs. Collectible, transferable, and securely stored on the Solana blockchain.",
@@ -34,7 +35,7 @@ const SLIDES: OnboardingSlide[] = [
   },
   {
     id: "2",
-    emoji: "🏆",
+    iconName: "trophy-outline",
     title: "Loyalty Rewards",
     description:
       "Attend events to earn loyalty tiers. Unlock discounts, early access, VIP perks, and exclusive badges.",
@@ -42,7 +43,7 @@ const SLIDES: OnboardingSlide[] = [
   },
   {
     id: "3",
-    emoji: "⚡",
+    iconName: "flash-outline",
     title: "Instant Payments",
     description:
       "Scan QR codes to pay merchants at events. Fast, secure payments powered by Solana with automatic loyalty discounts.",
@@ -114,7 +115,7 @@ export function OnboardingCarousel({
           keyExtractor={(item) => item.id}
           renderItem={({ item }) => (
             <SlideItem
-              emoji={item.emoji}
+              iconName={item.iconName}
               title={item.title}
               description={item.description}
               gradient={item.gradient}
@@ -182,12 +183,12 @@ export function OnboardingCarousel({
 }
 
 function SlideItem({
-  emoji,
+  iconName,
   title,
   description,
   gradient,
 }: {
-  emoji: string;
+  iconName: keyof typeof Ionicons.glyphMap;
   title: string;
   description: string;
   gradient: [string, string];
@@ -204,7 +205,7 @@ function SlideItem({
 
       {/* Content */}
       <View style={styles.slideContent}>
-        {/* Emoji icon */}
+        {/* Icon */}
         <View style={styles.emojiContainer}>
           <LinearGradient
             colors={gradient}
@@ -212,7 +213,7 @@ function SlideItem({
             start={{ x: 0, y: 0 }}
             end={{ x: 1, y: 1 }}
           >
-            <Text style={styles.emoji}>{emoji}</Text>
+            <Ionicons name={iconName} size={64} color="#FFFFFF" />
           </LinearGradient>
         </View>
 
@@ -282,9 +283,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 20,
     elevation: 15,
-  },
-  emoji: {
-    fontSize: 64,
   },
   textContainer: {
     alignItems: "center",

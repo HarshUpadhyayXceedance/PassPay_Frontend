@@ -53,7 +53,6 @@ export function TicketDetailsScreen() {
   const ticket = tickets.find((t) => t.publicKey === ticketKey);
 
   useEffect(() => {
-    // Entrance animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -141,13 +140,12 @@ export function TicketDetailsScreen() {
             role: result.role,
             eventPda: ticket.eventKey,
             ticketMint: ticket.mint,
-            // Tell RoomScreen if attendance was already confirmed — persists across rejoins
+            hostPubkey: result.room?.creator ?? "",
             isAlreadyCheckedIn: String(ticket.isCheckedIn),
             eventDate: String(ticket.eventDate instanceof Date
               ? ticket.eventDate.getTime()
               : new Date(ticket.eventDate).getTime()),
-            // Unique per-join timestamp so RoomScreen resets state even when
-            // expo-router reuses the cached tab component instance on rejoin.
+            // Unique per-join so RoomScreen resets cached tab state on each join
             joinTimestamp: String(Date.now()),
           },
         });
@@ -159,8 +157,7 @@ export function TicketDetailsScreen() {
     }
   }, [ticket, joinMeeting, router]);
 
-  // Deferred attendance: confirm on-chain from TicketDetailsScreen
-  // (fallback if the in-meeting strip was missed due to MWA navigation)
+  // Fallback path for users who missed the in-meeting attendance strip due to MWA navigation
   const handleConfirmAttendanceFromTicket = useCallback(async () => {
     if (!ticket) return;
     setIsConfirmingAttendance(true);
@@ -200,7 +197,6 @@ export function TicketDetailsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -217,7 +213,6 @@ export function TicketDetailsScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Hero Section with Gradient */}
         <Animated.View
           style={[
             styles.heroSection,
@@ -232,7 +227,6 @@ export function TicketDetailsScreen() {
             end={{ x: 1, y: 1 }}
             style={styles.heroGradient}
           >
-            {/* Status Badge */}
             {ticket.eventIsCancelled ? (
               <View style={[styles.statusBadge, styles.cancelledBadge]}>
                 <Text style={styles.statusBadgeText}>CANCELLED</Text>
@@ -247,27 +241,24 @@ export function TicketDetailsScreen() {
               </View>
             )}
 
-            {/* Seat tier badge — hidden for online events (no physical tier concept) */}
+            {/* hidden for online events — no physical tier concept */}
             {!isOnline && ticket.seatTierName && (
               <View style={[styles.statusBadge, styles.tierBadge]}>
                 <Text style={styles.statusBadgeText}>{ticket.seatTierName.toUpperCase()}</Text>
               </View>
             )}
 
-            {/* Seat Number - Large and Prominent */}
             <View style={styles.seatContainer}>
               <Text style={styles.seatLabel}>SEAT</Text>
               <Text style={styles.seatNumber}>#{ticket.seatNumber}</Text>
             </View>
 
-            {/* Pass Badge */}
             <View style={styles.passBadge}>
               <Text style={styles.passBadgeText}>NFT PASS</Text>
             </View>
           </LinearGradient>
         </Animated.View>
 
-        {/* Event Information Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Event Information</Text>
 
@@ -309,12 +300,11 @@ export function TicketDetailsScreen() {
                 : ticket.eventIsMeetingEnded
                 ? "Meeting Ended"
                 : isPastEvent
-                ? "Event Ended"
+                ? "Past Event"
                 : "Upcoming"}
             </Text>
           </View>
 
-          {/* Refund status */}
           {ticket.refundStatus !== "none" && (
             <View style={styles.infoItem}>
               <Text style={styles.infoLabel}>Refund Status</Text>
@@ -336,7 +326,6 @@ export function TicketDetailsScreen() {
           )}
         </View>
 
-        {/* Purchase Information Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Purchase Information</Text>
 
@@ -348,7 +337,6 @@ export function TicketDetailsScreen() {
           </View>
         </View>
 
-        {/* NFT Details Card */}
         <View style={styles.card}>
           <Text style={styles.cardTitle}>NFT Details</Text>
 
@@ -362,7 +350,7 @@ export function TicketDetailsScreen() {
               <Text style={[styles.infoValue, styles.addressValue]}>
                 {shortenAddress(ticket.mint, 8)}
               </Text>
-              <Text style={styles.copyIcon}>📋</Text>
+              <Ionicons name="copy-outline" size={16} color={colors.textMuted} style={styles.copyIcon} />
             </TouchableOpacity>
           </View>
 
@@ -377,7 +365,6 @@ export function TicketDetailsScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Cancellation Alert Banner */}
         {ticket.eventIsCancelled && (
           <View style={styles.cancelledAlertBanner}>
             <Text style={styles.cancelledAlertTitle}>Event Cancelled</Text>
@@ -390,18 +377,16 @@ export function TicketDetailsScreen() {
           </View>
         )}
 
-        {/* Action Buttons */}
         <View style={styles.actionsSection}>
           <Text style={styles.sectionTitle}>Actions</Text>
 
-          {/* Claim Refund for cancelled events */}
           {ticket.eventIsCancelled && !ticket.isCheckedIn && ticket.refundStatus === "none" && (
             <TouchableOpacity
               style={styles.primaryRefundButton}
               onPress={handleRefund}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryActionIcon}>💰</Text>
+              <Ionicons name="cash-outline" size={24} color="#FFFFFF" style={styles.primaryActionIcon} />
               <View style={styles.actionButtonContent}>
                 <Text style={styles.primaryActionTitle}>Claim Refund</Text>
                 <Text style={styles.primaryActionSubtitle}>
@@ -412,7 +397,6 @@ export function TicketDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Join Meeting — online events only, hide if meeting ended on-chain */}
           {isOnline && !ticket.eventIsCancelled && !ticket.eventIsMeetingEnded && (
             <TouchableOpacity
               style={[styles.joinMeetingButton, isJoiningMeeting && { opacity: 0.6 }]}
@@ -424,7 +408,7 @@ export function TicketDetailsScreen() {
                 <ActivityIndicator size="small" color="#FFFFFF" />
               ) : (
                 <>
-                  <Text style={styles.primaryActionIcon}>🎤</Text>
+                  <Ionicons name="mic-outline" size={24} color="#FFFFFF" style={styles.primaryActionIcon} />
                   <View style={styles.actionButtonContent}>
                     <Text style={[styles.primaryActionTitle, { color: "#FFFFFF" }]}>Join Meeting</Text>
                     <Text style={[styles.primaryActionSubtitle, { color: "rgba(255,255,255,0.75)" }]}>
@@ -437,8 +421,6 @@ export function TicketDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Confirm Attendance — online events, not yet checked in.
-              Deferred fallback for users who couldn't confirm during the meeting. */}
           {isOnline && !ticket.isCheckedIn && !ticket.eventIsCancelled && (
             <TouchableOpacity
               style={[styles.secondaryActionButton, isConfirmingAttendance && { opacity: 0.6 }]}
@@ -463,14 +445,13 @@ export function TicketDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Show QR Code — offline events only (physical check-in) */}
           {!isOnline && !ticket.eventIsCancelled && (
             <TouchableOpacity
               style={styles.primaryActionButton}
               onPress={handleShowQR}
               activeOpacity={0.8}
             >
-              <Text style={styles.primaryActionIcon}>📱</Text>
+              <Ionicons name="qr-code-outline" size={24} color={colors.background} style={styles.primaryActionIcon} />
               <View style={styles.actionButtonContent}>
                 <Text style={styles.primaryActionTitle}>Show QR Code</Text>
                 <Text style={styles.primaryActionSubtitle}>
@@ -487,7 +468,7 @@ export function TicketDetailsScreen() {
               onPress={handleAddToCalendar}
               activeOpacity={0.8}
             >
-              <Text style={styles.secondaryActionIcon}>📅</Text>
+              <Ionicons name="calendar-outline" size={24} color={colors.text} style={styles.secondaryActionIcon} />
               <View style={styles.actionButtonContent}>
                 <Text style={styles.secondaryActionTitle}>
                   Add to Calendar
@@ -507,7 +488,7 @@ export function TicketDetailsScreen() {
                 onPress={handleTransfer}
                 activeOpacity={0.8}
               >
-                <Text style={styles.secondaryActionIcon}>↗️</Text>
+                <Ionicons name="arrow-redo-outline" size={24} color={colors.text} style={styles.secondaryActionIcon} />
                 <View style={styles.actionButtonContent}>
                   <Text style={styles.secondaryActionTitle}>
                     Transfer Ticket
@@ -525,7 +506,7 @@ export function TicketDetailsScreen() {
                   onPress={handleRefund}
                   activeOpacity={0.8}
                 >
-                  <Text style={styles.dangerActionIcon}>🔄</Text>
+                  <Ionicons name="refresh-outline" size={24} color="#FF4757" style={styles.dangerActionIcon} />
                   <View style={styles.actionButtonContent}>
                     <Text style={styles.dangerActionTitle}>
                       Request Refund
@@ -541,7 +522,6 @@ export function TicketDetailsScreen() {
           )}
         </View>
 
-        {/* Bottom Spacer */}
         <View style={{ height: 40 }} />
       </Animated.ScrollView>
     </View>
@@ -602,7 +582,6 @@ const styles = StyleSheet.create({
     paddingBottom: 20,
   },
 
-  /* ---- Hero Section ---- */
   heroSection: {
     width: SCREEN_WIDTH,
     height: HERO_HEIGHT,
@@ -673,7 +652,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
   },
 
-  /* ---- Cards ---- */
   card: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -735,7 +713,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
   },
   copyIcon: {
-    fontSize: 16,
     marginLeft: 8,
   },
   solscanButton: {
@@ -753,7 +730,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
   },
 
-  /* ---- Cancellation Alert Banner ---- */
   cancelledAlertBanner: {
     backgroundColor: "rgba(255,71,87,0.1)",
     borderWidth: 1,
@@ -785,7 +761,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
 
-  /* ---- Actions Section ---- */
   actionsSection: {
     paddingHorizontal: 16,
   },
@@ -813,7 +788,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   primaryActionIcon: {
-    fontSize: 24,
     marginRight: 12,
   },
   actionButtonContent: {
@@ -848,7 +822,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   secondaryActionIcon: {
-    fontSize: 24,
     marginRight: 12,
   },
   secondaryActionTitle: {
@@ -875,7 +848,6 @@ const styles = StyleSheet.create({
     marginBottom: 12,
   },
   dangerActionIcon: {
-    fontSize: 24,
     marginRight: 12,
   },
   dangerActionTitle: {

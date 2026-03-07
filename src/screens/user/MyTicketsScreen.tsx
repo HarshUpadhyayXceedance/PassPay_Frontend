@@ -11,6 +11,7 @@ import {
   Share,
   ActivityIndicator,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { LinearGradient } from "expo-linear-gradient";
 import * as Haptics from "expo-haptics";
@@ -37,7 +38,6 @@ const GRADIENTS: [string, string][] = [
 
 type TabKey = "upcoming" | "past";
 
-// Helper: Check if event is happening today
 function isEventToday(eventDate: Date): boolean {
   const now = new Date();
   const event = new Date(eventDate);
@@ -48,12 +48,10 @@ function isEventToday(eventDate: Date): boolean {
   );
 }
 
-// Helper: Check if event has started
 function hasEventStarted(eventDate: Date): boolean {
   return new Date() >= new Date(eventDate);
 }
 
-// Helper: Get time until event
 function getTimeUntilEvent(eventDate: Date): string {
   const now = new Date();
   const event = new Date(eventDate);
@@ -80,7 +78,6 @@ export function MyTicketsScreen() {
 
   useEffect(() => {
     fetchMyTickets();
-    // Entrance animation
     Animated.timing(fadeAnim, {
       toValue: 1,
       duration: 400,
@@ -161,7 +158,6 @@ export function MyTicketsScreen() {
         }}
         activeOpacity={0.9}
       >
-        {/* Image area with gradient placeholder */}
         <View style={styles.imageContainer}>
           <LinearGradient
             colors={gradient}
@@ -170,9 +166,7 @@ export function MyTicketsScreen() {
             style={styles.gradientImage}
           />
 
-          {/* Top row badges */}
           <View style={styles.topBadgesRow}>
-            {/* CANCELLED badge takes priority */}
             {item.eventIsCancelled ? (
               <View style={[styles.statusBadge, styles.cancelledBadge]}>
                 <Text style={styles.statusBadgeText}>CANCELLED</Text>
@@ -187,7 +181,6 @@ export function MyTicketsScreen() {
               </View>
             )}
 
-            {/* Refund status badge */}
             {item.refundStatus === "pending" && (
               <View style={[styles.statusBadge, { backgroundColor: "#FFA502" }]}>
                 <Text style={styles.statusBadgeText}>REFUND PENDING</Text>
@@ -204,14 +197,12 @@ export function MyTicketsScreen() {
               </View>
             )}
 
-            {/* Seat tier badge */}
             {item.seatTierName && (
               <View style={[styles.statusBadge, styles.tierBadge]}>
                 <Text style={styles.statusBadgeText}>{item.seatTierName.toUpperCase()}</Text>
               </View>
             )}
 
-            {/* Active badge for today's events */}
             {!item.eventIsCancelled && isToday && !started && !isPast && (
               <View style={styles.activeBadge}>
                 <View style={styles.activeDot} />
@@ -219,7 +210,6 @@ export function MyTicketsScreen() {
               </View>
             )}
 
-            {/* Event Started badge */}
             {!item.eventIsCancelled && started && !isPast && (
               <View style={styles.startedBadge}>
                 <Text style={styles.startedBadgeText}>LIVE NOW</Text>
@@ -227,7 +217,6 @@ export function MyTicketsScreen() {
             )}
           </View>
 
-          {/* ProofPass number badge */}
           <View style={styles.proofPassBadge}>
             <Text style={styles.proofPassText}>
               Pass #{item.seatNumber}
@@ -235,13 +224,11 @@ export function MyTicketsScreen() {
           </View>
         </View>
 
-        {/* Card content */}
         <View style={styles.cardContent}>
           <View style={styles.eventNameRow}>
             <Text style={styles.eventName} numberOfLines={2}>
               {item.eventName}
             </Text>
-            {/* Countdown timer for upcoming events */}
             {!isPast && !started && (
               <View style={styles.countdownBadge}>
                 <Text style={styles.countdownText}>{timeUntil}</Text>
@@ -249,27 +236,22 @@ export function MyTicketsScreen() {
             )}
           </View>
 
-          {/* Date row */}
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📅</Text>
+            <Ionicons name="calendar-outline" size={13} color={colors.textMuted} style={styles.infoIcon} />
             <Text style={styles.infoText}>{formatDate(item.eventDate)}</Text>
           </View>
-
-          {/* Venue row */}
           <View style={styles.infoRow}>
-            <Text style={styles.infoIcon}>📍</Text>
+            <Ionicons name="location-outline" size={13} color={colors.textMuted} style={styles.infoIcon} />
             <Text style={styles.infoText} numberOfLines={1}>
               {item.eventVenue}
             </Text>
           </View>
 
-          {/* Bottom action row */}
           <View style={styles.actionRow}>
             {(() => {
               const isOnlineEvent = item.eventVenue.toLowerCase().startsWith("online");
               const isJoiningThis = joiningMeetingKey === item.publicKey;
 
-              // Cancelled + unrequested refund → Refund button
               if (item.eventIsCancelled && !item.isCheckedIn && item.refundStatus === "none") {
                 return (
                   <TouchableOpacity
@@ -286,7 +268,6 @@ export function MyTicketsScreen() {
                 );
               }
 
-              // Online event → two half-width buttons (valid) or single View Details (used/past)
               if (isOnlineEvent && !item.eventIsCancelled) {
                 if (item.isCheckedIn || isPast) {
                   return (
@@ -682,7 +663,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   infoIcon: {
-    fontSize: 16,
     marginRight: 8,
   },
   infoText: {

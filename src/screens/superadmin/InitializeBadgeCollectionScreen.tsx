@@ -7,6 +7,7 @@ import {
   KeyboardAvoidingView,
   Platform,
 } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { PublicKey } from "@solana/web3.js";
 import { showSuccess, showError } from "../../utils/alerts";
@@ -96,7 +97,7 @@ export function InitializeBadgeCollectionScreen() {
             try {
               const superAdminPubkey = new PublicKey(publicKey);
 
-              console.log("🔧 Initializing badge collection...");
+              console.log("Initializing badge collection...");
 
               const signature = await initializeBadgeCollection(
                 superAdminPubkey as any,
@@ -111,7 +112,7 @@ export function InitializeBadgeCollectionScreen() {
                 }
               );
 
-              console.log("✅ Badge collection initialized:", signature);
+              console.log("Badge collection initialized:", signature);
 
               showSuccess(
                 "Success!",
@@ -122,7 +123,7 @@ export function InitializeBadgeCollectionScreen() {
               );
               router.back();
             } catch (error: any) {
-              console.error("❌ Failed to initialize badge collection:", error);
+              console.error("Failed to initialize badge collection:", error);
               showError(
                 "Initialization Failed",
                 error.message || "An unknown error occurred"
@@ -154,7 +155,7 @@ export function InitializeBadgeCollectionScreen() {
         </View>
 
         <View style={styles.warningBox}>
-          <Text style={styles.warningIcon}>⚠️</Text>
+          <Ionicons name="warning-outline" size={24} color={colors.error} style={styles.warningIcon} />
           <View style={styles.warningContent}>
             <Text style={styles.warningTitle}>Important Warning</Text>
             <Text style={styles.warningText}>
@@ -211,7 +212,7 @@ export function InitializeBadgeCollectionScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
-              🥉 Bronze Badge Mint *
+              Bronze Badge Mint *
             </Text>
             <AppInput
               placeholder="Bronze badge mint address"
@@ -224,7 +225,7 @@ export function InitializeBadgeCollectionScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
-              🥈 Silver Badge Mint *
+              Silver Badge Mint *
             </Text>
             <AppInput
               placeholder="Silver badge mint address"
@@ -237,7 +238,7 @@ export function InitializeBadgeCollectionScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
-              🥇 Gold Badge Mint *
+              Gold Badge Mint *
             </Text>
             <AppInput
               placeholder="Gold badge mint address"
@@ -250,7 +251,7 @@ export function InitializeBadgeCollectionScreen() {
 
           <View style={styles.inputGroup}>
             <Text style={styles.label}>
-              💎 Platinum Badge Mint *
+              Platinum Badge Mint *
             </Text>
             <AppInput
               placeholder="Platinum badge mint address"
@@ -263,7 +264,7 @@ export function InitializeBadgeCollectionScreen() {
         </AppCard>
 
         <View style={styles.infoBox}>
-          <Text style={styles.infoText}>📋 How to create badge mints</Text>
+          <Text style={styles.infoText}>How to create badge mints</Text>
           <Text style={styles.infoDescription}>
             1. Create 4 NFT mints using Metaplex (one for each tier){"\n"}
             2. Set up metadata for each badge (name, image, attributes){"\n"}
@@ -324,7 +325,6 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   warningIcon: {
-    fontSize: 24,
     marginRight: spacing.sm,
   },
   warningContent: {

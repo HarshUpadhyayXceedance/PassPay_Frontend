@@ -30,8 +30,10 @@ export function EmptyStateView({
       <View style={styles.iconCircle}>
         {ionicon ? (
           <Ionicons name={ionicon} size={36} color={colors.textMuted} />
+        ) : icon ? (
+          <Text style={styles.icon}>{icon}</Text>
         ) : (
-          <Text style={styles.icon}>{icon ?? "🔍"}</Text>
+          <Ionicons name="search-outline" size={36} color={colors.textMuted} />
         )}
       </View>
 

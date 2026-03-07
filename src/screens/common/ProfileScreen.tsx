@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect } from "react";
+import React, { useCallback } from "react";
 import {
   View,
   Text,
@@ -8,6 +8,7 @@ import {
   TouchableOpacity,
 } from "react-native";
 import { useRouter } from "expo-router";
+import { useFocusEffect } from "expo-router";
 import * as Clipboard from "expo-clipboard";
 import * as Haptics from "expo-haptics";
 import { LinearGradient } from "expo-linear-gradient";
@@ -33,12 +34,13 @@ export function ProfileScreen() {
   const { loyaltyBenefits, userAttendance, fetchLoyaltyBenefits } = useLoyalty();
   const { tickets, fetchMyTickets } = useTickets();
 
-  // Refresh data when screen mounts
-  useEffect(() => {
-    fetchLoyaltyBenefits();
-    fetchMyTickets();
-    refreshBalance();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      fetchLoyaltyBenefits();
+      fetchMyTickets();
+      refreshBalance();
+    }, [])
+  );
 
   const displayAddress = publicKey ? shortenAddress(publicKey, 6) : "Not connected";
   const isUserRole = role === "user";

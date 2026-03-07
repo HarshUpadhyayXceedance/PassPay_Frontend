@@ -89,7 +89,7 @@ export function CreateAdminScreen() {
         return;
       }
 
-      console.log("🔧 Creating admin:", {
+      console.log("Creating admin:", {
         name: adminName.trim(),
         wallet: adminPubkey.toBase58(),
       });
@@ -100,7 +100,7 @@ export function CreateAdminScreen() {
         adminName.trim()
       );
 
-      console.log("✅ Admin created successfully:", signature);
+      console.log("Admin created successfully:", signature);
 
       showSuccess("Success", `Admin "${adminName}" created successfully!`);
       router.back();
@@ -109,7 +109,7 @@ export function CreateAdminScreen() {
       setAdminName("");
       setAdminWallet("");
     } catch (error: any) {
-      console.error("❌ Failed to create admin:", error);
+      console.error("Failed to create admin:", error);
       const msg = error.message || "An unknown error occurred";
       if (msg.includes("already in use")) {
         showWarning(

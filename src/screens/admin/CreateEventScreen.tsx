@@ -52,7 +52,7 @@ export function CreateEventScreen() {
   const { publicKey } = useWallet();
   const [name, setName] = useState("");
   const [venue, setVenue] = useState("");
-  const [isOnline, setIsOnline] = useState(false);
+  const [isOnline, setIsOnline] = useState(true);
   const [description, setDescription] = useState("");
   const [imageUri, setImageUri] = useState("");
   const [uploading, setUploading] = useState(false);
@@ -82,7 +82,7 @@ export function CreateEventScreen() {
     useCallback(() => {
       setName("");
       setVenue("");
-      setIsOnline(false);
+      setIsOnline(true);
       setDescription("");
       setImageUri("");
       setErrors({});
@@ -299,21 +299,33 @@ export function CreateEventScreen() {
             <Text style={styles.eventModeLabel}>Event Mode</Text>
             <View style={styles.eventModeToggle}>
               <TouchableOpacity
-                style={[styles.modeBtn, !isOnline && styles.modeBtnActive]}
-                onPress={() => setIsOnline(false)}
-                activeOpacity={0.8}
-              >
-                <Text style={[styles.modeBtnText, !isOnline && styles.modeBtnTextActive]}>
-                  📍 Offline
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
                 style={[styles.modeBtn, isOnline && styles.modeBtnActive]}
                 onPress={() => setIsOnline(true)}
                 activeOpacity={0.8}
               >
+                <Ionicons
+                  name="globe-outline"
+                  size={14}
+                  color={isOnline ? colors.primary : colors.textMuted}
+                  style={{ marginRight: 4 }}
+                />
                 <Text style={[styles.modeBtnText, isOnline && styles.modeBtnTextActive]}>
-                  🌐 Online
+                  Online
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modeBtn, !isOnline && styles.modeBtnActive]}
+                onPress={() => setIsOnline(false)}
+                activeOpacity={0.8}
+              >
+                <Ionicons
+                  name="location-outline"
+                  size={14}
+                  color={!isOnline ? colors.primary : colors.textMuted}
+                  style={{ marginRight: 4 }}
+                />
+                <Text style={[styles.modeBtnText, !isOnline && styles.modeBtnTextActive]}>
+                  Offline
                 </Text>
               </TouchableOpacity>
             </View>
@@ -663,7 +675,9 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.md,
     borderWidth: 1,
     borderColor: colors.border,
+    flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     backgroundColor: colors.background,
   },
   modeBtnActive: {

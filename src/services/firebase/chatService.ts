@@ -69,7 +69,7 @@ export function subscribeRoomMessages(
   const messagesRef = query(
     ref(firebaseDb, `rooms/${roomId}/messages`),
     orderByChild("timestamp"),
-    limitToLast(100)
+    limitToLast(50)
   );
 
   const handler = onChildAdded(

@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo } from "react";
 import { View, Text, StyleSheet, ScrollView } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { TierBadge } from "../../components/loyalty/TierBadge";
 import { TierProgressBar } from "../../components/loyalty/TierProgressBar";
 import { StreakDisplay } from "../../components/loyalty/StreakDisplay";
@@ -99,19 +100,19 @@ export function LoyaltyBenefitsScreen() {
         <Text style={styles.sectionTitle}>Your Benefits</Text>
 
         <BenefitRow
-          icon="🛍️"
+          icon="bag-handle-outline"
           title="Merchant Discount"
           value={`${loyaltyBenefits?.merchantDiscount ?? 0}% off`}
           active={(loyaltyBenefits?.merchantDiscount ?? 0) > 0}
         />
         <BenefitRow
-          icon="🎫"
+          icon="ticket-outline"
           title="Ticket Discount"
           value={`${loyaltyBenefits?.ticketDiscount ?? 0}% off`}
           active={(loyaltyBenefits?.ticketDiscount ?? 0) > 0}
         />
         <BenefitRow
-          icon="⏰"
+          icon="time-outline"
           title="Early Access"
           value={
             (loyaltyBenefits?.earlyAccessHours ?? 0) > 0
@@ -121,25 +122,25 @@ export function LoyaltyBenefitsScreen() {
           active={(loyaltyBenefits?.earlyAccessHours ?? 0) > 0}
         />
         <BenefitRow
-          icon="🚪"
+          icon="enter-outline"
           title="Priority Entry"
           value={loyaltyBenefits?.hasPriorityEntry ? "Unlocked" : "Locked"}
           active={loyaltyBenefits?.hasPriorityEntry ?? false}
         />
         <BenefitRow
-          icon="🛋️"
+          icon="star-outline"
           title="VIP Lounge"
           value={loyaltyBenefits?.hasVipLounge ? "Unlocked" : "Locked"}
           active={loyaltyBenefits?.hasVipLounge ?? false}
         />
         <BenefitRow
-          icon="🚗"
+          icon="car-outline"
           title="Free Parking"
           value={loyaltyBenefits?.hasFreeParking ? "Unlocked" : "Locked"}
           active={loyaltyBenefits?.hasFreeParking ?? false}
         />
         <BenefitRow
-          icon="📞"
+          icon="headset-outline"
           title="Concierge Support"
           value={loyaltyBenefits?.hasConciergeSupport ? "Unlocked" : "Locked"}
           active={loyaltyBenefits?.hasConciergeSupport ?? false}
@@ -176,7 +177,7 @@ function BenefitRow({
   active,
   last,
 }: {
-  icon: string;
+  icon: keyof typeof Ionicons.glyphMap;
   title: string;
   value: string;
   active: boolean;
@@ -184,7 +185,7 @@ function BenefitRow({
 }) {
   return (
     <View style={[styles.benefitRow, !last && styles.benefitBorder]}>
-      <Text style={styles.benefitIcon}>{icon}</Text>
+      <Ionicons name={icon} size={20} color={colors.textMuted} style={styles.benefitIcon} />
       <View style={styles.benefitInfo}>
         <Text style={styles.benefitTitle}>{title}</Text>
         <Text style={[styles.benefitValue, active && styles.benefitActive]}>
@@ -192,9 +193,9 @@ function BenefitRow({
         </Text>
       </View>
       {active ? (
-        <Text style={styles.checkmark}>✅</Text>
+        <Ionicons name="checkmark-circle" size={20} color={colors.secondary} />
       ) : (
-        <Text style={styles.lockIcon}>🔒</Text>
+        <Ionicons name="lock-closed-outline" size={18} color={colors.textMuted} />
       )}
     </View>
   );
@@ -281,7 +282,6 @@ const styles = StyleSheet.create({
     borderBottomColor: colors.border,
   },
   benefitIcon: {
-    fontSize: 20,
     marginRight: spacing.sm + 2,
   },
   benefitInfo: {
@@ -300,12 +300,6 @@ const styles = StyleSheet.create({
   },
   benefitActive: {
     color: colors.primary,
-  },
-  checkmark: {
-    fontSize: 16,
-  },
-  lockIcon: {
-    fontSize: 14,
   },
   achievementsSection: {
     marginHorizontal: spacing.lg,

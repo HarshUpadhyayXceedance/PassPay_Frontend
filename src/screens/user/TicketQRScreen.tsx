@@ -9,6 +9,7 @@ import {
 } from "react-native";
 import { useRouter, useLocalSearchParams } from "expo-router";
 import * as Haptics from "expo-haptics";
+import { Ionicons } from "@expo/vector-icons";
 import QRCode from "react-native-qrcode-svg";
 import { useTickets } from "../../hooks/useTickets";
 import { formatDate } from "../../utils/formatters";
@@ -186,14 +187,14 @@ export function TicketQRScreen() {
         <View style={styles.instructionsContainer}>
           {ticket.isCheckedIn ? (
             <>
-              <Text style={styles.instructionsIcon}>✓</Text>
+              <Ionicons name="checkmark-circle-outline" size={24} color={colors.textMuted} style={styles.instructionsIcon} />
               <Text style={styles.instructionsText}>
                 This ticket has already been checked in
               </Text>
             </>
           ) : (
             <>
-              <Text style={styles.instructionsIcon}>📱</Text>
+              <Ionicons name="phone-portrait-outline" size={24} color={colors.textMuted} style={styles.instructionsIcon} />
               <Text style={styles.instructionsText}>
                 Present this QR code to staff at the venue entrance
               </Text>
@@ -367,9 +368,7 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     gap: 12,
   },
-  instructionsIcon: {
-    fontSize: 24,
-  },
+  instructionsIcon: {},
   instructionsText: {
     flex: 1,
     fontSize: 13,

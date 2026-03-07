@@ -1,5 +1,5 @@
 import React from "react";
-import { Text } from "react-native";
+import { Ionicons } from "@expo/vector-icons";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import { createBottomTabNavigator } from "@react-navigation/bottom-tabs";
 import { colors } from "../theme/colors";
@@ -38,7 +38,7 @@ function SuperAdminTabs() {
         component={SuperAdminDashboardScreen}
         options={{
           title: "System",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>⚡</Text>,
+          tabBarIcon: ({ color, size }) => <Ionicons name="flash-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -46,7 +46,7 @@ function SuperAdminTabs() {
         component={AdminListScreen}
         options={{
           title: "Admins",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👥</Text>,
+          tabBarIcon: ({ color, size }) => <Ionicons name="people-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -54,7 +54,7 @@ function SuperAdminTabs() {
         component={ManageEventsScreen}
         options={{
           title: "Events",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>🎫</Text>,
+          tabBarIcon: ({ color, size }) => <Ionicons name="ticket-outline" size={size} color={color} />,
         }}
       />
       <Tab.Screen
@@ -62,7 +62,7 @@ function SuperAdminTabs() {
         component={ProfileScreen}
         options={{
           title: "Profile",
-          tabBarIcon: ({ color }) => <Text style={{ color, fontSize: 20 }}>👤</Text>,
+          tabBarIcon: ({ color, size }) => <Ionicons name="person-outline" size={size} color={color} />,
         }}
       />
     </Tab.Navigator>

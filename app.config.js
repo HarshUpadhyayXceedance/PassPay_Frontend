@@ -65,6 +65,7 @@ module.exports = {
       permissions: [
         "android.permission.RECORD_AUDIO",
         "android.permission.CAMERA",
+        "android.permission.FOREGROUND_SERVICE",
         "android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION",
       ],
     },
@@ -97,11 +98,11 @@ module.exports = {
       ],
     ],
     extra: {
-      router: {},
-      eas: {
-        projectId: "6e4e71f5-da0f-4fbc-a3ed-b2f3d930e942",
+            "eas": {
+        "projectId": "700d020d-6ebe-4036-9d38-68b59c8145c4"
       },
+      router: {},
     },
-    owner: "harshupadhyay798557",
+    owner: "2100520100032_ietlucknow",
   },
 };

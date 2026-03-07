@@ -14,7 +14,8 @@ import {
   PermissionsAndroid,
   Alert,
   AppState,
-  Dimensions,
+  BackHandler,
+  useWindowDimensions,
 } from "react-native";
 import { useLocalSearchParams, useRouter, usePathname } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -44,7 +45,7 @@ import {
   SpeakRequestStatus,
 } from "../../services/firebase/chatService";
 
-// LiveKit imports — require a dev build (not available in Expo Go)
+// LiveKit requires a dev build — not available in Expo Go
 let Room: any = null;
 let RoomEvent: any = null;
 let AudioSession: any = null;
@@ -61,13 +62,11 @@ try {
   VideoTrackComponent = lkRn.VideoTrack;
   if (lkRn.registerGlobals) lkRn.registerGlobals();
 } catch {
-  // Running in Expo Go or native module not available
+  // Running in Expo Go — native module unavailable
 }
 
 const LIVEKIT_NATIVE_AVAILABLE = !!(Room && AudioSession);
-const { width: SCREEN_WIDTH } = Dimensions.get("window");
 
-// Deterministic avatar colors per identity
 const AVATAR_COLORS = ["#6C63FF", "#FF6B6B", "#FF8C00", "#00B4D8", "#9B59B6", "#2ECC71", "#E67E22"];
 function getAvatarColor(identity: string): string {
   let sum = 0;
@@ -123,20 +122,21 @@ async function requestCameraPermission(): Promise<boolean> {
   }
 }
 
-// ── Video track info for rendering ──
-// trackPublication stored only for camera tracks; screen share resolves live
+// trackPublication optional: camera tracks cache the pub; screen share resolves live from room at render time
 interface VideoTrackInfo {
   identity: string;
-  trackPublication?: any; // optional — screen share resolves from room at render time
+  trackPublication?: any;
   source: string; // "camera" | "screen_share"
 }
 
 export function RoomScreen() {
   const router = useRouter();
   const pathname = usePathname();
+  const pathnameRef = useRef(pathname);
+  useEffect(() => { pathnameRef.current = pathname; }, [pathname]);
   const params = useLocalSearchParams<Record<string, string>>();
   const { publicKey } = useWalletStore();
-  const { leaveRoom, requestSpeak, confirmAttendance, endMeeting } = useRooms();
+  const { leaveRoom, requestSpeak, endMeeting } = useRooms();
 
   const roomId = params.roomId ?? "";
   const title = params.title ?? "Room";
@@ -144,78 +144,64 @@ export function RoomScreen() {
   const livekitUrl = params.livekitUrl ?? "";
   const initialRole = (params.role ?? "speaker") as "speaker" | "listener";
   const eventPda = params.eventPda;
-  const ticketMint = params.ticketMint;
+
   const eventDateMs = params.eventDate ? parseInt(params.eventDate, 10) : 0;
   const paramDisplayName = params.displayName ?? "";
-  const isAlreadyCheckedIn = params.isAlreadyCheckedIn === "true";
-  // Unique per-join timestamp — changes each time the user joins, even to the same room.
-  // This lets us detect a fresh join on a cached tab component and reset all state.
+  // Changes each join so cached tab component can detect and reset state
   const joinTimestamp = params.joinTimestamp ?? "0";
+  const hostPubkey = params.hostPubkey ?? "";
 
   const isMeeting = !!eventPda;
 
-  // ── Name modal ───────────────────────────────────────────────────────
+  const { width: screenWidth } = useWindowDimensions();
+  const tileHalfStyle = { width: (screenWidth - 16) / 2, height: ((screenWidth - 16) / 2) * 0.75 };
+
   const [nameModalVisible, setNameModalVisible] = useState(!paramDisplayName);
   const [nameInput, setNameInput] = useState(paramDisplayName);
   const [displayName, setDisplayName] = useState(paramDisplayName);
 
-  // ── Audio / connection ────────────────────────────────────────────────
   const [isConnected, setIsConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(true);
   const [livekitUnavailable, setLivekitUnavailable] = useState(false);
   const [connectionFailed, setConnectionFailed] = useState(false);
 
-  // ── Participants ──────────────────────────────────────────────────────
   const [participantCount, setParticipantCount] = useState(1);
   const [remoteIdentities, setRemoteIdentities] = useState<string[]>([]);
   const [participantNames, setParticipantNames] = useState<Record<string, string>>({});
   const [activeSpeakers, setActiveSpeakers] = useState<Set<string>>(new Set());
   const [showParticipants, setShowParticipants] = useState(false);
+  const [hostLeft, setHostLeft] = useState(false);
 
-  // ── Mic & role ────────────────────────────────────────────────────────
   const [isMicOn, setIsMicOn] = useState(initialRole === "speaker");
   const [role, setRole] = useState<"speaker" | "listener">(initialRole);
   // Ref so the Reconnected handler can read current mic state without stale closure
   const isMicOnRef = useRef(initialRole === "speaker");
   useEffect(() => { isMicOnRef.current = isMicOn; }, [isMicOn]);
 
-  // ── Camera & Screen Share (meetings only) ──────────────────────────────
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isCameraFront, setIsCameraFront] = useState(true);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const isCameraOnRef = useRef(false);
   useEffect(() => { isCameraOnRef.current = isCameraOn; }, [isCameraOn]);
-  // Local camera publication — updated via LiveKit events (not render-time lookup)
+  // Updated via LiveKit events (not render-time lookup) to avoid stale pub refs
   const [localCameraPub, setLocalCameraPub] = useState<any>(null);
-  // Local screen share publication — updated via LiveKit events
   const [localScreenSharePub, setLocalScreenSharePub] = useState<any>(null);
-  // Remote video tracks: identity → { trackPublication, source }
   const [remoteVideoTracks, setRemoteVideoTracks] = useState<VideoTrackInfo[]>([]);
-  // Active screen share from remote participant
   const [remoteScreenShare, setRemoteScreenShare] = useState<VideoTrackInfo | null>(null);
 
-  // ── Chat ──────────────────────────────────────────────────────────────
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [showChat, setShowChat] = useState(false);
   const [inputText, setInputText] = useState("");
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // ── Speak requests (meetings) ─────────────────────────────────────────
   const [speakRequestStatus, setSpeakRequestStatus] = useState<SpeakRequestStatus | null>(null);
   const [pendingSpeakRequests, setPendingSpeakRequests] = useState<SpeakRequest[]>([]);
   const [isUpgradingToSpeaker, setIsUpgradingToSpeaker] = useState(false);
 
-  // ── Confirm attendance ────────────────────────────────────────────────
-  const [isConfirmingAttendance, setIsConfirmingAttendance] = useState(false);
-  const [attendanceConfirmed, setAttendanceConfirmed] = useState(isAlreadyCheckedIn);
-
-  // ── End meeting (admin only) ──────────────────────────────────────────
   const [isEndingMeeting, setIsEndingMeeting] = useState(false);
-  // Ref to prevent the subscribeMeetingEnded callback from double-navigating
-  // when the admin is already handling the end flow.
+  // Prevents subscribeMeetingEnded callback from double-navigating when admin is already handling the end flow
   const isEndingMeetingRef = useRef(false);
 
-  // ── Refs ──────────────────────────────────────────────────────────────
   const roomRef = useRef<any>(null);
   const chatListRef = useRef<FlatList>(null);
   const showChatRef = useRef(false);
@@ -223,31 +209,25 @@ export function RoomScreen() {
   const seenMessageIds = useRef<Set<string>>(new Set());
   const prevSpeakRequestCount = useRef(0);
   const nameConfirmed = useRef(!!paramDisplayName);
-  // Timestamp when this client joined — used to filter stale meetingEnded signals
+  // Filters stale meetingEnded Firebase signals from previous sessions
   const joinedAtRef = useRef(Date.now());
-  // Track previous joinTimestamp so we only reset on genuine re-joins
   const prevJoinTimestampRef = useRef(joinTimestamp);
-  // Set to true while MWA is in progress — AppState listener uses this to
-  // auto-navigate back to the room when Android restores a different screen.
+  // True while MWA is in progress — AppState listener uses this to auto-navigate back to room when Android restores a different screen
   const mwaInProgressRef = useRef(false);
 
   useEffect(() => {
     showChatRef.current = showChat;
   }, [showChat]);
 
-  // ── Auto-return to room after MWA (Android) ─────────────────────────
-  // When Phantom opens for signing, Android may background the app and
-  // restore a different tab on return. This listener detects the app
-  // coming to foreground while MWA was in progress and navigates back
-  // to the room screen so the user isn't stranded on "My Passes".
+  // When Phantom opens for MWA signing, Android may restore a different tab on return.
+  // Detect foreground resume while MWA was in progress and navigate back to the room.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active" && mwaInProgressRef.current) {
         mwaInProgressRef.current = false;
-        // Small delay to let the navigation stack settle after app resume
+        // Small delay to let navigation stack settle after app resume
         setTimeout(() => {
-          // Check if we're NOT on the room screen — if so, navigate back to it
-          const isOnRoom = pathname.includes("/room");
+          const isOnRoom = pathnameRef.current.includes("/room");
           if (!isOnRoom) {
             const roomPath = initialRole === "speaker" ? "/(admin)/room" : "/(user)/room";
             router.push({
@@ -259,10 +239,10 @@ export function RoomScreen() {
                 livekitUrl,
                 role: initialRole,
                 eventPda: eventPda ?? "",
-                ticketMint: ticketMint ?? "",
-                isAlreadyCheckedIn: String(attendanceConfirmed),
+                ticketMint: params.ticketMint ?? "",
+                isAlreadyCheckedIn: params.isAlreadyCheckedIn ?? "false",
                 eventDate: String(eventDateMs),
-                joinTimestamp, // same timestamp — won't trigger state reset
+                joinTimestamp, // same timestamp so re-join won't reset state again
               },
             });
           }
@@ -271,21 +251,17 @@ export function RoomScreen() {
     });
     return () => subscription.remove();
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pathname, roomId, title, token, livekitUrl, initialRole, eventPda, ticketMint, eventDateMs, joinTimestamp]);
+  }, [roomId, title, token, livekitUrl, initialRole, eventPda, eventDateMs, joinTimestamp]);
 
-  // ── Reset all state when user re-joins (joinTimestamp changes) ────────
-  // expo-router caches tab screen components; useState initializers don't re-run
-  // when params change on a cached component. We detect a fresh join via the
-  // unique joinTimestamp and manually reset every piece of transient state.
+  // expo-router caches tab screen components so useState initializers don't re-run on rejoin.
+  // Detect fresh join via joinTimestamp and manually reset transient state.
   useEffect(() => {
     if (joinTimestamp === prevJoinTimestampRef.current) return;
     prevJoinTimestampRef.current = joinTimestamp;
 
-    // Record new join time for meetingEnded signal filtering
     joinedAtRef.current = Date.now();
     isEndingMeetingRef.current = false;
 
-    // Reset UI state
     setNameModalVisible(!paramDisplayName);
     nameConfirmed.current = !!paramDisplayName;
     setDisplayName(paramDisplayName);
@@ -297,8 +273,6 @@ export function RoomScreen() {
     setSpeakRequestStatus(null);
     setPendingSpeakRequests([]);
     setIsUpgradingToSpeaker(false);
-    setIsConfirmingAttendance(false);
-    setAttendanceConfirmed(isAlreadyCheckedIn);
     setIsEndingMeeting(false);
     setRemoteIdentities([]);
     setActiveSpeakers(new Set());
@@ -314,7 +288,6 @@ export function RoomScreen() {
     setShowParticipants(false);
     setShowChat(false);
     setInputText("");
-    // Reset video/screenshare state
     setIsCameraOn(false);
     isCameraOnRef.current = false;
     setIsCameraFront(true);
@@ -323,10 +296,10 @@ export function RoomScreen() {
     setLocalScreenSharePub(null);
     setRemoteVideoTracks([]);
     setRemoteScreenShare(null);
+    setHostLeft(false);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinTimestamp]);
 
-  // ── When name is confirmed — write to Firebase + start everything ────
   const handleNameConfirm = useCallback(() => {
     const name = nameInput.trim() || shortenAddress(publicKey ?? "Me");
     setDisplayName(name);
@@ -337,7 +310,6 @@ export function RoomScreen() {
     }
   }, [nameInput, publicKey, roomId]);
 
-  // ── Firebase chat subscription ────────────────────────────────────────
   useEffect(() => {
     chatUnsubRef.current?.();
     chatUnsubRef.current = null;
@@ -363,29 +335,25 @@ export function RoomScreen() {
     };
   }, [roomId]);
 
-  // ── Firebase participant names ────────────────────────────────────────
   useEffect(() => {
     if (!roomId) return;
     const unsub = subscribeParticipantNames(roomId, setParticipantNames);
     return unsub;
   }, [roomId]);
 
-  // ── Write name to Firebase when pre-supplied (name modal skipped) ─────
-  // joinTimestamp ensures the write re-fires on rejoin (same name + same room)
+  // joinTimestamp ensures write re-fires on rejoin even with same name+room
   useEffect(() => {
     if (paramDisplayName && publicKey && roomId) {
       writeParticipantName(roomId, publicKey, paramDisplayName).catch(() => {});
     }
   }, [paramDisplayName, publicKey, roomId, joinTimestamp]);
 
-  // ── Firebase speak requests — admin side ──────────────────────────────
   useEffect(() => {
     if (!roomId || !isMeeting || initialRole !== "speaker") return;
     const unsub = subscribeSpeakRequests(roomId, setPendingSpeakRequests);
     return unsub;
   }, [roomId, isMeeting, initialRole]);
 
-  // ── Notify admin when new speak request arrives ───────────────────────
   useEffect(() => {
     if (!isMeeting || initialRole !== "speaker") return;
     const curr = pendingSpeakRequests.length;
@@ -399,7 +367,6 @@ export function RoomScreen() {
     prevSpeakRequestCount.current = curr;
   }, [pendingSpeakRequests, isMeeting, initialRole]);
 
-  // ── Firebase speak requests — attendee side ───────────────────────────
   useEffect(() => {
     if (!roomId || !isMeeting || !publicKey || initialRole !== "listener") return;
     const unsub = subscribeMySpeakRequest(roomId, publicKey, (status) => {
@@ -412,11 +379,10 @@ export function RoomScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, isMeeting, publicKey, initialRole]);
 
-  // ── Meeting ended signal (all participants) ───────────────────────────
   useEffect(() => {
     if (!roomId || !isMeeting) return;
     const unsub = subscribeMeetingEnded(roomId, joinedAtRef.current, () => {
-      if (isEndingMeetingRef.current) return; // admin handles their own navigation
+      if (isEndingMeetingRef.current) return; // admin already handles its own navigation
       roomRef.current?.disconnect();
       if (publicKey && roomId) removeParticipantName(roomId, publicKey).catch(() => {});
       showInfo("Meeting Ended", "The host has ended this meeting.");
@@ -426,9 +392,8 @@ export function RoomScreen() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, isMeeting]);
 
-  // ── LiveKit connection ────────────────────────────────────────────────
   useEffect(() => {
-    if (nameModalVisible) return; // Wait for name before connecting
+    if (nameModalVisible) return; // wait for name entry before connecting
 
     if (!LIVEKIT_NATIVE_AVAILABLE) {
       setLivekitUnavailable(true);
@@ -444,7 +409,6 @@ export function RoomScreen() {
     const lkRoom = new Room({
       adaptiveStream: true,
       dynacast: true,
-      // Attempt automatic reconnect on transient network drops (Issue 6)
       reconnectPolicy: { maxRetries: 5, minDelay: 500, maxDelay: 8000, multiplier: 1.5 },
     });
     roomRef.current = lkRoom;
@@ -471,13 +435,17 @@ export function RoomScreen() {
 
     lkRoom.on(RoomEvent.Disconnected, () => setIsConnected(false));
     lkRoom.on(RoomEvent.ParticipantConnected, updateParticipants);
-    lkRoom.on(RoomEvent.ParticipantDisconnected, updateParticipants);
+    lkRoom.on(RoomEvent.ParticipantDisconnected, (participant: any) => {
+      updateParticipants();
+      if (isMeeting && hostPubkey && participant.identity === hostPubkey) {
+        setHostLeft(true);
+      }
+    });
 
     lkRoom.on(RoomEvent.ActiveSpeakersChanged, (speakers: any[]) => {
       setActiveSpeakers(new Set(speakers.map((s: any) => s.identity)));
     });
 
-    // Issue 6: Re-enable mic/camera after automatic reconnect if they were on
     lkRoom.on(RoomEvent.Reconnected, () => {
       setIsConnected(true);
       updateParticipants();
@@ -489,16 +457,31 @@ export function RoomScreen() {
       }
     });
 
-    // ── Track events for video/screenshare (meetings only) ──
+    lkRoom.on(RoomEvent.LocalParticipantPermissionsChanged, () => {
+      const canPublish = lkRoom.localParticipant?.permissions?.canPublish ?? false;
+      if (!canPublish) {
+        setRole("listener");
+        setIsMicOn(false);
+        isMicOnRef.current = false;
+        setIsCameraOn(false);
+        isCameraOnRef.current = false;
+        setSpeakRequestStatus(null);
+      }
+    });
+
     if (isMeeting && TrackEnum) {
       lkRoom.on(RoomEvent.TrackSubscribed, (track: any, publication: any, participant: any) => {
         if (track.source === TrackEnum.Source.Camera) {
+          if (publication.isMuted) return;
           setRemoteVideoTracks((prev) => {
             if (prev.some((t) => t.identity === participant.identity && t.source === "camera")) return prev;
             return [...prev, { identity: participant.identity, trackPublication: publication, source: "camera" }];
           });
         } else if (track.source === TrackEnum.Source.ScreenShare) {
-          setRemoteScreenShare({ identity: participant.identity, trackPublication: publication, source: "screen_share" });
+          // 500ms delay lets the track's mediaStream initialize before rendering (slower on Android)
+          setTimeout(() => {
+            setRemoteScreenShare({ identity: participant.identity, trackPublication: publication, source: "screen_share" });
+          }, 500);
         }
       });
 
@@ -510,7 +493,6 @@ export function RoomScreen() {
         }
       });
 
-      // TrackMuted: remote participant turned camera off (track disabled but not unpublished)
       lkRoom.on(RoomEvent.TrackMuted, (publication: any, participant: any) => {
         if (publication?.source === TrackEnum.Source.Camera) {
           setRemoteVideoTracks((prev) => prev.filter((t) => !(t.identity === participant.identity && t.source === "camera")));
@@ -519,7 +501,6 @@ export function RoomScreen() {
         }
       });
 
-      // TrackUnmuted: remote participant turned camera back on
       lkRoom.on(RoomEvent.TrackUnmuted, (publication: any, participant: any) => {
         if (publication?.source === TrackEnum.Source.Camera) {
           setRemoteVideoTracks((prev) => {
@@ -530,13 +511,13 @@ export function RoomScreen() {
       });
     }
 
-    // ── Local track publish/unpublish events (for local camera tile) ──
     if (isMeeting && TrackEnum) {
       lkRoom.on(RoomEvent.LocalTrackPublished, (publication: any) => {
         if (publication?.source === TrackEnum.Source.Camera) {
           setLocalCameraPub(publication);
         } else if (publication?.source === TrackEnum.Source.ScreenShare) {
-          setLocalScreenSharePub(publication);
+          // 500ms delay for track mediaStream initialization (slower on Android)
+          setTimeout(() => setLocalScreenSharePub(publication), 500);
         }
       });
       lkRoom.on(RoomEvent.LocalTrackUnpublished, (publication: any) => {
@@ -560,9 +541,8 @@ export function RoomScreen() {
       lkRoom.disconnect();
       AudioSession?.stopAudioSession();
     };
-  }, [token, livekitUrl, nameModalVisible]);
+  }, [token, livekitUrl, nameModalVisible, joinTimestamp]);
 
-  // ── Mic toggle (with Android permission check) ───────────────────────
   const toggleMic = useCallback(async () => {
     const lkRoom = roomRef.current;
     if (!lkRoom) return;
@@ -578,18 +558,25 @@ export function RoomScreen() {
       await lkRoom.localParticipant.setMicrophoneEnabled(next);
       setIsMicOn(next);
     } catch (err: any) {
-      showError("Mic Error", err.message ?? "Could not toggle microphone.");
+      const msg: string = err?.message ?? "";
+      if (msg.toLowerCase().includes("insufficient permissions") || msg.toLowerCase().includes("publish")) {
+        setRole("listener");
+        setIsMicOn(false);
+        isMicOnRef.current = false;
+        setSpeakRequestStatus(null);
+      } else {
+        showError("Mic Error", msg || "Could not toggle microphone.");
+      }
     }
   }, [isMicOn]);
 
-  // ── Camera toggle (meetings only, speakers only) ──────────────────────
   const toggleCamera = useCallback(async () => {
     const lkRoom = roomRef.current;
     if (!lkRoom || !isMeeting) return;
     const next = !isCameraOn;
     if (next) {
-      // Keep mwaInProgressRef=true for the ENTIRE operation (permission + camera enable).
-      // Both can briefly background the app on Android; clearing early leaves user stranded.
+      // Keep mwaInProgressRef=true for the full operation — both permission dialogs and camera enable
+      // can briefly background the app on Android; clearing early leaves user stranded.
       mwaInProgressRef.current = true;
       const granted = await requestCameraPermission();
       if (!granted) {
@@ -606,12 +593,11 @@ export function RoomScreen() {
     } catch (err: any) {
       showError("Camera Error", err.message ?? "Could not toggle camera.");
     } finally {
-      // Delayed clear — gives AppState handler time to fire first if app was backgrounded
+      // Delayed clear gives AppState handler time to fire first if app was backgrounded
       setTimeout(() => { mwaInProgressRef.current = false; }, 1000);
     }
   }, [isCameraOn, isCameraFront, isMeeting]);
 
-  // ── Camera flip (front/back) ──────────────────────────────────────────
   const flipCamera = useCallback(async () => {
     const lkRoom = roomRef.current;
     if (!lkRoom || !isCameraOn) return;
@@ -625,12 +611,11 @@ export function RoomScreen() {
           setIsCameraFront(newFront);
           return;
         } catch {
-          // restartTrack failed — fall through to disable/re-enable
+          // restartTrack failed — fall through to disable/re-enable fallback
         }
       }
-      // Fallback: disable then re-enable with new facing mode
       await lkRoom.localParticipant.setCameraEnabled(false);
-      // Small delay to let the track fully release
+      // Small delay lets the track fully release before re-enable
       await new Promise<void>((r) => setTimeout(r, 300));
       await lkRoom.localParticipant.setCameraEnabled(true, { facingMode: newFront ? "user" : "environment" });
       setIsCameraFront(newFront);
@@ -639,14 +624,12 @@ export function RoomScreen() {
     }
   }, [isCameraOn, isCameraFront]);
 
-  // ── Screen share toggle (meetings only, speakers only) ────────────────
   const toggleScreenShare = useCallback(async () => {
     const lkRoom = roomRef.current;
     if (!lkRoom || !isMeeting) return;
     const next = !isScreenSharing;
     if (next) {
-      // Android MediaProjection dialog puts app in background briefly.
-      // Set mwaInProgressRef so AppState handler navigates back to room.
+      // Android MediaProjection dialog briefly backgrounds the app — flag so AppState handler can navigate back
       mwaInProgressRef.current = true;
     }
     try {
@@ -657,12 +640,11 @@ export function RoomScreen() {
         showError("Screen Share", err.message ?? "Could not start screen sharing.");
       }
     } finally {
-      // Delayed clear — gives AppState handler time to fire first if app was backgrounded
+      // Delayed clear gives AppState handler time to fire first if app was backgrounded
       setTimeout(() => { mwaInProgressRef.current = false; }, 1000);
     }
   }, [isScreenSharing, isMeeting]);
 
-  // ── Request speak (attendee submits via Firebase) ─────────────────────
   const handleRequestSpeak = useCallback(async () => {
     if (!publicKey || !roomId) return;
     const name = displayName || shortenAddress(publicKey);
@@ -677,7 +659,6 @@ export function RoomScreen() {
     }
   }, [publicKey, roomId, displayName]);
 
-  // ── Admin approves a speak request ───────────────────────────────────
   const handleApproveSpeak = useCallback(async (req: SpeakRequest) => {
     if (!roomId) return;
     try {
@@ -715,70 +696,36 @@ export function RoomScreen() {
     ]);
   }, [eventPda, publicKey, participantNames]);
 
-  // ── Attendee gets speaker permission after approval ───────────────────
   const handleSpeakerUpgrade = useCallback(async () => {
     if (!eventPda || !publicKey || isUpgradingToSpeaker) return;
     setIsUpgradingToSpeaker(true);
+    // Hold mwaInProgressRef for the entire upgrade — the network call or LiveKit's mic-enable
+    // can briefly restore a different Android screen, which would trigger AppState navigation.
+    mwaInProgressRef.current = true;
     try {
-      // Backend grants canPublish=true via RoomServiceClient (no reconnect needed)
+      // Backend grants canPublish=true via RoomServiceClient — no LiveKit disconnect/reconnect needed
       await requestSpeak(eventPda);
-      // Small delay for the permission update to propagate to the LiveKit client
+      // Wait for canPublish permission to propagate to the LiveKit client
       await new Promise<void>((resolve) => setTimeout(resolve, 600));
       const lkRoom = roomRef.current;
       if (lkRoom) {
-        // Permission dialog may briefly background the app — set flag so
-        // AppState handler navigates back to room if Android displaces us.
-        mwaInProgressRef.current = true;
-        const granted = await requestMicPermission();
-        mwaInProgressRef.current = false;
-        if (granted) await lkRoom.localParticipant.setMicrophoneEnabled(true);
+        // Enable mic via LiveKit — its native layer handles Android permission internally,
+        // avoiding an explicit PermissionsAndroid dialog that would trigger AppState issues.
+        await lkRoom.localParticipant.setMicrophoneEnabled(true).catch(() => {});
         setRole("speaker");
-        setIsMicOn(granted);
-        isMicOnRef.current = granted;
+        setIsMicOn(true);
+        isMicOnRef.current = true;
       }
       if (publicKey && roomId) await removeSpeakRequest(roomId, publicKey).catch(() => {});
       showSuccess("Mic Granted!", "You can now speak. Your mic is on.");
     } catch (err: any) {
-      mwaInProgressRef.current = false;
       showError("Upgrade Failed", err.message ?? "Could not enable your mic.");
     } finally {
+      setTimeout(() => { mwaInProgressRef.current = false; }, 1000);
       setIsUpgradingToSpeaker(false);
     }
   }, [eventPda, publicKey, requestSpeak, roomId, isUpgradingToSpeaker]);
 
-  // ── Confirm attendance ────────────────────────────────────────────────
-  const handleConfirmAttendance = useCallback(async () => {
-    if (!eventPda || !ticketMint) return;
-    const nowMs = Date.now();
-    if (eventDateMs > 0 && nowMs < eventDateMs) {
-      const minsLeft = Math.ceil((eventDateMs - nowMs) / 60000);
-      showError("Event Not Started", `Attendance can only be confirmed once the event starts. Starts in ${minsLeft} min.`);
-      return;
-    }
-    setAttendanceConfirmed(true);
-    setIsConfirmingAttendance(true);
-    mwaInProgressRef.current = true;
-    try {
-      await confirmAttendance(eventPda, ticketMint);
-      showSuccess("Attendance Confirmed", "Your attendance has been recorded on-chain. Loyalty points updated!");
-    } catch (err: any) {
-      const msg: string = err?.message ?? "";
-      if (msg.includes("AlreadyCheckedIn")) {
-        showInfo("Already Confirmed", "Your attendance was already recorded.");
-      } else if (msg.includes("EventNotStarted")) {
-        setAttendanceConfirmed(false);
-        showError("Event Not Started", "Attendance can only be confirmed once the event starts.");
-      } else {
-        setAttendanceConfirmed(false);
-        showError("Confirmation Failed", msg || "Could not confirm attendance. Try again.");
-      }
-    } finally {
-      setIsConfirmingAttendance(false);
-      mwaInProgressRef.current = false;
-    }
-  }, [eventPda, ticketMint, eventDateMs, confirmAttendance]);
-
-  // ── Send message ──────────────────────────────────────────────────────
   const sendMessage = useCallback(async () => {
     const text = inputText.trim();
     if (!text || !roomId) return;
@@ -791,14 +738,12 @@ export function RoomScreen() {
     setInputText("");
   }, [inputText, publicKey, roomId, displayName]);
 
-  // ── Leave room ────────────────────────────────────────────────────────
   const handleLeave = useCallback(async () => {
     try {
       roomRef.current?.disconnect();
       if (publicKey && roomId) {
         await removeParticipantName(roomId, publicKey).catch(() => {});
-        // Issue 5: Remove speak request if still pending so the admin's
-        // participant panel doesn't show a stale request after this user leaves.
+        // Remove pending speak request so admin's panel doesn't show stale request after user leaves
         if (isMeeting && speakRequestStatus === "pending") {
           await removeSpeakRequest(roomId, publicKey).catch(() => {});
         }
@@ -809,7 +754,15 @@ export function RoomScreen() {
     }
   }, [isMeeting, roomId, publicKey, leaveRoom, router, speakRequestStatus]);
 
-  // ── End meeting (admin only) ──────────────────────────────────────────
+  // Run full cleanup instead of raw router.back() to disconnect LiveKit and remove Firebase presence
+  useEffect(() => {
+    const sub = BackHandler.addEventListener("hardwareBackPress", () => {
+      handleLeave();
+      return true;
+    });
+    return () => sub.remove();
+  }, [handleLeave]);
+
   const handleEndMeeting = useCallback(() => {
     if (!eventPda) return;
     Alert.alert(
@@ -824,11 +777,9 @@ export function RoomScreen() {
             isEndingMeetingRef.current = true;
             setIsEndingMeeting(true);
             try {
-              // 1. Signal all clients via Firebase BEFORE deleting (they need to react)
+              // Signal clients via Firebase BEFORE deleting so they can react before being kicked
               await setMeetingEnded(roomId);
-              // 2. Delete Redis room + LiveKit room (kicks all participants)
               await endMeeting(eventPda);
-              // 3. Clean up admin's own connection
               roomRef.current?.disconnect();
               if (publicKey && roomId) {
                 await removeParticipantName(roomId, publicKey).catch(() => {});
@@ -845,7 +796,6 @@ export function RoomScreen() {
     );
   }, [eventPda, endMeeting, roomId, publicKey, router]);
 
-  // ── Chat toggle ───────────────────────────────────────────────────────
   const toggleChat = useCallback(() => {
     setShowChat((prev) => {
       if (!prev) setUnreadCount(0);
@@ -853,7 +803,6 @@ export function RoomScreen() {
     });
   }, []);
 
-  // ── Render helpers ────────────────────────────────────────────────────
   const renderMessage = useCallback(
     ({ item }: { item: ChatMessage }) => {
       const isOwn = !!publicKey && item.senderFull === publicKey;
@@ -882,11 +831,9 @@ export function RoomScreen() {
   const localDisplayName = displayName || shortenAddress(localIdentity);
   const isAdminInMeeting = isMeeting && initialRole === "speaker";
 
-  // ── Determine if any video/screenshare is active (for layout) ────────
   const hasLocalCamera = isCameraOn && !!localCameraPub;
   const hasAnyVideo = isMeeting && (hasLocalCamera || remoteVideoTracks.length > 0 || remoteScreenShare !== null || isScreenSharing);
 
-  // ── Video tile component ──────────────────────────────────────────────
   const renderVideoTile = (
     trackPublication: any,
     identity: string,
@@ -895,11 +842,11 @@ export function RoomScreen() {
     tileStyle: any
   ) => {
     if (!VideoTrackComponent) return null;
-    // For remote: get live publication from participant (avoids stale cached refs)
+    // For remote participants, get live publication from the room to avoid stale cached refs
     const livePub = isLocal
       ? trackPublication
       : roomRef.current?.remoteParticipants?.get(identity)?.getTrackPublication?.(TrackEnum?.Source?.Camera) ?? trackPublication;
-    if (!livePub) return null;
+    if (!livePub || livePub.isMuted) return null;
     const trackRef = {
       participant: isLocal
         ? roomRef.current?.localParticipant
@@ -930,7 +877,6 @@ export function RoomScreen() {
     );
   };
 
-  // ── Name prompt modal ─────────────────────────────────────────────────
   if (nameModalVisible) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
@@ -962,13 +908,16 @@ export function RoomScreen() {
     );
   }
 
-  // ── Connecting state ──────────────────────────────────────────────────
   if (isConnecting) {
     return (
       <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
           <Text style={styles.connectingText}>Joining room...</Text>
+          <TouchableOpacity style={styles.connectingLeaveBtn} onPress={() => router.back()}>
+            <Ionicons name="arrow-back" size={18} color={colors.textMuted} />
+            <Text style={styles.connectingLeaveBtnText}>Leave</Text>
+          </TouchableOpacity>
         </View>
       </SafeAreaView>
     );
@@ -976,7 +925,6 @@ export function RoomScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top", "bottom"]}>
-      {/* ── Header ── */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           {isMeeting ? (
@@ -1036,29 +984,15 @@ export function RoomScreen() {
         </View>
       )}
 
-      {/* ── Confirm Attendance strip (meetings only) ── */}
-      {isMeeting && ticketMint && !attendanceConfirmed && (
-        <TouchableOpacity
-          style={styles.attendanceStrip}
-          onPress={handleConfirmAttendance}
-          disabled={isConfirmingAttendance}
-          activeOpacity={0.85}
-        >
-          {isConfirmingAttendance ? (
-            <ActivityIndicator size="small" color={colors.primary} />
-          ) : (
-            <>
-              <Ionicons name="finger-print-outline" size={15} color={colors.primary} />
-              <Text style={styles.attendanceStripText}>Tap to confirm your attendance on-chain</Text>
-              <Ionicons name="chevron-forward" size={14} color={colors.primary} />
-            </>
-          )}
-        </TouchableOpacity>
-      )}
-      {isMeeting && ticketMint && attendanceConfirmed && (
-        <View style={[styles.attendanceStrip, styles.attendanceStripDone]}>
-          <Ionicons name="checkmark-circle" size={15} color="#2ED573" />
-          <Text style={[styles.attendanceStripText, { color: "#2ED573" }]}>Attendance confirmed on-chain</Text>
+
+      {/* Host-left banner — shown to attendees when host disconnects without ending meeting */}
+      {isMeeting && hostLeft && initialRole !== "speaker" && (
+        <View style={styles.hostLeftBanner}>
+          <Ionicons name="alert-circle-outline" size={15} color="#FFA502" />
+          <Text style={styles.hostLeftText}>Host has left · Meeting continues until explicitly ended</Text>
+          <TouchableOpacity onPress={() => setHostLeft(false)} hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}>
+            <Ionicons name="close" size={15} color="#FFA502" />
+          </TouchableOpacity>
         </View>
       )}
 
@@ -1128,7 +1062,7 @@ export function RoomScreen() {
               localIdentity,
               true,
               "You",
-              remoteVideoTracks.length === 0 ? styles.videoTileFull : styles.videoTileHalf
+              remoteVideoTracks.length === 0 ? styles.videoTileFull : tileHalfStyle
             )}
             {/* Remote cameras */}
             {remoteVideoTracks.slice(0, hasLocalCamera ? 3 : 4).map((track) => {
@@ -1139,12 +1073,12 @@ export function RoomScreen() {
                 track.identity,
                 false,
                 name,
-                totalTiles <= 1 ? styles.videoTileFull : styles.videoTileHalf
+                totalTiles <= 1 ? styles.videoTileFull : tileHalfStyle
               );
             })}
             {/* Overflow indicator */}
             {remoteVideoTracks.length > (hasLocalCamera ? 3 : 4) && (
-              <View style={[styles.videoTile, styles.videoTileHalf, styles.videoTileOverflow]}>
+              <View style={[styles.videoTile, tileHalfStyle, styles.videoTileOverflow]}>
                 <Text style={styles.videoOverflowText}>+{remoteVideoTracks.length - (hasLocalCamera ? 3 : 4)}</Text>
                 <Text style={styles.videoOverflowSub}>more with video</Text>
               </View>
@@ -1301,8 +1235,8 @@ export function RoomScreen() {
           </TouchableOpacity>
         ) : null}
 
-        {/* Camera (meeting speakers only) */}
-        {isMeeting && role === "speaker" && !livekitUnavailable && !connectionFailed && (
+        {/* Camera (initial meeting speakers / admin only — not for upgraded attendees) */}
+        {isMeeting && initialRole === "speaker" && !livekitUnavailable && !connectionFailed && (
           <TouchableOpacity
             style={[styles.controlBtn, isCameraOn && styles.controlBtnActive]}
             onPress={toggleCamera}
@@ -1315,8 +1249,8 @@ export function RoomScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Screen Share (meeting speakers only) */}
-        {isMeeting && role === "speaker" && !livekitUnavailable && !connectionFailed && (
+        {/* Screen Share (initial meeting speakers / admin only — not for upgraded attendees) */}
+        {isMeeting && initialRole === "speaker" && !livekitUnavailable && !connectionFailed && (
           <TouchableOpacity
             style={[styles.controlBtn, isScreenSharing && styles.controlBtnScreenShare]}
             onPress={toggleScreenShare}
@@ -1415,6 +1349,9 @@ export function RoomScreen() {
                   <Text style={styles.participantName}>{localDisplayName}</Text>
                   <Text style={styles.participantRole}>You · {role}</Text>
                 </View>
+                {isMeeting && hostPubkey && localIdentity === hostPubkey && (
+                  <Ionicons name="star" size={14} color="#FFA502" style={{ marginLeft: 4 }} />
+                )}
                 {isMicOn && <Ionicons name="mic" size={16} color={colors.primary} />}
                 {isCameraOn && <Ionicons name="videocam" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
                 {isScreenSharing && <Ionicons name="desktop-outline" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
@@ -1443,6 +1380,9 @@ export function RoomScreen() {
                         {isMeeting ? (canPublish ? "Speaker" : "Listener") : "Member"}
                       </Text>
                     </View>
+                    {isMeeting && hostPubkey && identity === hostPubkey && (
+                      <Ionicons name="star" size={14} color="#FFA502" style={{ marginLeft: 4 }} />
+                    )}
                     {hasVideo && <Ionicons name="videocam" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
                     {isSharingScreen && <Ionicons name="desktop-outline" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
                     {isSpeaking && <View style={styles.speakingDot} />}
@@ -1470,6 +1410,8 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.background },
   centered: { flex: 1, alignItems: "center", justifyContent: "center", gap: spacing.sm },
   connectingText: { fontFamily: fonts.body, fontSize: 15, color: colors.textMuted },
+  connectingLeaveBtn: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, marginTop: 24, paddingHorizontal: 20, paddingVertical: 10, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
+  connectingLeaveBtnText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
 
   // Name modal
   nameModalWrapper: { flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.lg, backgroundColor: colors.background },
@@ -1508,6 +1450,8 @@ const styles = StyleSheet.create({
   attendanceStrip: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: spacing.md, paddingVertical: 10, backgroundColor: `${colors.primary}12`, borderBottomWidth: 1, borderBottomColor: `${colors.primary}25` },
   attendanceStripText: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.primary },
   attendanceStripDone: { backgroundColor: "rgba(46,213,115,0.1)", borderBottomColor: "rgba(46,213,115,0.2)" },
+  hostLeftBanner: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: spacing.md, paddingVertical: 10, backgroundColor: "rgba(255,165,2,0.1)", borderBottomWidth: 1, borderBottomColor: "rgba(255,165,2,0.2)" },
+  hostLeftText: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 12, color: "#FFA502" },
 
   // Main
   main: { flex: 1 },
@@ -1536,8 +1480,7 @@ const styles = StyleSheet.create({
   videoGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap", padding: 4, gap: 4 },
   videoTile: { borderRadius: borderRadius.md, overflow: "hidden", backgroundColor: "#111" },
   videoTileFull: { width: "100%", height: "100%", flex: 1, minHeight: 200 },
-  videoTileHalf: { width: (SCREEN_WIDTH - 16) / 2, height: (SCREEN_WIDTH - 16) / 2 * 0.75 },
-  videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRadius.md, overflow: "hidden", backgroundColor: "#111" },
+videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRadius.md, overflow: "hidden", backgroundColor: "#111" },
   videoTileOverflow: { alignItems: "center", justifyContent: "center", backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
   videoTrackFill: { width: "100%", height: "100%" },
   videoNameOverlay: { position: "absolute", bottom: 0, left: 0, right: 0, flexDirection: "row", alignItems: "center", justifyContent: "center", paddingVertical: 4, paddingHorizontal: 8, backgroundColor: "rgba(0,0,0,0.55)" },

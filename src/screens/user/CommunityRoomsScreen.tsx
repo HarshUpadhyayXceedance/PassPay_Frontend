@@ -11,6 +11,7 @@ import {
   RefreshControl,
   KeyboardAvoidingView,
   Platform,
+  Switch,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -21,6 +22,8 @@ import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
 import { showError } from "../../utils/alerts";
+
+const SKR_COLOR = "#9945FF"; // Solana purple for Seeker brand
 
 function shortenAddress(addr: string): string {
   if (addr.length <= 10) return addr;
@@ -42,12 +45,16 @@ export function CommunityRoomsScreen() {
   const [showCreate, setShowCreate] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [displayName, setDisplayName] = useState("");
+  const [isSeekerGated, setIsSeekerGated] = useState(false);
   const [creating, setCreating] = useState(false);
   const [joiningId, setJoiningId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  // Join name modal state
+
   const [pendingJoinRoom, setPendingJoinRoom] = useState<CommunityRoom | null>(null);
   const [joinDisplayName, setJoinDisplayName] = useState("");
+
+  // Shown when the user fails the SKR verification gate
+  const [showSeekerGatedModal, setShowSeekerGatedModal] = useState(false);
 
   useEffect(() => {
     fetchRooms();
@@ -71,11 +78,12 @@ export function CommunityRoomsScreen() {
     }
     setCreating(true);
     try {
-      const result = await createRoom({ title });
+      const result = await createRoom({ title, isSeekerGated });
       setShowCreate(false);
       setNewTitle("");
       const name = displayName.trim();
       setDisplayName("");
+      setIsSeekerGated(false);
       if (result.token && result.livekitUrl) {
         router.push({
           pathname: "/(user)/room",
@@ -94,15 +102,13 @@ export function CommunityRoomsScreen() {
     } finally {
       setCreating(false);
     }
-  }, [newTitle, displayName, createRoom, router]);
+  }, [newTitle, displayName, isSeekerGated, createRoom, router]);
 
-  // Step 1: Show name modal before joining
   const handleJoinRoom = useCallback((room: CommunityRoom) => {
     setPendingJoinRoom(room);
     setJoinDisplayName("");
   }, []);
 
-  // Step 2: Confirmed name — actually join
   const handleJoinConfirm = useCallback(async () => {
     if (!pendingJoinRoom) return;
     const room = pendingJoinRoom;
@@ -127,7 +133,12 @@ export function CommunityRoomsScreen() {
         showError("No Token", "Could not get meeting access. Try again.");
       }
     } catch (err: any) {
-      showError("Join Failed", err.message ?? "Could not join room.");
+      // SEEKER_REQUIRED is returned as a 403 with error code in the message
+      if (err.message?.includes("SEEKER_REQUIRED") || err.message?.includes("Seeker")) {
+        setShowSeekerGatedModal(true);
+      } else {
+        showError("Join Failed", err.message ?? "Could not join room.");
+      }
     } finally {
       setJoiningId(null);
     }
@@ -137,17 +148,26 @@ export function CommunityRoomsScreen() {
     ({ item }: { item: CommunityRoom }) => {
       const count = item.participantCount ?? 0;
       const isJoining = joiningId === item.id;
+      const isGated = item.isSeekerGated === true;
       return (
         <TouchableOpacity
-          style={styles.roomCard}
+          style={[styles.roomCard, isGated && styles.roomCardGated]}
           onPress={() => handleJoinRoom(item)}
           activeOpacity={0.75}
           disabled={isJoining}
         >
           <View style={styles.roomCardLeft}>
-            <View style={styles.liveIndicator}>
-              <View style={styles.liveDot} />
-              <Text style={styles.liveText}>LIVE</Text>
+            <View style={styles.liveRow}>
+              <View style={styles.liveIndicator}>
+                <View style={styles.liveDot} />
+                <Text style={styles.liveText}>LIVE</Text>
+              </View>
+              {isGated && (
+                <View style={styles.skrBadge}>
+                  <Ionicons name="shield-checkmark" size={10} color={SKR_COLOR} />
+                  <Text style={styles.skrBadgeText}>SKR</Text>
+                </View>
+              )}
             </View>
             <Text style={styles.roomTitle} numberOfLines={2}>
               {item.title}
@@ -165,10 +185,11 @@ export function CommunityRoomsScreen() {
               <ActivityIndicator size="small" color={colors.primary} style={{ marginTop: 8 }} />
             ) : (
               <TouchableOpacity
-                style={styles.joinButton}
+                style={[styles.joinButton, isGated && styles.joinButtonGated]}
                 onPress={() => handleJoinRoom(item)}
                 activeOpacity={0.8}
               >
+                {isGated && <Ionicons name="shield-checkmark" size={11} color={colors.background} style={{ marginRight: 3 }} />}
                 <Text style={styles.joinButtonText}>Join</Text>
               </TouchableOpacity>
             )}
@@ -181,7 +202,6 @@ export function CommunityRoomsScreen() {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => router.back()} style={styles.backBtn}>
           <Ionicons name="arrow-back" size={22} color={colors.text} />
@@ -195,7 +215,6 @@ export function CommunityRoomsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Room list */}
       {isLoading && rooms.length === 0 ? (
         <View style={styles.centered}>
           <ActivityIndicator size="large" color={colors.primary} />
@@ -219,7 +238,7 @@ export function CommunityRoomsScreen() {
           }
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
-              <Text style={styles.emptyIcon}>🎙️</Text>
+              <Ionicons name="mic-outline" size={56} color={colors.textMuted} style={{ marginBottom: spacing.md }} />
               <Text style={styles.emptyTitle}>No rooms yet</Text>
               <Text style={styles.emptySub}>
                 Be the first to start a conversation
@@ -235,7 +254,7 @@ export function CommunityRoomsScreen() {
         />
       )}
 
-      {/* Join name modal */}
+      {/* Join — display name modal */}
       <Modal
         visible={!!pendingJoinRoom}
         transparent
@@ -247,6 +266,12 @@ export function CommunityRoomsScreen() {
           style={styles.modalOverlay}
         >
           <View style={styles.modalCard}>
+            {pendingJoinRoom?.isSeekerGated && (
+              <View style={styles.gatedNotice}>
+                <Ionicons name="shield-checkmark" size={14} color={SKR_COLOR} />
+                <Text style={styles.gatedNoticeText}>Seeker Exclusive — SKR token required</Text>
+              </View>
+            )}
             <Text style={styles.modalTitle}>Join "{pendingJoinRoom?.title}"</Text>
             <Text style={styles.modalSub}>Enter a display name so others know who you are.</Text>
             <TextInput
@@ -308,12 +333,33 @@ export function CommunityRoomsScreen() {
               returnKeyType="done"
               onSubmitEditing={handleCreateRoom}
             />
+            {/* Seeker Exclusive toggle */}
+            <View style={styles.seekerToggleRow}>
+              <View style={styles.seekerToggleLeft}>
+                <Ionicons name="shield-checkmark" size={18} color={isSeekerGated ? SKR_COLOR : colors.textMuted} />
+                <View style={styles.seekerToggleLabels}>
+                  <Text style={[styles.seekerToggleTitle, isSeekerGated && styles.seekerToggleTitleActive]}>
+                    Seeker Exclusive
+                  </Text>
+                  <Text style={styles.seekerToggleSub}>
+                    Only SKR token holders can join
+                  </Text>
+                </View>
+              </View>
+              <Switch
+                value={isSeekerGated}
+                onValueChange={setIsSeekerGated}
+                trackColor={{ false: colors.border, true: `${SKR_COLOR}60` }}
+                thumbColor={isSeekerGated ? SKR_COLOR : colors.textMuted}
+              />
+            </View>
             <View style={styles.modalActions}>
               <TouchableOpacity
                 style={styles.cancelBtn}
                 onPress={() => {
                   setShowCreate(false);
                   setNewTitle("");
+                  setIsSeekerGated(false);
                 }}
               >
                 <Text style={styles.cancelBtnText}>Cancel</Text>
@@ -332,6 +378,38 @@ export function CommunityRoomsScreen() {
             </View>
           </View>
         </KeyboardAvoidingView>
+      </Modal>
+
+      {/* Seeker gated — access denied modal */}
+      <Modal
+        visible={showSeekerGatedModal}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowSeekerGatedModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalCard}>
+            <View style={styles.seekerDeniedIcon}>
+              <Ionicons name="shield-checkmark" size={36} color={SKR_COLOR} />
+            </View>
+            <Text style={styles.modalTitle}>Seeker Exclusive Room</Text>
+            <Text style={styles.modalSub}>
+              This room is reserved for Seeker (SKR) token holders. SKR is the native token of the
+              Solana Mobile Seeker device ecosystem — rewarding early supporters of the web3 mobile
+              revolution.
+            </Text>
+            <Text style={styles.seekerDeniedHint}>
+              Your connected wallet does not hold any SKR tokens. Acquire SKR on a Solana DEX to
+              unlock access to Seeker-exclusive rooms.
+            </Text>
+            <TouchableOpacity
+              style={styles.confirmBtn}
+              onPress={() => setShowSeekerGatedModal(false)}
+            >
+              <Text style={styles.confirmBtnText}>Got it</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </Modal>
     </SafeAreaView>
   );
@@ -396,15 +474,24 @@ const styles = StyleSheet.create({
     alignItems: "flex-start",
     marginBottom: spacing.sm,
   },
+  roomCardGated: {
+    borderColor: `${SKR_COLOR}40`,
+    backgroundColor: `${SKR_COLOR}08`,
+  },
   roomCardLeft: {
     flex: 1,
     marginRight: spacing.sm,
+  },
+  liveRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.xs,
+    marginBottom: 4,
   },
   liveIndicator: {
     flexDirection: "row",
     alignItems: "center",
     gap: 4,
-    marginBottom: 4,
   },
   liveDot: {
     width: 6,
@@ -417,6 +504,23 @@ const styles = StyleSheet.create({
     fontSize: 10,
     color: "#00FFA3",
     letterSpacing: 1,
+  },
+  skrBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 3,
+    backgroundColor: `${SKR_COLOR}20`,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: `${SKR_COLOR}40`,
+  },
+  skrBadgeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 9,
+    color: SKR_COLOR,
+    letterSpacing: 0.5,
   },
   roomTitle: {
     fontFamily: fonts.bodySemiBold,
@@ -452,6 +556,11 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     backgroundColor: colors.primary,
     borderRadius: 16,
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  joinButtonGated: {
+    backgroundColor: SKR_COLOR,
   },
   joinButtonText: {
     fontFamily: fonts.bodySemiBold,
@@ -474,10 +583,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "center",
     paddingVertical: 80,
-  },
-  emptyIcon: {
-    fontSize: 56,
-    marginBottom: spacing.md,
   },
   emptyTitle: {
     fontFamily: fonts.heading,
@@ -503,7 +608,86 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.background,
   },
-  // Modal
+  // Seeker gated notice in join modal
+  gatedNotice: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: `${SKR_COLOR}15`,
+    borderRadius: borderRadius.sm,
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 6,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: `${SKR_COLOR}30`,
+  },
+  gatedNoticeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12,
+    color: SKR_COLOR,
+  },
+  // Seeker toggle in create modal
+  seekerToggleRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: borderRadius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    marginBottom: spacing.md,
+  },
+  seekerToggleLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: spacing.sm,
+    flex: 1,
+  },
+  seekerToggleLabels: {
+    flex: 1,
+  },
+  seekerToggleTitle: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.textSecondary,
+  },
+  seekerToggleTitleActive: {
+    color: SKR_COLOR,
+  },
+  seekerToggleSub: {
+    fontFamily: fonts.body,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 1,
+  },
+  // Seeker denied modal
+  seekerDeniedIcon: {
+    alignSelf: "center",
+    width: 68,
+    height: 68,
+    borderRadius: 34,
+    backgroundColor: `${SKR_COLOR}15`,
+    alignItems: "center",
+    justifyContent: "center",
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: `${SKR_COLOR}30`,
+  },
+  seekerDeniedHint: {
+    fontFamily: fonts.body,
+    fontSize: 13,
+    color: colors.textMuted,
+    lineHeight: 19,
+    marginBottom: spacing.lg,
+    padding: spacing.sm,
+    backgroundColor: `${colors.error}10`,
+    borderRadius: borderRadius.sm,
+    borderLeftWidth: 3,
+    borderLeftColor: colors.error,
+  },
+  // Modal shared
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",

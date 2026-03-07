@@ -44,7 +44,7 @@ export function AdminDashboardScreen() {
 
   const myEvents = events.filter((e) => e.admin === publicKey);
   const totalTicketsSold = myEvents.reduce((sum, e) => sum + e.ticketsSold, 0);
-  const activeEvents = myEvents.filter((e) => e.isActive).length;
+  const activeEvents = myEvents.filter((e) => e.isActive && !e.isCancelled && !e.isMeetingEnded).length;
 
   // Derive total revenue from seat tiers
   const totalRevenue = myEvents.reduce((sum, event) => {

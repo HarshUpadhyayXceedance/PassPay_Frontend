@@ -48,10 +48,8 @@ export function BuyTicketScreen() {
 
   const event = getEvent(eventKey as string);
 
-  // Filter tiers for this event
   const eventTiers = seatTiers.filter((t) => t.eventKey === eventKey);
 
-  // Auto-select first available tier
   useEffect(() => {
     if (eventTiers.length > 0 && !selectedTier) {
       const firstAvailable = eventTiers.find((t) => t.availableSeats > 0);
@@ -59,7 +57,7 @@ export function BuyTicketScreen() {
     }
   }, [eventTiers.length]);
 
-  // Reset stale state when screen re-focuses (expo-router doesn't unmount screens)
+  // expo-router caches screens; reset transient state on re-focus
   useFocusEffect(
     useCallback(() => {
       setShowSuccess(false);
@@ -72,7 +70,6 @@ export function BuyTicketScreen() {
   useEffect(() => {
     fetchLoyaltyBenefits();
     if (eventKey) fetchSeatTiers(eventKey);
-    // Entrance animation
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -107,13 +104,11 @@ export function BuyTicketScreen() {
     );
   }
 
-  // Dynamic pricing multiplier: applies ratio to all tier prices
   const dynamicMultiplier =
     event.dynamicPricingEnabled && event.baseTicketPrice > 0
       ? event.currentTicketPrice / event.baseTicketPrice
       : 1;
 
-  // Calculate prices with dynamic pricing + loyalty discount
   const tierBasePrice = selectedTier ? selectedTier.price : 0;
   const basePrice = tierBasePrice;
   const currentPrice = tierBasePrice * dynamicMultiplier;
@@ -157,13 +152,11 @@ export function BuyTicketScreen() {
       const result = await apiBuyTicket(event.publicKey, selectedTier.publicKey, metadataUri);
       await refreshBalance();
 
-      // Send purchase confirmation notification
       scheduleLocalNotification(
         "Ticket Purchased!",
         `You got a ticket for ${event.name}. See you there!`
       );
 
-      // Schedule event reminder 1 hour before
       if (event.eventDate) {
         const reminderDate = new Date(event.eventDate);
         reminderDate.setHours(reminderDate.getHours() - 1);
@@ -176,7 +169,6 @@ export function BuyTicketScreen() {
         }
       }
 
-      // Success - show modal with confetti
       setPurchasedMint(result.mint);
       setBuying(false);
       setShowSuccess(true);
@@ -200,7 +192,6 @@ export function BuyTicketScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -225,7 +216,6 @@ export function BuyTicketScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Item Details */}
         <Text style={styles.sectionLabel}>ITEM DETAILS</Text>
         <View style={styles.card}>
           <View style={styles.itemRow}>
@@ -266,7 +256,6 @@ export function BuyTicketScreen() {
           </View>
         </View>
 
-        {/* Seat Tier Selector */}
         {eventTiers.length > 0 && (
           <>
             <Text style={styles.sectionLabel}>SELECT SEAT TIER</Text>
@@ -318,7 +307,6 @@ export function BuyTicketScreen() {
           </>
         )}
 
-        {/* Payment Method */}
         <Text style={styles.sectionLabel}>PAYMENT METHOD</Text>
         <View style={styles.card}>
           <View style={styles.paymentRow}>
@@ -337,7 +325,6 @@ export function BuyTicketScreen() {
           </View>
         </View>
 
-        {/* Price Breakdown */}
         <Text style={styles.sectionLabel}>PRICE BREAKDOWN</Text>
         <PriceBreakdown
           basePrice={basePrice}
@@ -347,7 +334,6 @@ export function BuyTicketScreen() {
           showDynamic={event.dynamicPricingEnabled}
         />
 
-        {/* Payment Summary */}
         <Text style={styles.sectionLabel}>PAYMENT SUMMARY</Text>
         <View style={styles.card}>
           <View style={styles.summaryRow}>
@@ -382,7 +368,6 @@ export function BuyTicketScreen() {
         )}
       </Animated.ScrollView>
 
-      {/* Bottom */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[
@@ -408,7 +393,6 @@ export function BuyTicketScreen() {
         </View>
       </View>
 
-      {/* Success Modal with Confetti */}
       <TicketPurchaseSuccess
         visible={showSuccess}
         mintAddress={purchasedMint}
@@ -661,7 +645,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  /* ---- Seat Tier Selector ---- */
   tierList: {
     gap: 10,
   },

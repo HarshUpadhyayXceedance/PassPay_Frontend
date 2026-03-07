@@ -63,7 +63,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       // Refresh balance after connection
       await get().refreshBalance();
 
-      console.log("✅ Phantom wallet connected:", pubkeyStr);
+      console.log("Phantom wallet connected:", pubkeyStr);
     } catch (error: any) {
       const errorMessage =
         error.message || "Failed to connect to Phantom wallet";
@@ -71,7 +71,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         isConnecting: false,
         error: errorMessage,
       });
-      console.error("❌ Phantom connection failed:", errorMessage);
+      console.error("Phantom connection failed:", errorMessage);
       throw error;
     }
   },
@@ -92,9 +92,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       });
       // Clear persisted wallet
       await AsyncStorage.removeItem(PERSISTED_WALLET_KEY).catch(() => {});
-      console.log("✅ Phantom wallet disconnected");
+      console.log("Phantom wallet disconnected");
     } catch (error: any) {
-      console.error("❌ Disconnect failed:", error.message);
+      console.error("Disconnect failed:", error.message);
       // Even if disconnect fails, clear state
       const { publicKey: failKey } = get();
       if (failKey) await clearAuthToken(failKey).catch(() => {});
@@ -127,7 +127,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         phantomWalletAdapter.restorePublicKey(new PublicKey(storedKey));
         // Check if a valid JWT is stored — log result for debugging
         const token = await getAuthToken(storedKey);
-        console.log("📦 Wallet restored from persistence:", storedKey.slice(0, 8), token ? "(JWT valid)" : "(no JWT — will use legacy auth)");
+        console.log("Wallet restored from persistence:", storedKey.slice(0, 8), token ? "(JWT valid)" : "(no JWT — will use legacy auth)");
         return true;
       }
     } catch (e) {
@@ -147,9 +147,9 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       const solBalance = lamports / LAMPORTS_PER_SOL;
 
       set({ balance: solBalance, error: null });
-      console.log("💰 Balance refreshed:", solBalance, "SOL");
+      console.log("Balance refreshed:", solBalance, "SOL");
     } catch (error: any) {
-      console.error("❌ Failed to refresh balance:", error.message);
+      console.error("Failed to refresh balance:", error.message);
       // Reset singleton on RPC failure so the next call gets a fresh connection
       _solanaConnection = null;
       set({ error: "Unable to fetch balance. Check your connection." });

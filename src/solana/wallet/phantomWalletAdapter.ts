@@ -100,10 +100,10 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
       this._authToken = authResult.auth_token ?? null;
       this._devMode = false;
 
-      console.log("✅ Connected to Phantom:", this._publicKey.toBase58());
+      console.log("Connected to Phantom:", this._publicKey.toBase58());
       return this._publicKey;
     } catch (error: any) {
-      console.error("❌ Phantom connection failed:", error);
+      console.error("Phantom connection failed:", error);
 
       if (
         error.message?.includes("No installed wallet") ||
@@ -141,7 +141,7 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
       this._publicKey = new PublicKey(clipText.trim());
       this._devMode = true;
       console.log(
-        "✅ Connected via clipboard (dev mode):",
+        "Connected via clipboard (dev mode):",
         this._publicKey.toBase58()
       );
       showInfo(
@@ -170,7 +170,7 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
       this._publicKey = null;
       this._authToken = null;
       this._devMode = false;
-      console.log("✅ Disconnected from Phantom");
+      console.log("Disconnected from Phantom");
     }
   }
 
@@ -190,7 +190,7 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
         return;
       } catch {
         // reauthorize failed (token expired), fall back to full authorize
-        console.warn("⚠️ Reauthorize failed, falling back to authorize");
+        console.warn("Reauthorize failed, falling back to authorize");
       }
     }
     const result = await wallet.authorize({
@@ -254,7 +254,7 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
 
     // MWA web3js wrapper returns base58 signature strings
     const signature = signatures[0];
-    console.log("✅ Transaction sent:", signature);
+    console.log("Transaction sent:", signature);
     return { signature: String(signature) };
   }
 

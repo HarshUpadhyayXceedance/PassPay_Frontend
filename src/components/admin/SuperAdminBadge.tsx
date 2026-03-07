@@ -1,6 +1,7 @@
 import React from "react";
-import { View, Text, StyleSheet } from "react-native";
+import { Text, StyleSheet } from "react-native";
 import { LinearGradient } from "expo-linear-gradient";
+import { Ionicons } from "@expo/vector-icons";
 import { colors } from "../../theme/colors";
 import { typography } from "../../theme/typography";
 
@@ -36,7 +37,12 @@ export function SuperAdminBadge({ size = "medium" }: SuperAdminBadgeProps) {
       end={{ x: 1, y: 1 }}
       style={[styles.badge, currentSize.badge]}
     >
-      <Text style={[styles.icon, currentSize.icon]}>⚡</Text>
+      <Ionicons
+        name="flash"
+        size={size === "small" ? 12 : size === "large" ? 18 : 14}
+        color="#FFFFFF"
+        style={currentSize.icon}
+      />
       <Text style={[styles.text, currentSize.text]}>SUPER ADMIN</Text>
     </LinearGradient>
   );
@@ -71,19 +77,13 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     borderRadius: 16,
   },
-  icon: {
-    marginRight: 4,
-  },
   iconSmall: {
-    fontSize: 12,
     marginRight: 3,
   },
   iconMedium: {
-    fontSize: 14,
     marginRight: 4,
   },
   iconLarge: {
-    fontSize: 18,
     marginRight: 6,
   },
   text: {

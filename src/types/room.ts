@@ -4,6 +4,7 @@ export interface CommunityRoom {
   title: string;
   type: "public" | "ticket";
   eventPda?: string;
+  isSeekerGated?: boolean;
   livekitRoom: string;
   maxParticipants: number;
   createdAt: number;
@@ -21,6 +22,7 @@ export interface JoinRoomResult {
 export interface CreateRoomBody {
   title: string;
   maxParticipants?: number;
+  isSeekerGated?: boolean;
 }
 
 export interface ChatMessage {

@@ -36,7 +36,7 @@ export async function detectUserRole(
     ) {
       const isDev = walletPublicKey.equals(DEV_SUPER_ADMIN_PUBKEY);
       console.log(
-        `✅ Role detected: super_admin (${isDev ? "dev mock wallet" : "production"})`
+        `Role detected: super_admin (${isDev ? "dev mock wallet" : "production"})`
       );
       return "super_admin";
     }
@@ -59,10 +59,10 @@ export async function detectUserRole(
       const adminAccount = await (program.account as any).admin.fetch(adminPda);
 
       if (adminAccount.isActive) {
-        console.log("✅ Role detected: admin (active Admin PDA found)");
+        console.log("Role detected: admin (active Admin PDA found)");
         return "admin";
       } else {
-        console.log("⚠️ Admin PDA found but inactive, continuing checks...");
+        console.log("Admin PDA found but inactive, continuing checks...");
       }
     } catch (error: any) {
       // Admin PDA doesn't exist or fetch failed, this is normal
@@ -90,12 +90,12 @@ export async function detectUserRole(
 
       if (activeMerchant) {
         console.log(
-          "✅ Role detected: merchant (active Merchant PDA found)"
+          "Role detected: merchant (active Merchant PDA found)"
         );
         return "merchant";
       } else if (merchantAccounts.length > 0) {
         console.log(
-          "⚠️ Merchant PDAs found but all inactive, defaulting to user role"
+          "Merchant PDAs found but all inactive, defaulting to user role"
         );
       }
     } catch (error: any) {
@@ -103,7 +103,7 @@ export async function detectUserRole(
     }
 
     // Step 4: Default to user role
-    console.log("✅ Role detected: user (no admin/merchant PDAs found)");
+    console.log("Role detected: user (no admin/merchant PDAs found)");
     return "user";
   } catch (error) {
     console.error("Fatal error in role detection:", error);
