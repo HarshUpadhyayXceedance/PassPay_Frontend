@@ -1,24 +1,38 @@
-import { useCallback } from "react";
+import { useCallback, useEffect, useRef } from "react";
 import { useLocalSearchParams } from "expo-router";
 import { useFocusEffect } from "expo-router";
 import { View, Text, StyleSheet } from "react-native";
 import { EventDetailsAdminScreen } from "../../src/screens/admin/EventDetailsAdminScreen";
 import { useEventStore } from "../../src/store/eventStore";
 import { useEvents } from "../../src/hooks/useEvents";
+import { useMerchants } from "../../src/hooks/useMerchants";
 import { colors } from "../../src/theme/colors";
 import { fonts } from "../../src/theme/fonts";
+
+const POLL_INTERVAL = 15_000; // 15 seconds
 
 export default function EventDetailsRoute() {
   const { eventKey } = useLocalSearchParams<{ eventKey: string }>();
   const events = useEventStore((s) => s.events);
   const { fetchEvents } = useEvents();
+  const { fetchSeatTiers } = useMerchants();
   const event = events.find((e) => e.publicKey === eventKey);
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
-  // Refetch events when screen gains focus (e.g. returning from dynamic pricing setup)
+  const refreshAll = useCallback(() => {
+    fetchEvents();
+    if (eventKey) fetchSeatTiers(eventKey);
+  }, [eventKey]);
+
+  // Fetch on focus + start polling; stop polling on blur
   useFocusEffect(
     useCallback(() => {
-      fetchEvents();
-    }, [])
+      refreshAll();
+      intervalRef.current = setInterval(refreshAll, POLL_INTERVAL);
+      return () => {
+        if (intervalRef.current) clearInterval(intervalRef.current);
+      };
+    }, [refreshAll])
   );
 
   if (!event) {
@@ -29,7 +43,7 @@ export default function EventDetailsRoute() {
     );
   }
 
-  return <EventDetailsAdminScreen event={event} onRefresh={fetchEvents} />;
+  return <EventDetailsAdminScreen event={event} onRefresh={refreshAll} />;
 }
 
 const styles = StyleSheet.create({

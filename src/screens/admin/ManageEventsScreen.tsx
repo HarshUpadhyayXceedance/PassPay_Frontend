@@ -130,35 +130,35 @@ export function ManageEventsScreen() {
               </View>
 
               {/* Status badge */}
-              <View
-                style={[
-                  styles.statusBadge,
-                  item.isActive
-                    ? styles.statusActive
-                    : styles.statusInactive,
-                ]}
-              >
-                <View
-                  style={[
-                    styles.statusDot,
-                    {
-                      backgroundColor: item.isActive
-                        ? colors.success
-                        : colors.error,
-                    },
-                  ]}
-                />
-                <Text
-                  style={[
-                    styles.statusText,
-                    {
-                      color: item.isActive ? colors.success : colors.error,
-                    },
-                  ]}
-                >
-                  {item.isActive ? "Active" : "Inactive"}
-                </Text>
-              </View>
+              {(() => {
+                const statusLabel = item.isCancelled
+                  ? "Cancelled"
+                  : item.isMeetingEnded
+                  ? "Ended"
+                  : item.isActive
+                  ? "Active"
+                  : "Inactive";
+                const statusColor = item.isCancelled || item.isMeetingEnded
+                  ? colors.error
+                  : item.isActive
+                  ? colors.success
+                  : colors.error;
+                return (
+                  <View
+                    style={[
+                      styles.statusBadge,
+                      item.isActive && !item.isCancelled && !item.isMeetingEnded
+                        ? styles.statusActive
+                        : styles.statusInactive,
+                    ]}
+                  >
+                    <View style={[styles.statusDot, { backgroundColor: statusColor }]} />
+                    <Text style={[styles.statusText, { color: statusColor }]}>
+                      {statusLabel}
+                    </Text>
+                  </View>
+                );
+              })()}
             </View>
 
             {/* Sell percentage bar */}

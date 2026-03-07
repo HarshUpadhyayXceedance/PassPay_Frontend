@@ -54,6 +54,18 @@ export async function apiRequestSpeak(
   );
 }
 
+export async function apiRevokeSpeak(
+  eventPda: string,
+  targetPubkey: string,
+  publicKey: string
+): Promise<void> {
+  await backendFetch<{ revoked: boolean }>(
+    `/api/meetings/${eventPda}/revoke-speak`,
+    { method: "POST", body: JSON.stringify({ targetPubkey }) },
+    publicKey
+  );
+}
+
 export async function apiEndMeeting(
   eventPda: string,
   publicKey: string

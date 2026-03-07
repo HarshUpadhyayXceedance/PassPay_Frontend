@@ -37,5 +37,6 @@ export interface TicketDisplay {
   pricePaid: number; // lamports
   eventIsCancelled: boolean;
   eventIsActive: boolean;
+  eventIsMeetingEnded: boolean;
   refundStatus: RefundStatus;
 }

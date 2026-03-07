@@ -53,6 +53,7 @@ export function useTickets() {
           let eventDate = new Date();
           let eventIsCancelled = false;
           let eventIsActive = true;
+          let eventIsMeetingEnded = false;
 
           try {
             const eventAcc = await program.account.event.fetch(data.event);
@@ -62,6 +63,7 @@ export function useTickets() {
             eventDate = fromUnixTimestamp(eventData.eventDate.toNumber());
             eventIsCancelled = eventData.isCancelled ?? false;
             eventIsActive = eventData.isActive ?? true;
+            eventIsMeetingEnded = eventData.isMeetingEnded ?? false;
           } catch {
             // event might not exist
           }
@@ -108,6 +110,7 @@ export function useTickets() {
             pricePaid: data.pricePaid?.toNumber?.() ?? 0,
             eventIsCancelled,
             eventIsActive,
+            eventIsMeetingEnded,
             refundStatus,
           };
         })

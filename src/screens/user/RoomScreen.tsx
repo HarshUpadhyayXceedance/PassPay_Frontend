@@ -24,6 +24,7 @@ import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
 import { showError, showInfo, showSuccess } from "../../utils/alerts";
 import { useRooms } from "../../hooks/useRooms";
+import { apiRevokeSpeak } from "../../services/api/roomApi";
 import { ChatMessage } from "../../types/room";
 import { useWalletStore } from "../../store/walletStore";
 import {
@@ -184,6 +185,10 @@ export function RoomScreen() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const isCameraOnRef = useRef(false);
   useEffect(() => { isCameraOnRef.current = isCameraOn; }, [isCameraOn]);
+  // Local camera publication — updated via LiveKit events (not render-time lookup)
+  const [localCameraPub, setLocalCameraPub] = useState<any>(null);
+  // Local screen share publication — updated via LiveKit events
+  const [localScreenSharePub, setLocalScreenSharePub] = useState<any>(null);
   // Remote video tracks: identity → { trackPublication, source }
   const [remoteVideoTracks, setRemoteVideoTracks] = useState<VideoTrackInfo[]>([]);
   // Active screen share from remote participant
@@ -314,6 +319,8 @@ export function RoomScreen() {
     isCameraOnRef.current = false;
     setIsCameraFront(true);
     setIsScreenSharing(false);
+    setLocalCameraPub(null);
+    setLocalScreenSharePub(null);
     setRemoteVideoTracks([]);
     setRemoteScreenShare(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -491,7 +498,7 @@ export function RoomScreen() {
             return [...prev, { identity: participant.identity, trackPublication: publication, source: "camera" }];
           });
         } else if (track.source === TrackEnum.Source.ScreenShare) {
-          setRemoteScreenShare({ identity: participant.identity, source: "screen_share" });
+          setRemoteScreenShare({ identity: participant.identity, trackPublication: publication, source: "screen_share" });
         }
       });
 
@@ -519,6 +526,24 @@ export function RoomScreen() {
             if (prev.some((t) => t.identity === participant.identity && t.source === "camera")) return prev;
             return [...prev, { identity: participant.identity, trackPublication: publication, source: "camera" }];
           });
+        }
+      });
+    }
+
+    // ── Local track publish/unpublish events (for local camera tile) ──
+    if (isMeeting && TrackEnum) {
+      lkRoom.on(RoomEvent.LocalTrackPublished, (publication: any) => {
+        if (publication?.source === TrackEnum.Source.Camera) {
+          setLocalCameraPub(publication);
+        } else if (publication?.source === TrackEnum.Source.ScreenShare) {
+          setLocalScreenSharePub(publication);
+        }
+      });
+      lkRoom.on(RoomEvent.LocalTrackUnpublished, (publication: any) => {
+        if (publication?.source === TrackEnum.Source.Camera) {
+          setLocalCameraPub(null);
+        } else if (publication?.source === TrackEnum.Source.ScreenShare) {
+          setLocalScreenSharePub(null);
         }
       });
     }
@@ -563,26 +588,26 @@ export function RoomScreen() {
     if (!lkRoom || !isMeeting) return;
     const next = !isCameraOn;
     if (next) {
-      // Mark in-progress BEFORE permission request so AppState handler can
-      // navigate back to room if Android restores a different screen.
+      // Keep mwaInProgressRef=true for the ENTIRE operation (permission + camera enable).
+      // Both can briefly background the app on Android; clearing early leaves user stranded.
       mwaInProgressRef.current = true;
       const granted = await requestCameraPermission();
-      mwaInProgressRef.current = false;
       if (!granted) {
+        mwaInProgressRef.current = false;
         showError("Permission Denied", "Camera permission is required for video.");
         return;
       }
     }
-    // Optimistic update — avoids black frame between async call and state change
-    setIsCameraOn(next);
-    isCameraOnRef.current = next;
     try {
       await lkRoom.localParticipant.setCameraEnabled(next, next ? { facingMode: isCameraFront ? "user" : "environment" } : undefined);
+      setIsCameraOn(next);
+      isCameraOnRef.current = next;
+      if (!next) setLocalCameraPub(null);
     } catch (err: any) {
-      // Revert on failure
-      setIsCameraOn(!next);
-      isCameraOnRef.current = !next;
       showError("Camera Error", err.message ?? "Could not toggle camera.");
+    } finally {
+      // Delayed clear — gives AppState handler time to fire first if app was backgrounded
+      setTimeout(() => { mwaInProgressRef.current = false; }, 1000);
     }
   }, [isCameraOn, isCameraFront, isMeeting]);
 
@@ -591,17 +616,24 @@ export function RoomScreen() {
     const lkRoom = roomRef.current;
     if (!lkRoom || !isCameraOn) return;
     const newFront = !isCameraFront;
-    setIsCameraFront(newFront);
     try {
-      // Use restartTrack on the existing camera track for seamless switching
       const camPub = lkRoom.localParticipant.getTrackPublication(TrackEnum?.Source?.Camera);
       if (camPub?.track) {
-        await camPub.track.restartTrack({ facingMode: newFront ? "user" : "environment" });
-      } else {
-        // Fallback: disable then re-enable
-        await lkRoom.localParticipant.setCameraEnabled(false);
-        await lkRoom.localParticipant.setCameraEnabled(true, { facingMode: newFront ? "user" : "environment" });
+        // Try restartTrack first (seamless switch)
+        try {
+          await camPub.track.restartTrack({ facingMode: newFront ? "user" : "environment" });
+          setIsCameraFront(newFront);
+          return;
+        } catch {
+          // restartTrack failed — fall through to disable/re-enable
+        }
       }
+      // Fallback: disable then re-enable with new facing mode
+      await lkRoom.localParticipant.setCameraEnabled(false);
+      // Small delay to let the track fully release
+      await new Promise<void>((r) => setTimeout(r, 300));
+      await lkRoom.localParticipant.setCameraEnabled(true, { facingMode: newFront ? "user" : "environment" });
+      setIsCameraFront(newFront);
     } catch (err: any) {
       showError("Camera Error", err.message ?? "Could not flip camera.");
     }
@@ -625,7 +657,8 @@ export function RoomScreen() {
         showError("Screen Share", err.message ?? "Could not start screen sharing.");
       }
     } finally {
-      mwaInProgressRef.current = false;
+      // Delayed clear — gives AppState handler time to fire first if app was backgrounded
+      setTimeout(() => { mwaInProgressRef.current = false; }, 1000);
     }
   }, [isScreenSharing, isMeeting]);
 
@@ -661,6 +694,26 @@ export function RoomScreen() {
       await updateSpeakRequestStatus(roomId, req.pubkey, "denied", req.name);
     } catch {}
   }, [roomId]);
+
+  const handleRevokeSpeak = useCallback(async (identity: string) => {
+    if (!eventPda || !publicKey) return;
+    const name = participantNames[identity] || shortenAddress(identity);
+    Alert.alert("Revoke Speaker", `Remove speaking permission from ${name}?`, [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Revoke",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await apiRevokeSpeak(eventPda, identity, publicKey);
+            showSuccess("Revoked", `${name} can no longer speak.`);
+          } catch {
+            showError("Failed", "Could not revoke speaking access.");
+          }
+        },
+      },
+    ]);
+  }, [eventPda, publicKey, participantNames]);
 
   // ── Attendee gets speaker permission after approval ───────────────────
   const handleSpeakerUpgrade = useCallback(async () => {
@@ -830,10 +883,8 @@ export function RoomScreen() {
   const isAdminInMeeting = isMeeting && initialRole === "speaker";
 
   // ── Determine if any video/screenshare is active (for layout) ────────
-  const hasAnyVideo = isMeeting && (isCameraOn || remoteVideoTracks.length > 0 || remoteScreenShare !== null || isScreenSharing);
-  const localCameraTrackRef = isCameraOn && roomRef.current
-    ? roomRef.current.localParticipant?.getTrackPublication?.(TrackEnum?.Source?.Camera)
-    : null;
+  const hasLocalCamera = isCameraOn && !!localCameraPub;
+  const hasAnyVideo = isMeeting && (hasLocalCamera || remoteVideoTracks.length > 0 || remoteScreenShare !== null || isScreenSharing);
 
   // ── Video tile component ──────────────────────────────────────────────
   const renderVideoTile = (
@@ -1025,24 +1076,38 @@ export function RoomScreen() {
               </Text>
             </View>
             {isScreenSharing ? (
-              <View style={styles.screenSharePlaceholder}>
-                <Ionicons name="desktop-outline" size={48} color={colors.textMuted} />
-                <Text style={styles.screenSharePlaceholderText}>Your screen is being shared</Text>
-                <TouchableOpacity style={styles.stopShareBtn} onPress={toggleScreenShare}>
+              <View style={styles.screenShareVideoWrap}>
+                {localScreenSharePub && VideoTrackComponent ? (
+                  <VideoTrackComponent
+                    trackRef={{
+                      participant: roomRef.current?.localParticipant,
+                      publication: localScreenSharePub,
+                      source: TrackEnum?.Source?.ScreenShare,
+                    }}
+                    style={styles.screenShareVideo}
+                    objectFit="contain"
+                  />
+                ) : (
+                  <View style={styles.screenSharePlaceholder}>
+                    <Ionicons name="desktop-outline" size={48} color={colors.textMuted} />
+                    <Text style={styles.screenSharePlaceholderText}>Your screen is being shared</Text>
+                  </View>
+                )}
+                <TouchableOpacity style={styles.stopShareOverlay} onPress={toggleScreenShare}>
                   <Ionicons name="stop-circle-outline" size={18} color="#FFF" />
                   <Text style={styles.stopShareBtnText}>Stop Sharing</Text>
                 </TouchableOpacity>
               </View>
             ) : remoteScreenShare && VideoTrackComponent ? (() => {
-              // Always get fresh participant + publication at render time to avoid
-              // stale reference bugs (track refs change after reconnect)
+              // Use stored publication from TrackSubscribed, with live lookup as fallback
               const ssParticipant = roomRef.current?.remoteParticipants?.get(remoteScreenShare.identity);
-              const ssPub = ssParticipant?.getTrackPublication?.(TrackEnum?.Source?.ScreenShare);
-              if (!ssParticipant || !ssPub) return null;
+              const ssPub = ssParticipant?.getTrackPublication?.(TrackEnum?.Source?.ScreenShare) ?? remoteScreenShare.trackPublication;
+              const ssParticipantRef = ssParticipant ?? (ssPub ? { identity: remoteScreenShare.identity } : null);
+              if (!ssParticipantRef || !ssPub) return null;
               return (
                 <VideoTrackComponent
                   trackRef={{
-                    participant: ssParticipant,
+                    participant: ssParticipantRef,
                     publication: ssPub,
                     source: TrackEnum?.Source?.ScreenShare,
                   }}
@@ -1058,17 +1123,17 @@ export function RoomScreen() {
         {isMeeting && hasAnyVideo && !(remoteScreenShare || isScreenSharing) ? (
           <View style={styles.videoGrid}>
             {/* Local camera */}
-            {isCameraOn && localCameraTrackRef && renderVideoTile(
-              localCameraTrackRef,
+            {hasLocalCamera && renderVideoTile(
+              localCameraPub,
               localIdentity,
               true,
               "You",
               remoteVideoTracks.length === 0 ? styles.videoTileFull : styles.videoTileHalf
             )}
             {/* Remote cameras */}
-            {remoteVideoTracks.slice(0, isCameraOn ? 3 : 4).map((track) => {
+            {remoteVideoTracks.slice(0, hasLocalCamera ? 3 : 4).map((track) => {
               const name = participantNames[track.identity] || shortenAddress(track.identity);
-              const totalTiles = (isCameraOn ? 1 : 0) + Math.min(remoteVideoTracks.length, isCameraOn ? 3 : 4);
+              const totalTiles = (hasLocalCamera ? 1 : 0) + Math.min(remoteVideoTracks.length, hasLocalCamera ? 3 : 4);
               return renderVideoTile(
                 track.trackPublication,
                 track.identity,
@@ -1078,9 +1143,9 @@ export function RoomScreen() {
               );
             })}
             {/* Overflow indicator */}
-            {remoteVideoTracks.length > (isCameraOn ? 3 : 4) && (
+            {remoteVideoTracks.length > (hasLocalCamera ? 3 : 4) && (
               <View style={[styles.videoTile, styles.videoTileHalf, styles.videoTileOverflow]}>
-                <Text style={styles.videoOverflowText}>+{remoteVideoTracks.length - (isCameraOn ? 3 : 4)}</Text>
+                <Text style={styles.videoOverflowText}>+{remoteVideoTracks.length - (hasLocalCamera ? 3 : 4)}</Text>
                 <Text style={styles.videoOverflowSub}>more with video</Text>
               </View>
             )}
@@ -1088,8 +1153,8 @@ export function RoomScreen() {
         ) : hasAnyVideo && (remoteScreenShare || isScreenSharing) ? (
           /* Small video tiles row below screen share */
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniVideoRow}>
-            {isCameraOn && localCameraTrackRef && renderVideoTile(
-              localCameraTrackRef,
+            {hasLocalCamera && renderVideoTile(
+              localCameraPub,
               localIdentity,
               true,
               "You",
@@ -1365,6 +1430,8 @@ export function RoomScreen() {
                 const isSpeaking = activeSpeakers.has(identity);
                 const hasVideo = remoteVideoTracks.some((t) => t.identity === identity);
                 const isSharingScreen = remoteScreenShare?.identity === identity;
+                const remoteP = roomRef.current?.remoteParticipants?.get(identity);
+                const canPublish = remoteP?.permissions?.canPublish === true;
                 return (
                   <View key={identity} style={styles.participantRow}>
                     <View style={[styles.participantAvatar, { backgroundColor: color + "40" }]}>
@@ -1372,11 +1439,18 @@ export function RoomScreen() {
                     </View>
                     <View style={styles.participantInfo}>
                       <Text style={styles.participantName}>{name}</Text>
-                      <Text style={styles.participantRole}>{isMeeting ? "Attendee" : "Member"}</Text>
+                      <Text style={styles.participantRole}>
+                        {isMeeting ? (canPublish ? "Speaker" : "Listener") : "Member"}
+                      </Text>
                     </View>
                     {hasVideo && <Ionicons name="videocam" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
                     {isSharingScreen && <Ionicons name="desktop-outline" size={16} color={colors.primary} style={{ marginLeft: 4 }} />}
                     {isSpeaking && <View style={styles.speakingDot} />}
+                    {isAdminInMeeting && canPublish && (
+                      <TouchableOpacity style={styles.revokeBtn} onPress={() => handleRevokeSpeak(identity)}>
+                        <Text style={styles.revokeBtnText}>Revoke</Text>
+                      </TouchableOpacity>
+                    )}
                   </View>
                 );
               })}
@@ -1478,6 +1552,8 @@ const styles = StyleSheet.create({
   screenShareBanner: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: `${colors.primary}15` },
   screenShareBannerText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.primary },
   screenShareVideo: { flex: 1, backgroundColor: "#000" },
+  screenShareVideoWrap: { flex: 1, position: "relative" as const },
+  stopShareOverlay: { position: "absolute" as const, bottom: 16, alignSelf: "center" as const, flexDirection: "row" as const, alignItems: "center" as const, gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "rgba(255,71,87,0.9)", borderRadius: borderRadius.md },
   screenSharePlaceholder: { flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: "#111", gap: 12 },
   screenSharePlaceholderText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
   stopShareBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FF4757", borderRadius: borderRadius.md },
@@ -1533,4 +1609,6 @@ const styles = StyleSheet.create({
   approveBtn: { paddingHorizontal: 12, paddingVertical: 5, backgroundColor: colors.primary, borderRadius: 12 },
   approveBtnText: { fontFamily: fonts.bodySemiBold, fontSize: 11, color: colors.background },
   denyBtn: { width: 28, height: 28, alignItems: "center", justifyContent: "center", borderRadius: 14, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border },
+  revokeBtn: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: borderRadius.sm, backgroundColor: "rgba(255,71,87,0.15)", marginLeft: 8 },
+  revokeBtnText: { fontFamily: fonts.body, fontSize: 11, color: "#FF4757", fontWeight: "600" as const },
 });

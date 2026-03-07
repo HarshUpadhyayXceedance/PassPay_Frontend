@@ -297,6 +297,8 @@ export function TicketDetailsScreen() {
                 styles.infoValue,
                 ticket.eventIsCancelled
                   ? styles.cancelledEvent
+                  : ticket.eventIsMeetingEnded
+                  ? styles.pastEvent
                   : isPastEvent
                   ? styles.pastEvent
                   : styles.upcomingEvent,
@@ -304,6 +306,8 @@ export function TicketDetailsScreen() {
             >
               {ticket.eventIsCancelled
                 ? "Event Cancelled"
+                : ticket.eventIsMeetingEnded
+                ? "Meeting Ended"
                 : isPastEvent
                 ? "Event Ended"
                 : "Upcoming"}
@@ -408,8 +412,8 @@ export function TicketDetailsScreen() {
             </TouchableOpacity>
           )}
 
-          {/* Join Meeting — online events only, ticket is the entry pass */}
-          {isOnline && !ticket.eventIsCancelled && (
+          {/* Join Meeting — online events only, hide if meeting ended on-chain */}
+          {isOnline && !ticket.eventIsCancelled && !ticket.eventIsMeetingEnded && (
             <TouchableOpacity
               style={[styles.joinMeetingButton, isJoiningMeeting && { opacity: 0.6 }]}
               onPress={handleJoinMeeting}
@@ -718,7 +722,8 @@ const styles = StyleSheet.create({
     color: colors.secondary,
   },
   pastEvent: {
-    color: colors.textMuted,
+    color: "#FF6B6B",
+    fontWeight: "700",
   },
   cancelledEvent: {
     color: "#FF4757",

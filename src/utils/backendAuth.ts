@@ -14,7 +14,7 @@
 import * as SecureStore from "expo-secure-store";
 import { Buffer } from "buffer";
 
-export const BACKEND_URL = "https://passpay-backend-web2-production.up.railway.app";
+export const BACKEND_URL = "https://passpay-backend-web2.vercel.app";
 
 const JWT_KEY = (pubkey: string) => `backend_jwt_${pubkey}`;
 
