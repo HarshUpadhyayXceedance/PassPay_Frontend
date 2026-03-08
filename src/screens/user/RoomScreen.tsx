@@ -45,7 +45,6 @@ import {
   SpeakRequestStatus,
 } from "../../services/firebase/chatService";
 
-// LiveKit requires a dev build — not available in Expo Go
 let Room: any = null;
 let RoomEvent: any = null;
 let AudioSession: any = null;
@@ -62,7 +61,6 @@ try {
   VideoTrackComponent = lkRn.VideoTrack;
   if (lkRn.registerGlobals) lkRn.registerGlobals();
 } catch {
-  // Running in Expo Go — native module unavailable
 }
 
 const LIVEKIT_NATIVE_AVAILABLE = !!(Room && AudioSession);
@@ -122,11 +120,10 @@ async function requestCameraPermission(): Promise<boolean> {
   }
 }
 
-// trackPublication optional: camera tracks cache the pub; screen share resolves live from room at render time
 interface VideoTrackInfo {
   identity: string;
   trackPublication?: any;
-  source: string; // "camera" | "screen_share"
+  source: string;
 }
 
 export function RoomScreen() {
@@ -147,7 +144,6 @@ export function RoomScreen() {
 
   const eventDateMs = params.eventDate ? parseInt(params.eventDate, 10) : 0;
   const paramDisplayName = params.displayName ?? "";
-  // Changes each join so cached tab component can detect and reset state
   const joinTimestamp = params.joinTimestamp ?? "0";
   const hostPubkey = params.hostPubkey ?? "";
 
@@ -174,7 +170,6 @@ export function RoomScreen() {
 
   const [isMicOn, setIsMicOn] = useState(initialRole === "speaker");
   const [role, setRole] = useState<"speaker" | "listener">(initialRole);
-  // Ref so the Reconnected handler can read current mic state without stale closure
   const isMicOnRef = useRef(initialRole === "speaker");
   useEffect(() => { isMicOnRef.current = isMicOn; }, [isMicOn]);
 
@@ -183,7 +178,6 @@ export function RoomScreen() {
   const [isScreenSharing, setIsScreenSharing] = useState(false);
   const isCameraOnRef = useRef(false);
   useEffect(() => { isCameraOnRef.current = isCameraOn; }, [isCameraOn]);
-  // Updated via LiveKit events (not render-time lookup) to avoid stale pub refs
   const [localCameraPub, setLocalCameraPub] = useState<any>(null);
   const [localScreenSharePub, setLocalScreenSharePub] = useState<any>(null);
   const [remoteVideoTracks, setRemoteVideoTracks] = useState<VideoTrackInfo[]>([]);
@@ -199,7 +193,6 @@ export function RoomScreen() {
   const [isUpgradingToSpeaker, setIsUpgradingToSpeaker] = useState(false);
 
   const [isEndingMeeting, setIsEndingMeeting] = useState(false);
-  // Prevents subscribeMeetingEnded callback from double-navigating when admin is already handling the end flow
   const isEndingMeetingRef = useRef(false);
 
   const roomRef = useRef<any>(null);
@@ -209,23 +202,18 @@ export function RoomScreen() {
   const seenMessageIds = useRef<Set<string>>(new Set());
   const prevSpeakRequestCount = useRef(0);
   const nameConfirmed = useRef(!!paramDisplayName);
-  // Filters stale meetingEnded Firebase signals from previous sessions
   const joinedAtRef = useRef(Date.now());
   const prevJoinTimestampRef = useRef(joinTimestamp);
-  // True while MWA is in progress — AppState listener uses this to auto-navigate back to room when Android restores a different screen
   const mwaInProgressRef = useRef(false);
 
   useEffect(() => {
     showChatRef.current = showChat;
   }, [showChat]);
 
-  // When Phantom opens for MWA signing, Android may restore a different tab on return.
-  // Detect foreground resume while MWA was in progress and navigate back to the room.
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextState) => {
       if (nextState === "active" && mwaInProgressRef.current) {
         mwaInProgressRef.current = false;
-        // Small delay to let navigation stack settle after app resume
         setTimeout(() => {
           const isOnRoom = pathnameRef.current.includes("/room");
           if (!isOnRoom) {
@@ -250,11 +238,8 @@ export function RoomScreen() {
       }
     });
     return () => subscription.remove();
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, title, token, livekitUrl, initialRole, eventPda, eventDateMs, joinTimestamp]);
 
-  // expo-router caches tab screen components so useState initializers don't re-run on rejoin.
-  // Detect fresh join via joinTimestamp and manually reset transient state.
   useEffect(() => {
     if (joinTimestamp === prevJoinTimestampRef.current) return;
     prevJoinTimestampRef.current = joinTimestamp;
@@ -297,7 +282,6 @@ export function RoomScreen() {
     setRemoteVideoTracks([]);
     setRemoteScreenShare(null);
     setHostLeft(false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [joinTimestamp]);
 
   const handleNameConfirm = useCallback(() => {
@@ -341,7 +325,6 @@ export function RoomScreen() {
     return unsub;
   }, [roomId]);
 
-  // joinTimestamp ensures write re-fires on rejoin even with same name+room
   useEffect(() => {
     if (paramDisplayName && publicKey && roomId) {
       writeParticipantName(roomId, publicKey, paramDisplayName).catch(() => {});
@@ -376,24 +359,22 @@ export function RoomScreen() {
       }
     });
     return unsub;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, isMeeting, publicKey, initialRole]);
 
   useEffect(() => {
     if (!roomId || !isMeeting) return;
     const unsub = subscribeMeetingEnded(roomId, joinedAtRef.current, () => {
-      if (isEndingMeetingRef.current) return; // admin already handles its own navigation
+      if (isEndingMeetingRef.current) return;
       roomRef.current?.disconnect();
       if (publicKey && roomId) removeParticipantName(roomId, publicKey).catch(() => {});
       showInfo("Meeting Ended", "The host has ended this meeting.");
       router.back();
     });
     return unsub;
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roomId, isMeeting]);
 
   useEffect(() => {
-    if (nameModalVisible) return; // wait for name entry before connecting
+    if (nameModalVisible) return;
 
     if (!LIVEKIT_NATIVE_AVAILABLE) {
       setLivekitUnavailable(true);
@@ -478,7 +459,6 @@ export function RoomScreen() {
             return [...prev, { identity: participant.identity, trackPublication: publication, source: "camera" }];
           });
         } else if (track.source === TrackEnum.Source.ScreenShare) {
-          // 500ms delay lets the track's mediaStream initialize before rendering (slower on Android)
           setTimeout(() => {
             setRemoteScreenShare({ identity: participant.identity, trackPublication: publication, source: "screen_share" });
           }, 500);
@@ -516,7 +496,6 @@ export function RoomScreen() {
         if (publication?.source === TrackEnum.Source.Camera) {
           setLocalCameraPub(publication);
         } else if (publication?.source === TrackEnum.Source.ScreenShare) {
-          // 500ms delay for track mediaStream initialization (slower on Android)
           setTimeout(() => setLocalScreenSharePub(publication), 500);
         }
       });
@@ -575,8 +554,6 @@ export function RoomScreen() {
     if (!lkRoom || !isMeeting) return;
     const next = !isCameraOn;
     if (next) {
-      // Keep mwaInProgressRef=true for the full operation — both permission dialogs and camera enable
-      // can briefly background the app on Android; clearing early leaves user stranded.
       mwaInProgressRef.current = true;
       const granted = await requestCameraPermission();
       if (!granted) {
@@ -593,7 +570,6 @@ export function RoomScreen() {
     } catch (err: any) {
       showError("Camera Error", err.message ?? "Could not toggle camera.");
     } finally {
-      // Delayed clear gives AppState handler time to fire first if app was backgrounded
       setTimeout(() => { mwaInProgressRef.current = false; }, 1000);
     }
   }, [isCameraOn, isCameraFront, isMeeting]);
@@ -605,17 +581,14 @@ export function RoomScreen() {
     try {
       const camPub = lkRoom.localParticipant.getTrackPublication(TrackEnum?.Source?.Camera);
       if (camPub?.track) {
-        // Try restartTrack first (seamless switch)
         try {
           await camPub.track.restartTrack({ facingMode: newFront ? "user" : "environment" });
           setIsCameraFront(newFront);
           return;
         } catch {
-          // restartTrack failed — fall through to disable/re-enable fallback
         }
       }
       await lkRoom.localParticipant.setCameraEnabled(false);
-      // Small delay lets the track fully release before re-enable
       await new Promise<void>((r) => setTimeout(r, 300));
       await lkRoom.localParticipant.setCameraEnabled(true, { facingMode: newFront ? "user" : "environment" });
       setIsCameraFront(newFront);
@@ -629,7 +602,6 @@ export function RoomScreen() {
     if (!lkRoom || !isMeeting) return;
     const next = !isScreenSharing;
     if (next) {
-      // Android MediaProjection dialog briefly backgrounds the app — flag so AppState handler can navigate back
       mwaInProgressRef.current = true;
     }
     try {
@@ -640,7 +612,6 @@ export function RoomScreen() {
         showError("Screen Share", err.message ?? "Could not start screen sharing.");
       }
     } finally {
-      // Delayed clear gives AppState handler time to fire first if app was backgrounded
       setTimeout(() => { mwaInProgressRef.current = false; }, 1000);
     }
   }, [isScreenSharing, isMeeting]);
@@ -699,18 +670,12 @@ export function RoomScreen() {
   const handleSpeakerUpgrade = useCallback(async () => {
     if (!eventPda || !publicKey || isUpgradingToSpeaker) return;
     setIsUpgradingToSpeaker(true);
-    // Hold mwaInProgressRef for the entire upgrade — the network call or LiveKit's mic-enable
-    // can briefly restore a different Android screen, which would trigger AppState navigation.
     mwaInProgressRef.current = true;
     try {
-      // Backend grants canPublish=true via RoomServiceClient — no LiveKit disconnect/reconnect needed
       await requestSpeak(eventPda);
-      // Wait for canPublish permission to propagate to the LiveKit client
       await new Promise<void>((resolve) => setTimeout(resolve, 600));
       const lkRoom = roomRef.current;
       if (lkRoom) {
-        // Enable mic via LiveKit — its native layer handles Android permission internally,
-        // avoiding an explicit PermissionsAndroid dialog that would trigger AppState issues.
         await lkRoom.localParticipant.setMicrophoneEnabled(true).catch(() => {});
         setRole("speaker");
         setIsMicOn(true);
@@ -743,7 +708,6 @@ export function RoomScreen() {
       roomRef.current?.disconnect();
       if (publicKey && roomId) {
         await removeParticipantName(roomId, publicKey).catch(() => {});
-        // Remove pending speak request so admin's panel doesn't show stale request after user leaves
         if (isMeeting && speakRequestStatus === "pending") {
           await removeSpeakRequest(roomId, publicKey).catch(() => {});
         }
@@ -754,7 +718,6 @@ export function RoomScreen() {
     }
   }, [isMeeting, roomId, publicKey, leaveRoom, router, speakRequestStatus]);
 
-  // Run full cleanup instead of raw router.back() to disconnect LiveKit and remove Firebase presence
   useEffect(() => {
     const sub = BackHandler.addEventListener("hardwareBackPress", () => {
       handleLeave();
@@ -777,7 +740,6 @@ export function RoomScreen() {
             isEndingMeetingRef.current = true;
             setIsEndingMeeting(true);
             try {
-              // Signal clients via Firebase BEFORE deleting so they can react before being kicked
               await setMeetingEnded(roomId);
               await endMeeting(eventPda);
               roomRef.current?.disconnect();
@@ -842,7 +804,6 @@ export function RoomScreen() {
     tileStyle: any
   ) => {
     if (!VideoTrackComponent) return null;
-    // For remote participants, get live publication from the room to avoid stale cached refs
     const livePub = isLocal
       ? trackPublication
       : roomRef.current?.remoteParticipants?.get(identity)?.getTrackPublication?.(TrackEnum?.Source?.Camera) ?? trackPublication;
@@ -966,7 +927,6 @@ export function RoomScreen() {
         </View>
       </View>
 
-      {/* ── Banners ── */}
       {livekitUnavailable && (
         <View style={styles.unavailableBanner}>
           <Ionicons name="warning-outline" size={16} color="#FFA502" />
@@ -985,7 +945,6 @@ export function RoomScreen() {
       )}
 
 
-      {/* Host-left banner — shown to attendees when host disconnects without ending meeting */}
       {isMeeting && hostLeft && initialRole !== "speaker" && (
         <View style={styles.hostLeftBanner}>
           <Ionicons name="alert-circle-outline" size={15} color="#FFA502" />
@@ -996,9 +955,7 @@ export function RoomScreen() {
         </View>
       )}
 
-      {/* ── Main area ── */}
       <View style={styles.main}>
-        {/* ── Screen share view (takes priority when active) ── */}
         {isMeeting && (remoteScreenShare || isScreenSharing) && (
           <View style={styles.screenShareContainer}>
             <View style={styles.screenShareBanner}>
@@ -1033,7 +990,6 @@ export function RoomScreen() {
                 </TouchableOpacity>
               </View>
             ) : remoteScreenShare && VideoTrackComponent ? (() => {
-              // Use stored publication from TrackSubscribed, with live lookup as fallback
               const ssParticipant = roomRef.current?.remoteParticipants?.get(remoteScreenShare.identity);
               const ssPub = ssParticipant?.getTrackPublication?.(TrackEnum?.Source?.ScreenShare) ?? remoteScreenShare.trackPublication;
               const ssParticipantRef = ssParticipant ?? (ssPub ? { identity: remoteScreenShare.identity } : null);
@@ -1053,10 +1009,8 @@ export function RoomScreen() {
           </View>
         )}
 
-        {/* ── Video grid (meetings with cameras on) ── */}
         {isMeeting && hasAnyVideo && !(remoteScreenShare || isScreenSharing) ? (
           <View style={styles.videoGrid}>
-            {/* Local camera */}
             {hasLocalCamera && renderVideoTile(
               localCameraPub,
               localIdentity,
@@ -1064,7 +1018,6 @@ export function RoomScreen() {
               "You",
               remoteVideoTracks.length === 0 ? styles.videoTileFull : tileHalfStyle
             )}
-            {/* Remote cameras */}
             {remoteVideoTracks.slice(0, hasLocalCamera ? 3 : 4).map((track) => {
               const name = participantNames[track.identity] || shortenAddress(track.identity);
               const totalTiles = (hasLocalCamera ? 1 : 0) + Math.min(remoteVideoTracks.length, hasLocalCamera ? 3 : 4);
@@ -1076,7 +1029,6 @@ export function RoomScreen() {
                 totalTiles <= 1 ? styles.videoTileFull : tileHalfStyle
               );
             })}
-            {/* Overflow indicator */}
             {remoteVideoTracks.length > (hasLocalCamera ? 3 : 4) && (
               <View style={[styles.videoTile, tileHalfStyle, styles.videoTileOverflow]}>
                 <Text style={styles.videoOverflowText}>+{remoteVideoTracks.length - (hasLocalCamera ? 3 : 4)}</Text>
@@ -1085,7 +1037,6 @@ export function RoomScreen() {
             )}
           </View>
         ) : hasAnyVideo && (remoteScreenShare || isScreenSharing) ? (
-          /* Small video tiles row below screen share */
           <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.miniVideoRow}>
             {hasLocalCamera && renderVideoTile(
               localCameraPub,
@@ -1100,12 +1051,10 @@ export function RoomScreen() {
             })}
           </ScrollView>
         ) : (
-          /* ── Default: avatar stage (no videos) ── */
           <View style={styles.stage}>
             <Text style={styles.stageLabel}>{getStageStatus()}</Text>
 
             <View style={styles.avatarsRow}>
-              {/* Local participant */}
               <View style={styles.avatarWrapper}>
                 <View style={[
                   styles.avatar,
@@ -1119,7 +1068,6 @@ export function RoomScreen() {
                 <Text style={styles.avatarLabel} numberOfLines={1}>You</Text>
               </View>
 
-              {/* Remote participants */}
               {remoteIdentities.slice(0, 4).map((identity) => {
                 const name = participantNames[identity] || shortenAddress(identity);
                 const color = getAvatarColor(identity);
@@ -1159,7 +1107,6 @@ export function RoomScreen() {
           </View>
         )}
 
-        {/* Chat */}
         {showChat && (
           <KeyboardAvoidingView
             behavior={Platform.OS === "ios" ? "padding" : "height"}
@@ -1199,9 +1146,7 @@ export function RoomScreen() {
         )}
       </View>
 
-      {/* ── Bottom controls ── */}
       <View style={styles.controls}>
-        {/* Mic (speaker) OR Request to Speak (listener in meeting) */}
         {role === "speaker" && !livekitUnavailable && !connectionFailed ? (
           <TouchableOpacity
             style={[styles.controlBtn, isMicOn && styles.controlBtnActive]}
@@ -1235,7 +1180,6 @@ export function RoomScreen() {
           </TouchableOpacity>
         ) : null}
 
-        {/* Camera (initial meeting speakers / admin only — not for upgraded attendees) */}
         {isMeeting && initialRole === "speaker" && !livekitUnavailable && !connectionFailed && (
           <TouchableOpacity
             style={[styles.controlBtn, isCameraOn && styles.controlBtnActive]}
@@ -1249,7 +1193,6 @@ export function RoomScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Screen Share (initial meeting speakers / admin only — not for upgraded attendees) */}
         {isMeeting && initialRole === "speaker" && !livekitUnavailable && !connectionFailed && (
           <TouchableOpacity
             style={[styles.controlBtn, isScreenSharing && styles.controlBtnScreenShare]}
@@ -1263,7 +1206,6 @@ export function RoomScreen() {
           </TouchableOpacity>
         )}
 
-        {/* Chat */}
         <TouchableOpacity
           style={[styles.controlBtn, showChat && styles.controlBtnActive]}
           onPress={toggleChat}
@@ -1280,7 +1222,6 @@ export function RoomScreen() {
           )}
         </TouchableOpacity>
 
-        {/* Participants */}
         <TouchableOpacity
           style={[styles.controlBtn, isAdminInMeeting && pendingSpeakRequests.length > 0 && styles.controlBtnAlert]}
           onPress={() => setShowParticipants(true)}
@@ -1294,7 +1235,6 @@ export function RoomScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* ── Participants + Speak Requests Modal ── */}
       <Modal
         visible={showParticipants}
         transparent
@@ -1312,7 +1252,6 @@ export function RoomScreen() {
             </View>
 
             <ScrollView style={styles.participantList} showsVerticalScrollIndicator={false}>
-              {/* Speak requests section (admin only) */}
               {isAdminInMeeting && pendingSpeakRequests.length > 0 && (
                 <View style={styles.speakReqSection}>
                   <Text style={styles.speakReqSectionTitle}>Speak Requests ({pendingSpeakRequests.length})</Text>
@@ -1360,7 +1299,6 @@ export function RoomScreen() {
                 )}
               </View>
 
-              {/* Remote participants */}
               {remoteIdentities.map((identity) => {
                 const name = participantNames[identity] || shortenAddress(identity);
                 const color = getAvatarColor(identity);
@@ -1413,7 +1351,6 @@ const styles = StyleSheet.create({
   connectingLeaveBtn: { flexDirection: "row" as const, alignItems: "center" as const, gap: 6, marginTop: 24, paddingHorizontal: 20, paddingVertical: 10, borderRadius: borderRadius.md, borderWidth: 1, borderColor: colors.border },
   connectingLeaveBtnText: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
 
-  // Name modal
   nameModalWrapper: { flex: 1, justifyContent: "center", alignItems: "center", padding: spacing.lg, backgroundColor: colors.background },
   nameModalCard: { width: "100%", backgroundColor: colors.surface, borderRadius: borderRadius.xl, padding: spacing.xl, alignItems: "center", borderWidth: 1, borderColor: colors.border },
   nameModalTitle: { fontFamily: fonts.heading, fontSize: 22, color: colors.text, marginBottom: 6, textAlign: "center" },
@@ -1423,7 +1360,6 @@ const styles = StyleSheet.create({
   nameModalBtnText: { fontFamily: fonts.bodySemiBold, fontSize: 16, color: colors.background },
   nameModalCancel: { fontFamily: fonts.body, fontSize: 14, color: colors.textMuted },
 
-  // Header
   header: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
   headerLeft: { flex: 1, flexDirection: "row", alignItems: "center", gap: spacing.xs, marginRight: spacing.sm },
   headerRight: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
@@ -1441,22 +1377,18 @@ const styles = StyleSheet.create({
   endMeetingBtn: { backgroundColor: "#C0392B", marginRight: 6 },
   leaveBtnText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: "#FFFFFF" },
 
-  // Banners
   unavailableBanner: { flexDirection: "row", alignItems: "flex-start", gap: spacing.xs, backgroundColor: "rgba(255,165,2,0.1)", borderBottomWidth: 1, borderBottomColor: "rgba(255,165,2,0.2)", paddingHorizontal: spacing.md, paddingVertical: spacing.sm },
   errorBanner: { backgroundColor: "rgba(255,71,87,0.1)", borderBottomColor: "rgba(255,71,87,0.2)" },
   unavailableText: { flex: 1, fontFamily: fonts.body, fontSize: 12, color: "#FFA502", lineHeight: 16 },
 
-  // Attendance strip
   attendanceStrip: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: spacing.md, paddingVertical: 10, backgroundColor: `${colors.primary}12`, borderBottomWidth: 1, borderBottomColor: `${colors.primary}25` },
   attendanceStripText: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.primary },
   attendanceStripDone: { backgroundColor: "rgba(46,213,115,0.1)", borderBottomColor: "rgba(46,213,115,0.2)" },
   hostLeftBanner: { flexDirection: "row", alignItems: "center", gap: 8, paddingHorizontal: spacing.md, paddingVertical: 10, backgroundColor: "rgba(255,165,2,0.1)", borderBottomWidth: 1, borderBottomColor: "rgba(255,165,2,0.2)" },
   hostLeftText: { flex: 1, fontFamily: fonts.bodySemiBold, fontSize: 12, color: "#FFA502" },
 
-  // Main
   main: { flex: 1 },
 
-  // Stage with avatars (audio-only view)
   stage: { alignItems: "center", paddingTop: 36, paddingBottom: 20, paddingHorizontal: spacing.lg },
   stageLabel: { fontFamily: fonts.bodySemiBold, fontSize: 15, color: colors.textMuted, marginBottom: 24, textAlign: "center" },
   avatarsRow: { flexDirection: "row", flexWrap: "wrap", justifyContent: "center", gap: 12, marginBottom: 16 },
@@ -1476,7 +1408,6 @@ const styles = StyleSheet.create({
   avatarOverflowText: { fontFamily: fonts.bodySemiBold, fontSize: 14, color: colors.textMuted },
   participantCountText: { fontFamily: fonts.body, fontSize: 12, color: colors.textMuted },
 
-  // Video grid
   videoGrid: { flex: 1, flexDirection: "row", flexWrap: "wrap", padding: 4, gap: 4 },
   videoTile: { borderRadius: borderRadius.md, overflow: "hidden", backgroundColor: "#111" },
   videoTileFull: { width: "100%", height: "100%", flex: 1, minHeight: 200 },
@@ -1490,7 +1421,6 @@ videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRa
   cameraFlipBtn: { position: "absolute", top: 8, right: 8, width: 30, height: 30, borderRadius: 15, backgroundColor: "rgba(0,0,0,0.5)", alignItems: "center", justifyContent: "center" },
   miniVideoRow: { height: 140, paddingHorizontal: 6, paddingVertical: 4 },
 
-  // Screen share
   screenShareContainer: { flex: 1 },
   screenShareBanner: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: spacing.md, paddingVertical: 8, backgroundColor: `${colors.primary}15` },
   screenShareBannerText: { fontFamily: fonts.bodySemiBold, fontSize: 12, color: colors.primary },
@@ -1502,7 +1432,6 @@ videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRa
   stopShareBtn: { flexDirection: "row", alignItems: "center", gap: 6, paddingHorizontal: 16, paddingVertical: 10, backgroundColor: "#FF4757", borderRadius: borderRadius.md },
   stopShareBtnText: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: "#FFF" },
 
-  // Chat
   chatContainer: { flex: 1, borderTopWidth: 1, borderTopColor: colors.border },
   chatList: { padding: spacing.sm, paddingBottom: spacing.xs, gap: spacing.xs },
   chatEmpty: { textAlign: "center", fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, paddingTop: spacing.xl },
@@ -1518,7 +1447,6 @@ videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRa
   sendBtn: { width: 38, height: 38, borderRadius: 19, backgroundColor: colors.primary, alignItems: "center", justifyContent: "center" },
   sendBtnDisabled: { opacity: 0.4 },
 
-  // Controls
   controls: { flexDirection: "row", alignItems: "center", justifyContent: "center", gap: spacing.md, paddingVertical: spacing.md, borderTopWidth: 1, borderTopColor: colors.border, backgroundColor: colors.surface },
   controlBtn: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
   controlBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
@@ -1528,7 +1456,6 @@ videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRa
   unreadBadge: { position: "absolute", top: 0, right: 0, width: 18, height: 18, borderRadius: 9, backgroundColor: "#FF4757", alignItems: "center", justifyContent: "center" },
   unreadBadgeText: { fontFamily: fonts.bodySemiBold, fontSize: 9, color: "#FFFFFF" },
 
-  // Modal
   modalOverlay: { flex: 1, backgroundColor: "rgba(0,0,0,0.65)", justifyContent: "flex-end" },
   modalCard: { backgroundColor: colors.surface, borderTopLeftRadius: borderRadius.xl, borderTopRightRadius: borderRadius.xl, borderWidth: 1, borderColor: colors.border, borderBottomWidth: 0, paddingHorizontal: spacing.md, paddingBottom: 40, height: "65%" },
   modalHandle: { width: 36, height: 4, borderRadius: 2, backgroundColor: colors.border, alignSelf: "center", marginTop: spacing.sm, marginBottom: spacing.md },
@@ -1545,7 +1472,6 @@ videoTileMini: { width: 100, height: 130, marginRight: 6, borderRadius: borderRa
   speakingDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: colors.primary },
   noParticipants: { textAlign: "center", fontFamily: fonts.body, fontSize: 13, color: colors.textMuted, paddingVertical: spacing.xl },
 
-  // Speak requests section (admin)
   speakReqSection: { borderBottomWidth: 1, borderBottomColor: colors.border, paddingBottom: spacing.sm, marginBottom: spacing.sm },
   speakReqSectionTitle: { fontFamily: fonts.bodySemiBold, fontSize: 13, color: colors.primary, marginBottom: spacing.sm },
   speakReqRow: { flexDirection: "row", alignItems: "center", paddingVertical: 8, gap: spacing.xs },

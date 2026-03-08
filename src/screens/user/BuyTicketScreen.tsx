@@ -57,7 +57,6 @@ export function BuyTicketScreen() {
     }
   }, [eventTiers.length]);
 
-  // expo-router caches screens; reset transient state on re-focus
   useFocusEffect(
     useCallback(() => {
       setShowSuccess(false);

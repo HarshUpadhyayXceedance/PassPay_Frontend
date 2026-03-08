@@ -5,14 +5,6 @@ import { DEVNET_RPC } from "../config/constants";
 import { phantomWalletAdapter } from "../wallet/phantomWalletAdapter";
 import { createProvider } from "../wallet/walletSession";
 
-/**
- * Create a new admin account (SuperAdmin only)
- *
- * @param superAdminPubkey - The SuperAdmin's public key (signer)
- * @param adminPubkey - The new admin's public key
- * @param name - The admin's name (max 64 chars)
- * @returns Transaction signature
- */
 export async function createAdmin(
   superAdminPubkey: PublicKey,
   adminPubkey: PublicKey,

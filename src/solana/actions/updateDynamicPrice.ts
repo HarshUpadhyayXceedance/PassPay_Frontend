@@ -4,9 +4,6 @@ import { DEVNET_RPC } from "../config/constants";
 import { phantomWalletAdapter } from "../wallet/phantomWalletAdapter";
 import { createProvider } from "../wallet/walletSession";
 
-/**
- * Recalculate and update event ticket price (anyone can call, rate-limited)
- */
 export async function updateDynamicPrice(
   callerPubkey: PublicKey,
   eventPubkey: PublicKey

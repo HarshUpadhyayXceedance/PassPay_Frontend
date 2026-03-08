@@ -24,7 +24,6 @@ export default function EventDetailsRoute() {
     if (eventKey) fetchSeatTiers(eventKey);
   }, [eventKey]);
 
-  // Fetch on focus + start polling; stop polling on blur
   useFocusEffect(
     useCallback(() => {
       refreshAll();

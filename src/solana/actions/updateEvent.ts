@@ -11,13 +11,10 @@ export interface UpdateEventParams {
   description?: string;
   imageUrl?: string;
   eventDate?: number;
-  ticketPrice?: number; // lamports
+  ticketPrice?: number;
   totalSeats?: number;
 }
 
-/**
- * Update event details (Admin only)
- */
 export async function updateEvent(
   adminPubkey: PublicKey,
   eventPubkey: PublicKey,

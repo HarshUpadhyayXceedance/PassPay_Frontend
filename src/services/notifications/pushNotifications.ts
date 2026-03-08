@@ -1,12 +1,9 @@
 import { Platform } from "react-native";
 
-// expo-notifications is not available in Expo Go (SDK 53+).
-// Lazy-load to prevent crashing the import chain.
 let Notifications: typeof import("expo-notifications") | null = null;
 
 try {
   Notifications = require("expo-notifications");
-  // Configure default notification behaviour (show when app is in foreground)
   Notifications!.setNotificationHandler({
     handleNotification: async () => ({
       shouldShowAlert: true,
@@ -20,10 +17,6 @@ try {
   console.warn("expo-notifications not available (Expo Go)");
 }
 
-/**
- * Request permission and register for push notifications.
- * Returns the Expo push token string, or null if permission is denied.
- */
 export async function registerForPushNotifications(): Promise<string | null> {
   if (!Notifications) return null;
   try {
@@ -39,7 +32,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
       return null;
     }
 
-    // Android: create a default channel
     if (Platform.OS === "android") {
       await Notifications.setNotificationChannelAsync("default", {
         name: "PassPay",
@@ -57,9 +49,6 @@ export async function registerForPushNotifications(): Promise<string | null> {
   }
 }
 
-/**
- * Schedule a local notification that fires immediately.
- */
 export async function scheduleLocalNotification(
   title: string,
   body: string,
@@ -73,14 +62,11 @@ export async function scheduleLocalNotification(
       data: data ?? {},
       sound: true,
     },
-    trigger: null, // fire immediately
+    trigger: null,
   });
   return id;
 }
 
-/**
- * Schedule a local notification at a specific date.
- */
 export async function scheduleNotificationAt(
   title: string,
   body: string,
@@ -105,17 +91,11 @@ export async function scheduleNotificationAt(
   return id;
 }
 
-/**
- * Cancel all scheduled notifications.
- */
 export async function cancelAllNotifications(): Promise<void> {
   if (!Notifications) return;
   await Notifications.cancelAllScheduledNotificationsAsync();
 }
 
-/**
- * Add a listener for when a notification is received while the app is foregrounded.
- */
 export function addNotificationReceivedListener(
   handler: (notification: any) => void
 ) {
@@ -123,9 +103,6 @@ export function addNotificationReceivedListener(
   return Notifications.addNotificationReceivedListener(handler);
 }
 
-/**
- * Add a listener for when a user taps on a notification.
- */
 export function addNotificationResponseListener(
   handler: (response: any) => void
 ) {

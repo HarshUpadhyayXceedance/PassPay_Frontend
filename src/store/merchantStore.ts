@@ -47,7 +47,6 @@ export const useMerchantStore = create<MerchantState>((set) => ({
 
   mergeProducts: (newProducts, merchantKey) =>
     set((state) => {
-      // Remove existing products for this merchant, then add the new ones
       const other = state.products.filter((p) => p.merchantKey !== merchantKey);
       return { products: [...other, ...newProducts] };
     }),

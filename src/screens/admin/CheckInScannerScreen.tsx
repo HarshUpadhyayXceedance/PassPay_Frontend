@@ -30,13 +30,11 @@ export function CheckInScannerScreen() {
   const ticket =
     lastScan?.type === "ticket" ? (lastScan as TicketQRPayload) : null;
 
-  // Use eventKey from nav params OR from the scanned ticket QR payload
   const resolvedEventKey = eventKey || ticket?.event;
 
   const handleCheckIn = async () => {
     if (!ticket) return;
 
-    // Validate required fields before creating PublicKey objects
     if (!ticket.mint || !ticket.owner) {
       showWarning("Invalid Ticket QR", "This QR code is missing required data. Please ask the attendee to regenerate their QR code.");
       return;
@@ -63,10 +61,6 @@ export function CheckInScannerScreen() {
         ticketHolder: ticket.owner,
       });
 
-      // Check-in success — attendance record, streak, and tier are
-      // updated on-chain by the check_in instruction itself.
-      // Badge NFT minting (issue_attendance_badge) requires a separate
-      // initialize_badge_collection setup, so skip it for MVP.
       await Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
       setShowConfetti(true);
 

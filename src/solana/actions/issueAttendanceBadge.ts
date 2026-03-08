@@ -12,7 +12,6 @@ import { getAssociatedTokenAddress } from "../utils/tokenUtils";
 import { DEVNET_RPC } from "../config/constants";
 import { BadgeTier } from "../../types/loyalty";
 
-/** Convert raw u8 tier value to BadgeTier enum */
 function tierFromU8(value: number): BadgeTier {
   switch (value) {
     case 0: return BadgeTier.None;
@@ -31,17 +30,6 @@ const ASSOCIATED_TOKEN_PROGRAM_ID = new PublicKey(
   "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
 );
 
-/**
- * Claim a soulbound badge NFT for the user's current tier.
- *
- * Prerequisites:
- *   1. User must have been checked in (attendance record exists)
- *   2. Badge collection must be initialized (admin one-time setup)
- *   3. User's current tier must be > None
- *   4. User must not already hold a badge for this tier
- *
- * The USER signs this transaction (not the admin).
- */
 export async function claimBadge(): Promise<{
   signature: string;
   badgeMint: string;
@@ -56,18 +44,14 @@ export async function claimBadge(): Promise<{
 
   const userPubkey = wallet;
 
-  // Derive PDAs
   const [userAttendancePda] = findUserAttendancePda(userPubkey);
   const [badgeCollectionPda] = findBadgeCollectionPda();
 
-  // Fetch user attendance raw bytes to determine tier
-  // (bypass Anchor BorshCoder — #[repr(u8)] enum causes "variant mismatch")
   const accountInfo = await connection.getAccountInfo(userAttendancePda);
   if (!accountInfo || !accountInfo.data) {
     throw new Error("No attendance record found. Check in to an event first.");
   }
 
-  // current_tier is at byte offset 44 (after 8 disc + 32 user + 4 total_events)
   const tierByte = new Uint8Array(accountInfo.data)[44];
   const currentTier = tierFromU8(tierByte);
   if (currentTier === BadgeTier.None) {
@@ -76,12 +60,10 @@ export async function claimBadge(): Promise<{
     );
   }
 
-  // Fetch badge collection to get the correct mint for this tier
   const badgeCollection = await program.account.badgeCollection.fetch(
     badgeCollectionPda
   );
 
-  // Get the correct badge mint for the user's tier
   let badgeMint: PublicKey;
   switch (currentTier) {
     case BadgeTier.Bronze:
@@ -100,10 +82,8 @@ export async function claimBadge(): Promise<{
       throw new Error("Unknown tier");
   }
 
-  // Derive user's ATA for this badge mint
   const userBadgeTokenAccount = getAssociatedTokenAddress(badgeMint, userPubkey);
 
-  // Call the on-chain instruction (no args — pure claim)
   const tx = await program.methods
     .issueAttendanceBadge()
     .accounts({
@@ -112,7 +92,7 @@ export async function claimBadge(): Promise<{
       badgeCollection: badgeCollectionPda,
       badgeMint,
       userBadgeTokenAccount,
-      badgeAuthority: badgeCollectionPda, // same PDA address, different role
+      badgeAuthority: badgeCollectionPda,
       tokenProgram: TOKEN_PROGRAM_ID,
       associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
       systemProgram: SystemProgram.programId,

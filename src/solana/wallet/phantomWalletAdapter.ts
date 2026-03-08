@@ -15,12 +15,6 @@ export interface PhantomWalletAdapter {
   signAndSendTransaction: (
     transaction: Transaction
   ) => Promise<{ signature: string }>;
-  /**
-   * Sign an arbitrary message using the wallet's Ed25519 key.
-   * Returns the full signed message bytes: [signature (64 bytes) | original message].
-   * Used for backend authentication (POST /api/auth).
-   * Throws in dev/Expo Go mode.
-   */
   signMessage: (message: Uint8Array) => Promise<Uint8Array>;
   getPublicKey: () => PublicKey | null;
   isDevMode: () => boolean;
@@ -32,12 +26,10 @@ const MWA_IDENTITY = {
   icon: "favicon.ico",
 };
 
-/** Check if we're running inside Expo Go (no native modules) */
 function isExpoGo(): boolean {
   return Constants.appOwnership === "expo";
 }
 
-/** Validate a Solana base58 address */
 function isValidSolanaAddress(str: string): boolean {
   try {
     const key = new PublicKey(str.trim());
@@ -47,15 +39,6 @@ function isValidSolanaAddress(str: string): boolean {
   }
 }
 
-/**
- * Phantom Wallet Adapter using Solana Mobile Wallet Adapter (MWA)
- *
- * Connects directly to Phantom wallet on the device.
- * Requires: `npx expo run:android` (dev client build, NOT Expo Go)
- * Requires: Phantom app installed on the same device/emulator
- *
- * In Expo Go, falls back to clipboard-based connection (read-only).
- */
 class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
   private _publicKey: PublicKey | null = null;
   private _authToken: string | null = null;
@@ -73,7 +56,6 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
   }
 
   async connect(): Promise<PublicKey> {
-    // In Expo Go, skip MWA entirely and use clipboard fallback
     if (isExpoGo()) {
       return this.connectViaClipboard();
     }
@@ -93,7 +75,6 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
         throw new Error("No accounts returned. Please approve in Phantom.");
       }
 
-      // MWA returns account address as base64-encoded bytes
       const account = authResult.accounts[0];
       const addressBytes = Buffer.from(account.address, "base64");
       this._publicKey = new PublicKey(addressBytes);
@@ -115,7 +96,6 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
         );
       }
 
-      // MWA native module missing — fallback to clipboard
       if (
         error.message?.includes("not a function") ||
         error.message?.includes("native module") ||
@@ -130,10 +110,6 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
     }
   }
 
-  /**
-   * Clipboard-based fallback for Expo Go.
-   * User copies their Phantom wallet address, then taps Connect.
-   */
   private async connectViaClipboard(): Promise<PublicKey> {
     const clipText = await Clipboard.getStringAsync();
 
@@ -174,11 +150,6 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
     }
   }
 
-  /**
-   * Reauthorize or authorize within a MWA session.
-   * Uses saved auth_token for silent re-auth (avoids full "Connect" prompt).
-   * Falls back to full authorize if reauthorize fails.
-   */
   private async authorizeSession(wallet: any): Promise<void> {
     if (this._authToken) {
       try {
@@ -189,7 +160,6 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
         this._authToken = result.auth_token ?? this._authToken;
         return;
       } catch {
-        // reauthorize failed (token expired), fall back to full authorize
         console.warn("Reauthorize failed, falling back to authorize");
       }
     }
@@ -252,17 +222,11 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
       });
     });
 
-    // MWA web3js wrapper returns base58 signature strings
     const signature = signatures[0];
     console.log("Transaction sent:", signature);
     return { signature: String(signature) };
   }
 
-  /**
-   * Sign a raw message using MWA signMessages (Ed25519).
-   * Returns signed_payload = signature (64 bytes) + original message.
-   * Shows a one-time Phantom approval dialog.
-   */
   async signMessage(message: Uint8Array): Promise<Uint8Array> {
     if (!this._publicKey) throw new Error("Wallet not connected");
     if (this._devMode) {
@@ -280,7 +244,6 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
       });
     });
 
-    // MWA returns either { signed_payloads: Uint8Array[] } or Uint8Array[] directly
     const signedPayloads: Uint8Array[] = result?.signed_payloads ?? result;
     if (!signedPayloads?.[0]) throw new Error("No signed message returned from wallet");
 
@@ -291,17 +254,9 @@ class PhantomWalletAdapterImpl implements PhantomWalletAdapter {
     return this._publicKey;
   }
 
-  /**
-   * Restore a previously-connected public key without a full MWA session.
-   * Used after Activity restarts (e.g. orientation change on Android) to
-   * keep the user authenticated for read-only operations. The next
-   * transaction will trigger a fresh MWA authorize/reauthorize prompt.
-   */
   restorePublicKey(key: PublicKey): void {
     this._publicKey = key;
-    // _authToken stays null → next signTransaction triggers full authorize
   }
 }
 
-// Export singleton instance
 export const phantomWalletAdapter = new PhantomWalletAdapterImpl();

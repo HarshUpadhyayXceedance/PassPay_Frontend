@@ -12,7 +12,6 @@ export interface BuyProductParams {
   eventPda: PublicKey;
   merchantAuthority: PublicKey;
   productName: string;
-  /** Current total_sold on the product (used to derive the PurchaseRecord PDA) */
   currentTotalSold: number;
 }
 

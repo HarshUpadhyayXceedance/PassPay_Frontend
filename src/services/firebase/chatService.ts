@@ -1,29 +1,3 @@
-/**
- * Firebase Realtime Database — Room Chat + Presence + Speak Requests
- *
- * Database paths:
- *   /rooms/{roomId}/messages/{pushId}      — chat messages
- *   /rooms/{roomId}/names/{pubkey}         — participant display names
- *   /rooms/{roomId}/speakRequests/{pubkey} — speak request status (meetings)
- *
- * Security Rules (paste in Firebase Console → Realtime Database → Rules):
- * {
- *   "rules": {
- *     "rooms": {
- *       "$roomId": {
- *         "messages": {
- *           ".read": true,
- *           ".write": true,
- *           ".indexOn": ["timestamp"]
- *         },
- *         "names": { ".read": true, ".write": true },
- *         "speakRequests": { ".read": true, ".write": true }
- *       }
- *     }
- *   }
- * }
- */
-
 import {
   ref,
   push,
@@ -39,9 +13,6 @@ import {
 import { firebaseDb } from "../../config/firebase";
 import { ChatMessage } from "../../types/room";
 
-// ─── Chat ────────────────────────────────────────────────────────────────────
-
-/** Push a new message to a room's chat. */
 export async function sendFirebaseMessage(
   roomId: string,
   sender: string,
@@ -57,10 +28,6 @@ export async function sendFirebaseMessage(
   });
 }
 
-/**
- * Subscribe to new messages in a room.
- * @returns unsubscribe function
- */
 export function subscribeRoomMessages(
   roomId: string,
   onMessage: (msg: ChatMessage) => void,
@@ -101,9 +68,6 @@ export function subscribeRoomMessages(
   };
 }
 
-// ─── Participant Names ────────────────────────────────────────────────────────
-
-/** Write the display name for a participant when they enter a room. */
 export async function writeParticipantName(
   roomId: string,
   pubkey: string,
@@ -113,7 +77,6 @@ export async function writeParticipantName(
   await set(nameRef, { name, pubkey });
 }
 
-/** Remove a participant's name entry when they leave. */
 export async function removeParticipantName(
   roomId: string,
   pubkey: string
@@ -122,11 +85,6 @@ export async function removeParticipantName(
   await remove(nameRef);
 }
 
-/**
- * Subscribe to all participant display names in a room.
- * Callback receives { pubkey → displayName } map.
- * @returns unsubscribe function
- */
 export function subscribeParticipantNames(
   roomId: string,
   onNames: (names: Record<string, string>) => void
@@ -147,8 +105,6 @@ export function subscribeParticipantNames(
   return () => off(namesRef, "value", handler);
 }
 
-// ─── Speak Requests (meeting rooms only) ─────────────────────────────────────
-
 export type SpeakRequestStatus = "pending" | "approved" | "denied";
 
 export interface SpeakRequest {
@@ -158,7 +114,6 @@ export interface SpeakRequest {
   status: SpeakRequestStatus;
 }
 
-/** Attendee: submit a request to speak. */
 export async function writeSpeakRequest(
   roomId: string,
   pubkey: string,
@@ -168,7 +123,6 @@ export async function writeSpeakRequest(
   await set(reqRef, { pubkey, name, requestedAt: Date.now(), status: "pending" });
 }
 
-/** Admin: update speak request status (approve / deny). */
 export async function updateSpeakRequestStatus(
   roomId: string,
   pubkey: string,
@@ -179,7 +133,6 @@ export async function updateSpeakRequestStatus(
   await set(reqRef, { pubkey, name: name ?? "", status, updatedAt: Date.now() });
 }
 
-/** Remove speak request once actioned. */
 export async function removeSpeakRequest(
   roomId: string,
   pubkey: string
@@ -188,10 +141,6 @@ export async function removeSpeakRequest(
   await remove(reqRef);
 }
 
-/**
- * Admin: subscribe to all pending speak requests in a room.
- * @returns unsubscribe function
- */
 export function subscribeSpeakRequests(
   roomId: string,
   onRequests: (requests: SpeakRequest[]) => void
@@ -212,24 +161,11 @@ export function subscribeSpeakRequests(
   return () => off(reqRef, "value", handler);
 }
 
-// ─── Meeting Ended Signal ─────────────────────────────────────────────────────
-
-/**
- * Admin: signal that the meeting has ended.
- * Stores { ended: true, endedAt: timestamp } so clients can distinguish
- * a current "end" event from a stale flag left over from a previous session.
- */
 export async function setMeetingEnded(roomId: string): Promise<void> {
   const statusRef = ref(firebaseDb, `rooms/${roomId}/meetingEnded`);
   await set(statusRef, { ended: true, endedAt: Date.now() });
 }
 
-/**
- * All participants: subscribe to the meeting-ended signal.
- * `joinedAt` is the timestamp of when this client joined the room — signals
- * older than this are from a previous session and are ignored.
- * @returns unsubscribe function
- */
 export function subscribeMeetingEnded(
   roomId: string,
   joinedAt: number,
@@ -245,10 +181,6 @@ export function subscribeMeetingEnded(
   return () => off(statusRef, "value", handler);
 }
 
-/**
- * Attendee: watch MY OWN speak request status.
- * @returns unsubscribe function
- */
 export function subscribeMySpeakRequest(
   roomId: string,
   pubkey: string,

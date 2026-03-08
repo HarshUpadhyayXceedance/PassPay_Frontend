@@ -14,9 +14,7 @@ const TOKEN_PROGRAM_ID = new PublicKey(
   "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
 );
 
-// SPL Token InitializeMint instruction layout
-// https://github.com/solana-labs/solana-program-library/blob/master/token/program/src/instruction.rs
-const MINT_SIZE = 82; // Mint account size
+const MINT_SIZE = 82;
 
 export interface InitializeBadgeCollectionParams {
   collectionName: string;
@@ -24,11 +22,6 @@ export interface InitializeBadgeCollectionParams {
   collectionUri: string;
 }
 
-/**
- * Create 4 SPL token mints for badge tiers.
- * Each mint has badge_authority PDA as mint+freeze authority (so the program can CPI mint/freeze).
- * Uses the same Keypair+MWA pattern as buyTicket.
- */
 export async function createBadgeMints(
   provider: AnchorProvider
 ): Promise<{
@@ -40,10 +33,8 @@ export async function createBadgeMints(
   const payer = provider.wallet.publicKey;
   const connection = provider.connection;
 
-  // badge_authority PDA is the mint+freeze authority for all badge mints
   const [badgeAuthorityPda] = findBadgeCollectionPda();
 
-  // Generate 4 Keypairs for the mint accounts
   const bronzeKeypair = Keypair.generate();
   const silverKeypair = Keypair.generate();
   const goldKeypair = Keypair.generate();
@@ -51,14 +42,11 @@ export async function createBadgeMints(
 
   const mintKeypairs = [bronzeKeypair, silverKeypair, goldKeypair, platinumKeypair];
 
-  // Get rent exemption for mint accounts
   const rentExemption = await connection.getMinimumBalanceForRentExemption(MINT_SIZE);
 
-  // Build transaction with createAccount + initializeMint for each mint
   const tx = new Transaction();
 
   for (const kp of mintKeypairs) {
-    // 1. Create the account
     tx.add(
       SystemProgram.createAccount({
         fromPubkey: payer,
@@ -69,14 +57,12 @@ export async function createBadgeMints(
       })
     );
 
-    // 2. Initialize as mint (decimals=0, authority=badge_authority PDA)
-    // InitializeMint instruction: index 0, decimals, mintAuthority, freezeAuthority
     const data = Buffer.alloc(67);
-    data.writeUInt8(0, 0); // instruction index: InitializeMint
-    data.writeUInt8(0, 1); // decimals: 0
-    badgeAuthorityPda.toBuffer().copy(data, 2); // mintAuthority (32 bytes)
-    data.writeUInt8(1, 34); // COption<Pubkey> tag: Some
-    badgeAuthorityPda.toBuffer().copy(data, 35); // freezeAuthority (32 bytes)
+    data.writeUInt8(0, 0);
+    data.writeUInt8(0, 1);
+    badgeAuthorityPda.toBuffer().copy(data, 2);
+    data.writeUInt8(1, 34);
+    badgeAuthorityPda.toBuffer().copy(data, 35);
 
     tx.add({
       keys: [
@@ -88,21 +74,17 @@ export async function createBadgeMints(
     });
   }
 
-  // Set tx properties
   tx.feePayer = payer;
   const { blockhash, lastValidBlockHeight } =
     await connection.getLatestBlockhash("confirmed");
   tx.recentBlockhash = blockhash;
 
-  // Step 1: Send to Phantom for signing (unsigned)
   const signedTx = await provider.wallet.signTransaction(tx);
 
-  // Step 2: Add all 4 keypair signatures locally
   for (const kp of mintKeypairs) {
     signedTx.partialSign(kp);
   }
 
-  // Step 3: Send raw transaction
   const signature = await connection.sendRawTransaction(signedTx.serialize(), {
     skipPreflight: false,
     preflightCommitment: "confirmed",
@@ -121,10 +103,6 @@ export async function createBadgeMints(
   };
 }
 
-/**
- * Initialize the global badge collection (SuperAdmin only, one-time setup).
- * Call createBadgeMints() first to create the 4 tier mints.
- */
 export async function initializeBadgeCollection(
   provider: AnchorProvider,
   params: InitializeBadgeCollectionParams & {
@@ -147,7 +125,7 @@ export async function initializeBadgeCollection(
     })
     .accounts({
       authority,
-      superAdminCheck: authority, // UncheckedAccount — constraint checks authority key
+      superAdminCheck: authority,
       badgeCollection: badgeCollectionPda,
       bronzeBadgeMint: params.bronzeBadgeMint,
       silverBadgeMint: params.silverBadgeMint,

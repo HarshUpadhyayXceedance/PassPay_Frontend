@@ -12,10 +12,13 @@ import {
   KeyboardAvoidingView,
   Platform,
   Switch,
+  ScrollView,
+  Linking,
 } from "react-native";
 import { useRouter } from "expo-router";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
 import { useRooms } from "../../hooks/useRooms";
 import { CommunityRoom } from "../../types/room";
 import { colors } from "../../theme/colors";
@@ -23,7 +26,8 @@ import { fonts } from "../../theme/fonts";
 import { spacing, borderRadius } from "../../theme/spacing";
 import { showError } from "../../utils/alerts";
 
-const SKR_COLOR = "#9945FF"; // Solana purple for Seeker brand
+const SKR_COLOR = "#9945FF";
+const SEEKER_ROOM_ID = "seeker-room";
 
 function shortenAddress(addr: string): string {
   if (addr.length <= 10) return addr;
@@ -53,7 +57,6 @@ export function CommunityRoomsScreen() {
   const [pendingJoinRoom, setPendingJoinRoom] = useState<CommunityRoom | null>(null);
   const [joinDisplayName, setJoinDisplayName] = useState("");
 
-  // Shown when the user fails the SKR verification gate
   const [showSeekerGatedModal, setShowSeekerGatedModal] = useState(false);
 
   useEffect(() => {
@@ -133,7 +136,6 @@ export function CommunityRoomsScreen() {
         showError("No Token", "Could not get meeting access. Try again.");
       }
     } catch (err: any) {
-      // SEEKER_REQUIRED is returned as a 403 with error code in the message
       if (err.message?.includes("SEEKER_REQUIRED") || err.message?.includes("Seeker")) {
         setShowSeekerGatedModal(true);
       } else {
@@ -222,13 +224,10 @@ export function CommunityRoomsScreen() {
         </View>
       ) : (
         <FlatList
-          data={rooms}
+          data={rooms.filter((r) => r.id !== SEEKER_ROOM_ID)}
           keyExtractor={(item) => item.id}
           renderItem={renderRoom}
-          contentContainerStyle={[
-            styles.listContent,
-            rooms.length === 0 && styles.listEmpty,
-          ]}
+          contentContainerStyle={styles.listContent}
           refreshControl={
             <RefreshControl
               refreshing={refreshing}
@@ -236,6 +235,68 @@ export function CommunityRoomsScreen() {
               tintColor={colors.primary}
             />
           }
+          ListHeaderComponent={() => {
+            const seekerRoom = rooms.find((r) => r.id === SEEKER_ROOM_ID);
+            if (!seekerRoom) return null;
+            const count = seekerRoom.participantCount ?? 0;
+            const isJoining = joiningId === SEEKER_ROOM_ID;
+            return (
+              <View style={styles.seekerFeaturedWrapper}>
+                <LinearGradient
+                  colors={["#2D1B69", "#1A0F3C"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={styles.seekerFeaturedCard}
+                >
+                  <View style={styles.seekerFeaturedHeader}>
+                    <View style={styles.seekerFeaturedBadge}>
+                      <Ionicons name="pin" size={10} color={SKR_COLOR} />
+                      <Text style={styles.seekerFeaturedBadgeText}>OFFICIAL · ALWAYS ON</Text>
+                    </View>
+                    <View style={styles.seekerParticipantBadge}>
+                      <Ionicons name="people" size={12} color={SKR_COLOR} />
+                      <Text style={styles.seekerParticipantCount}>{count}</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.seekerFeaturedIconRow}>
+                    <View style={styles.seekerFeaturedIconCircle}>
+                      <Ionicons name="shield-checkmark" size={28} color={SKR_COLOR} />
+                    </View>
+                    <View style={{ flex: 1, marginLeft: spacing.md }}>
+                      <Text style={styles.seekerFeaturedTitle}>Seeker Room</Text>
+                      <Text style={styles.seekerFeaturedSub}>Exclusive to Seeker (SKR) token holders</Text>
+                    </View>
+                  </View>
+
+                  <View style={styles.seekerFeaturedDivider} />
+
+                  <View style={styles.seekerFeaturedFooter}>
+                    <View style={styles.livePillRow}>
+                      <View style={styles.liveDot} />
+                      <Text style={styles.liveText}>LIVE</Text>
+                    </View>
+                    {isJoining ? (
+                      <ActivityIndicator size="small" color={SKR_COLOR} />
+                    ) : (
+                      <TouchableOpacity
+                        style={styles.seekerJoinBtn}
+                        onPress={() => handleJoinRoom(seekerRoom)}
+                        activeOpacity={0.8}
+                      >
+                        <Ionicons name="shield-checkmark" size={13} color="#FFF" style={{ marginRight: 4 }} />
+                        <Text style={styles.seekerJoinBtnText}>Join</Text>
+                      </TouchableOpacity>
+                    )}
+                  </View>
+                </LinearGradient>
+
+                {rooms.filter((r) => r.id !== SEEKER_ROOM_ID).length > 0 && (
+                  <Text style={styles.sectionLabel}>All Rooms</Text>
+                )}
+              </View>
+            );
+          }}
           ListEmptyComponent={
             <View style={styles.emptyContainer}>
               <Ionicons name="mic-outline" size={56} color={colors.textMuted} style={{ marginBottom: spacing.md }} />
@@ -254,7 +315,6 @@ export function CommunityRoomsScreen() {
         />
       )}
 
-      {/* Join — display name modal */}
       <Modal
         visible={!!pendingJoinRoom}
         transparent
@@ -297,7 +357,6 @@ export function CommunityRoomsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Create room modal */}
       <Modal
         visible={showCreate}
         transparent
@@ -333,7 +392,6 @@ export function CommunityRoomsScreen() {
               returnKeyType="done"
               onSubmitEditing={handleCreateRoom}
             />
-            {/* Seeker Exclusive toggle */}
             <View style={styles.seekerToggleRow}>
               <View style={styles.seekerToggleLeft}>
                 <Ionicons name="shield-checkmark" size={18} color={isSeekerGated ? SKR_COLOR : colors.textMuted} />
@@ -380,7 +438,6 @@ export function CommunityRoomsScreen() {
         </KeyboardAvoidingView>
       </Modal>
 
-      {/* Seeker gated — access denied modal */}
       <Modal
         visible={showSeekerGatedModal}
         transparent
@@ -388,26 +445,46 @@ export function CommunityRoomsScreen() {
         onRequestClose={() => setShowSeekerGatedModal(false)}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.modalCard}>
-            <View style={styles.seekerDeniedIcon}>
-              <Ionicons name="shield-checkmark" size={36} color={SKR_COLOR} />
-            </View>
-            <Text style={styles.modalTitle}>Seeker Exclusive Room</Text>
-            <Text style={styles.modalSub}>
-              This room is reserved for Seeker (SKR) token holders. SKR is the native token of the
-              Solana Mobile Seeker device ecosystem — rewarding early supporters of the web3 mobile
-              revolution.
-            </Text>
-            <Text style={styles.seekerDeniedHint}>
-              Your connected wallet does not hold any SKR tokens. Acquire SKR on a Solana DEX to
-              unlock access to Seeker-exclusive rooms.
-            </Text>
+          <View style={styles.seekerModalCard}>
             <TouchableOpacity
-              style={styles.confirmBtn}
+              style={styles.seekerModalClose}
               onPress={() => setShowSeekerGatedModal(false)}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
-              <Text style={styles.confirmBtnText}>Got it</Text>
+              <Ionicons name="close" size={20} color={colors.textMuted} />
             </TouchableOpacity>
+            <ScrollView showsVerticalScrollIndicator={false} bounces={false}>
+              <View style={styles.seekerDeniedIcon}>
+                <Ionicons name="shield-checkmark" size={36} color={SKR_COLOR} />
+              </View>
+              <Text style={styles.modalTitle}>Seeker Exclusive Room</Text>
+              <Text style={styles.modalSub}>
+                This room is reserved for Seeker (SKR) token holders. SKR is the native token of
+                the Solana Mobile Seeker device ecosystem — rewarding early supporters of the web3
+                mobile revolution.
+              </Text>
+              <Text style={styles.seekerDeniedHint}>
+                Your connected wallet does not hold any SKR tokens. Acquire SKR on a Solana DEX to
+                unlock access to Seeker-exclusive rooms.
+              </Text>
+              <TouchableOpacity
+                style={styles.swapSkrBtn}
+                onPress={() =>
+                  Linking.openURL(
+                    "https://jup.ag/swap?sell=So11111111111111111111111111111111111111112&buy=SKRbvo6Gf7GondiT3BbTfuRDPqLWei4j2Qy2NPGZhW3"
+                  )
+                }
+              >
+                <Ionicons name="swap-horizontal" size={16} color={colors.background} style={{ marginRight: 6 }} />
+                <Text style={styles.swapSkrBtnText}>Purchase / Swap Seeker (SKR)</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.dismissBtn}
+                onPress={() => setShowSeekerGatedModal(false)}
+              >
+                <Text style={styles.dismissBtnText}>Got it</Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </View>
       </Modal>
@@ -459,10 +536,119 @@ const styles = StyleSheet.create({
   },
   listContent: {
     padding: spacing.md,
+    paddingTop: 0,
     gap: spacing.sm,
   },
-  listEmpty: {
-    flex: 1,
+  seekerFeaturedWrapper: {
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.xs,
+  },
+  seekerFeaturedCard: {
+    borderRadius: borderRadius.xl,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: `${SKR_COLOR}40`,
+    marginBottom: spacing.sm,
+  },
+  seekerFeaturedHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: spacing.sm,
+  },
+  seekerFeaturedBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: `${SKR_COLOR}25`,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: `${SKR_COLOR}40`,
+  },
+  seekerFeaturedBadgeText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 9,
+    color: SKR_COLOR,
+    letterSpacing: 0.8,
+  },
+  seekerParticipantBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 4,
+    backgroundColor: "rgba(255,255,255,0.08)",
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 8,
+  },
+  seekerParticipantCount: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 12,
+    color: SKR_COLOR,
+  },
+  seekerFeaturedIconRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: spacing.md,
+  },
+  seekerFeaturedIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: `${SKR_COLOR}20`,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: `${SKR_COLOR}40`,
+  },
+  seekerFeaturedTitle: {
+    fontFamily: fonts.heading,
+    fontSize: 20,
+    color: "#FFFFFF",
+  },
+  seekerFeaturedSub: {
+    fontFamily: fonts.body,
+    fontSize: 12,
+    color: "rgba(255,255,255,0.55)",
+    marginTop: 2,
+  },
+  seekerFeaturedDivider: {
+    height: 1,
+    backgroundColor: `${SKR_COLOR}25`,
+    marginBottom: spacing.sm,
+  },
+  seekerFeaturedFooter: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+  },
+  livePillRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 5,
+  },
+  seekerJoinBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: SKR_COLOR,
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  seekerJoinBtnText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+    color: "#FFF",
+  },
+  sectionLabel: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 13,
+    color: colors.textMuted,
+    letterSpacing: 0.5,
+    marginTop: spacing.xs,
+    marginBottom: spacing.xs,
   },
   roomCard: {
     backgroundColor: colors.surface,
@@ -608,7 +794,6 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.background,
   },
-  // Seeker gated notice in join modal
   gatedNotice: {
     flexDirection: "row",
     alignItems: "center",
@@ -626,7 +811,6 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: SKR_COLOR,
   },
-  // Seeker toggle in create modal
   seekerToggleRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -662,7 +846,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
     marginTop: 1,
   },
-  // Seeker denied modal
   seekerDeniedIcon: {
     alignSelf: "center",
     width: 68,
@@ -687,7 +870,6 @@ const styles = StyleSheet.create({
     borderLeftWidth: 3,
     borderLeftColor: colors.error,
   },
-  // Modal shared
   modalOverlay: {
     flex: 1,
     backgroundColor: "rgba(0,0,0,0.7)",
@@ -701,6 +883,57 @@ const styles = StyleSheet.create({
     padding: spacing.lg,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  seekerModalCard: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.xl,
+    padding: spacing.lg,
+    paddingTop: spacing.xl,
+    borderWidth: 1,
+    borderColor: `${SKR_COLOR}30`,
+    maxHeight: "85%",
+    position: "relative",
+  },
+  seekerModalClose: {
+    position: "absolute",
+    top: spacing.md,
+    right: spacing.md,
+    zIndex: 10,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: colors.background,
+    alignItems: "center",
+    justifyContent: "center",
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  swapSkrBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: SKR_COLOR,
+    borderRadius: borderRadius.md,
+    paddingVertical: 13,
+    marginBottom: spacing.sm,
+  },
+  swapSkrBtnText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.background,
+  },
+  dismissBtn: {
+    borderRadius: borderRadius.md,
+    paddingVertical: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    alignItems: "center",
+    marginBottom: spacing.xs,
+  },
+  dismissBtnText: {
+    fontFamily: fonts.bodySemiBold,
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   modalTitle: {
     fontFamily: fonts.heading,

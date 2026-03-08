@@ -30,14 +30,12 @@ export function useTickets() {
           t.account.owner.toBase58() === wallet.getPublicKey()!.toBase58()
       );
 
-      // Batch fetch refund request PDAs for all tickets
       const refundPdaKeys = myTickets.map((acc: any) => {
         const data = acc.account as any;
         const [refundPda] = findRefundRequestPda(data.event, data.mint);
         return refundPda;
       });
 
-      // Fetch refund accounts in batches of 10
       const refundAccounts: (any | null)[] = [];
       for (let i = 0; i < refundPdaKeys.length; i += 10) {
         const batch = refundPdaKeys.slice(i, i + 10);
@@ -65,15 +63,11 @@ export function useTickets() {
             eventIsActive = eventData.isActive ?? true;
             eventIsMeetingEnded = eventData.isMeetingEnded ?? false;
           } catch {
-            // event might not exist
           }
 
-          // Parse refund status from account data
           let refundStatus: RefundStatus = "none";
           const refundAccountInfo = refundAccounts[index];
           if (refundAccountInfo && refundAccountInfo.data.length >= 113) {
-            // RefundRequest layout: disc(8) + event(32) + ticket_mint(32) + holder(32) + amount(8) + status(1)
-            // status offset = 8 + 32 + 32 + 32 + 8 = 112
             const statusByte = refundAccountInfo.data[112];
             switch (statusByte) {
               case 0:

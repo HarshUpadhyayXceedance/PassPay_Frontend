@@ -36,13 +36,11 @@ export function BadgeCollectionScreen() {
   const tier = loyaltyBenefits?.currentTier ?? BadgeTier.None;
   const totalEvents = loyaltyBenefits?.totalEvents ?? 0;
 
-  // Explicitly fetch loyalty data when screen mounts
   useEffect(() => {
     fetchLoyaltyBenefits();
     fetchBadgeCollection();
   }, []);
 
-  // Check which badges have already been claimed by reading on-chain ATAs
   const checkClaimedBadges = useCallback(async () => {
     if (!publicKey || !badgeCollection) return;
 
@@ -64,16 +62,13 @@ export function BadgeCollectionScreen() {
         try {
           const accountInfo = await connection.getAccountInfo(ata);
           if (accountInfo && accountInfo.data.length >= 72) {
-            // SPL token account: amount is u64 LE at bytes 64-72
-            // Avoid readBigUInt64LE / BigInt — not reliable in Hermes
-            const amountBytes = accountInfo.data.slice(64, 72);
+              const amountBytes = accountInfo.data.slice(64, 72);
             const hasTokens = amountBytes.some((b: number) => b > 0);
             if (hasTokens) {
               claimed.add(t);
             }
           }
         } catch {
-          // ATA doesn't exist
         }
       }
 
@@ -149,7 +144,6 @@ export function BadgeCollectionScreen() {
           </Text>
         </View>
 
-        {/* Error banner */}
         {error && (
           <View style={styles.errorBox}>
             <Text style={styles.errorText}>
@@ -158,7 +152,6 @@ export function BadgeCollectionScreen() {
           </View>
         )}
 
-        {/* Current status */}
         <View style={styles.statusRow}>
           <View style={styles.statusItem}>
             <Text style={styles.statusValue}>{totalEvents}</Text>
@@ -183,7 +176,6 @@ export function BadgeCollectionScreen() {
           {TIERS.map((t) => {
             const isEarned = tier >= t;
             const isClaimed = claimedTiers.has(t);
-            // Only show claim for the user's current tier if not yet claimed
             const canClaim = isEarned && !isClaimed && !!badgeCollection && tier === t;
 
             return (

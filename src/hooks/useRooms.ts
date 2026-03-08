@@ -76,12 +76,6 @@ export function useRooms() {
     [publicKey]
   );
 
-  /**
-   * Confirm attendance for an online event on-chain.
-   * Calls the `self_check_in` Solana instruction — the user signs with Phantom.
-   * Marks `ticket.is_checked_in = true` and updates the UserAttendanceRecord
-   * (event count, streak, tier) exactly like a physical QR check-in.
-   */
   const confirmAttendance = useCallback(
     async (eventPda: string, ticketMint: string): Promise<string> => {
       if (!publicKey) throw new Error("Wallet not connected");
@@ -94,17 +88,11 @@ export function useRooms() {
     [publicKey]
   );
 
-  /**
-   * End meeting: set is_meeting_ended=true on-chain (wallet signs),
-   * then call backend to clean up LiveKit room + Redis entry.
-   */
   const endMeeting = useCallback(
     async (eventPda: string): Promise<void> => {
       if (!publicKey) throw new Error("Wallet not connected");
-      // 1. On-chain: set is_meeting_ended = true (requires admin wallet signature)
       const provider = createProvider(phantomWalletAdapter);
       await endMeetingOnChain(provider, new PublicKey(eventPda));
-      // 2. Backend: clean up LiveKit room + Redis entry
       await apiEndMeeting(eventPda, publicKey);
     },
     [publicKey]

@@ -7,7 +7,6 @@ import { clearAuthToken, getAuthToken } from "../utils/backendAuth";
 
 const PERSISTED_WALLET_KEY = "persisted_wallet_pubkey";
 
-// Module-level singleton — avoids creating a new WebSocket connection on every refreshBalance() call
 let _solanaConnection: Connection | null = null;
 function getSolanaConnection(): Connection {
   if (!_solanaConnection) {
@@ -18,13 +17,12 @@ function getSolanaConnection(): Connection {
 
 interface WalletState {
   publicKey: string | null;
-  balance: number; // in SOL
+  balance: number;
   isConnected: boolean;
   isConnecting: boolean;
   walletType: "phantom" | null;
   error: string | null;
 
-  // Actions
   connectPhantom: () => Promise<void>;
   disconnectPhantom: () => Promise<void>;
   refreshBalance: () => Promise<void>;
@@ -57,10 +55,8 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         walletType: "phantom",
       });
 
-      // Persist wallet key so it survives Activity restarts (orientation change)
       await AsyncStorage.setItem(PERSISTED_WALLET_KEY, pubkeyStr).catch(() => {});
 
-      // Refresh balance after connection
       await get().refreshBalance();
 
       console.log("Phantom wallet connected:", pubkeyStr);
@@ -79,7 +75,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
   disconnectPhantom: async () => {
     try {
       await phantomWalletAdapter.disconnect();
-      // Clear backend JWT for this wallet
       const { publicKey: prevKey } = get();
       if (prevKey) await clearAuthToken(prevKey).catch(() => {});
 
@@ -90,12 +85,10 @@ export const useWalletStore = create<WalletState>((set, get) => ({
         walletType: null,
         error: null,
       });
-      // Clear persisted wallet
       await AsyncStorage.removeItem(PERSISTED_WALLET_KEY).catch(() => {});
       console.log("Phantom wallet disconnected");
     } catch (error: any) {
       console.error("Disconnect failed:", error.message);
-      // Even if disconnect fails, clear state
       const { publicKey: failKey } = get();
       if (failKey) await clearAuthToken(failKey).catch(() => {});
       set({
@@ -108,12 +101,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
     }
   },
 
-  /**
-   * Restore wallet connection from AsyncStorage after JS context restart
-   * (e.g. Activity recreation on orientation change). This sets publicKey
-   * and isConnected so the auth flow doesn't redirect to welcome.
-   * The MWA session will be re-established on the next transaction.
-   */
   restorePersistedWallet: async (): Promise<boolean> => {
     try {
       const storedKey = await AsyncStorage.getItem(PERSISTED_WALLET_KEY);
@@ -123,9 +110,7 @@ export const useWalletStore = create<WalletState>((set, get) => ({
           isConnected: true,
           walletType: "phantom",
         });
-        // Restore the adapter's public key (read-only; MWA re-auth on next tx)
         phantomWalletAdapter.restorePublicKey(new PublicKey(storedKey));
-        // Check if a valid JWT is stored — log result for debugging
         const token = await getAuthToken(storedKey);
         console.log("Wallet restored from persistence:", storedKey.slice(0, 8), token ? "(JWT valid)" : "(no JWT — will use legacy auth)");
         return true;
@@ -150,7 +135,6 @@ export const useWalletStore = create<WalletState>((set, get) => ({
       console.log("Balance refreshed:", solBalance, "SOL");
     } catch (error: any) {
       console.error("Failed to refresh balance:", error.message);
-      // Reset singleton on RPC failure so the next call gets a fresh connection
       _solanaConnection = null;
       set({ error: "Unable to fetch balance. Check your connection." });
     }

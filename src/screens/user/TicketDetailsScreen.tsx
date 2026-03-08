@@ -145,7 +145,6 @@ export function TicketDetailsScreen() {
             eventDate: String(ticket.eventDate instanceof Date
               ? ticket.eventDate.getTime()
               : new Date(ticket.eventDate).getTime()),
-            // Unique per-join so RoomScreen resets cached tab state on each join
             joinTimestamp: String(Date.now()),
           },
         });
@@ -157,7 +156,6 @@ export function TicketDetailsScreen() {
     }
   }, [ticket, joinMeeting, router]);
 
-  // Fallback path for users who missed the in-meeting attendance strip due to MWA navigation
   const handleConfirmAttendanceFromTicket = useCallback(async () => {
     if (!ticket) return;
     setIsConfirmingAttendance(true);
@@ -241,7 +239,6 @@ export function TicketDetailsScreen() {
               </View>
             )}
 
-            {/* hidden for online events — no physical tier concept */}
             {!isOnline && ticket.seatTierName && (
               <View style={[styles.statusBadge, styles.tierBadge]}>
                 <Text style={styles.statusBadgeText}>{ticket.seatTierName.toUpperCase()}</Text>

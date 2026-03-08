@@ -4,11 +4,6 @@ import { utils } from "@coral-xyz/anchor";
 import { DEVNET_RPC, PROGRAM_ID } from "../solana/config/constants";
 import { lamportsToSOL } from "../utils/formatters";
 
-/**
- * ProductPurchase on-chain account layout (130 bytes total):
- *   disc(8) + buyer(32) + product(32) + merchant(32)
- *   + amount(8) + is_collected(1) + purchased_at(8) + collected_at(8) + bump(1)
- */
 const PRODUCT_PURCHASE_DISC = new Uint8Array([63, 63, 31, 130, 199, 201, 162, 171]);
 
 export interface ProductPurchaseDisplay {
@@ -16,11 +11,11 @@ export interface ProductPurchaseDisplay {
   buyer: string;
   product: string;
   merchant: string;
-  amount: number; // in SOL
+  amount: number;
   amountLamports: number;
   isCollected: boolean;
-  purchasedAt: number; // ms
-  collectedAt: number; // ms (0 if not collected)
+  purchasedAt: number;
+  collectedAt: number;
 }
 
 interface PurchaseState {
@@ -36,7 +31,7 @@ function parseProductPurchase(
 ): ProductPurchaseDisplay | null {
   if (data.length < 130) return null;
 
-  let offset = 8; // skip discriminator
+  let offset = 8;
 
   const buyer = new PublicKey(data.subarray(offset, offset + 32));
   offset += 32;
@@ -47,7 +42,6 @@ function parseProductPurchase(
   const merchant = new PublicKey(data.subarray(offset, offset + 32));
   offset += 32;
 
-  // amount: u64 (LE)
   const amountLow = data.readUInt32LE(offset);
   const amountHigh = data.readUInt32LE(offset + 4);
   const amountLamports = amountLow + amountHigh * 0x100000000;
@@ -56,13 +50,11 @@ function parseProductPurchase(
   const isCollected = data[offset] !== 0;
   offset += 1;
 
-  // purchased_at: i64 (LE)
   const purchasedAtLow = data.readUInt32LE(offset);
   const purchasedAtHigh = data.readInt32LE(offset + 4);
   const purchasedAtSec = purchasedAtLow + purchasedAtHigh * 0x100000000;
   offset += 8;
 
-  // collected_at: i64 (LE)
   const collectedAtLow = data.readUInt32LE(offset);
   const collectedAtHigh = data.readInt32LE(offset + 4);
   const collectedAtSec = collectedAtLow + collectedAtHigh * 0x100000000;
@@ -101,7 +93,7 @@ export const usePurchaseStore = create<PurchaseState>((set) => ({
           },
           {
             memcmp: {
-              offset: 8, // buyer field starts right after discriminator
+              offset: 8,
               bytes: buyerPubkey.toBase58(),
             },
           },
@@ -118,7 +110,6 @@ export const usePurchaseStore = create<PurchaseState>((set) => ({
         }
       }
 
-      // Sort newest first
       purchases.sort((a, b) => b.purchasedAt - a.purchasedAt);
 
       set({ purchases, isLoaded: true, isLoading: false });

@@ -66,16 +66,13 @@ export function RefundRequestScreen() {
     );
   }
 
-  // Use actual price paid (after loyalty discount) for refund display
   const refundAmount = ticket.pricePaid > 0
     ? ticket.pricePaid / 1_000_000_000
     : event.ticketPrice;
 
   const isCancelledEvent = ticket.eventIsCancelled;
 
-  // Resolve the seat tier PDA for this ticket
   const resolveSeatTierPda = async (): Promise<string> => {
-    // Fetch tiers for this event if not already loaded
     await fetchSeatTiers(ticket.eventKey);
     const eventTiers = seatTiers.filter((t) => t.eventKey === ticket.eventKey);
     const matchingTier = eventTiers.find((t) => t.tierLevel === ticket.seatTier);
@@ -87,7 +84,6 @@ export function RefundRequestScreen() {
 
   const handleRefund = async () => {
     if (isCancelledEvent) {
-      // Auto-refund for cancelled events — no admin approval needed
       confirm({
         title: "Claim Refund",
         message: `Claim your refund of ${formatSOL(refundAmount)} SOL? The event was cancelled and you'll receive your SOL back immediately.`,
@@ -123,7 +119,6 @@ export function RefundRequestScreen() {
         ],
       });
     } else {
-      // Regular refund request — needs admin approval
       confirm({
         title: "Request Refund",
         message: `Submit a refund request for ${formatSOL(refundAmount)} SOL? The event admin will review and approve or reject your request.`,
@@ -163,7 +158,6 @@ export function RefundRequestScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -180,7 +174,6 @@ export function RefundRequestScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Ticket Details */}
         <Text style={styles.sectionLabel}>TICKET DETAILS</Text>
         <View style={styles.card}>
           <View style={styles.itemRow}>
@@ -213,7 +206,6 @@ export function RefundRequestScreen() {
           </View>
         </View>
 
-        {/* Refund Summary */}
         <Text style={styles.sectionLabel}>REFUND SUMMARY</Text>
         <View style={styles.card}>
           <View style={styles.summaryRow}>
@@ -231,7 +223,6 @@ export function RefundRequestScreen() {
           </View>
         </View>
 
-        {/* Info Section */}
         <View style={styles.infoCard}>
           <View style={styles.infoHeader}>
             <Ionicons
@@ -251,7 +242,6 @@ export function RefundRequestScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom Actions */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[

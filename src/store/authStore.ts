@@ -16,7 +16,6 @@ interface AuthState {
   isDetectingRole: boolean;
   error: string | null;
 
-  // Actions
   detectRole: (walletPublicKey: string) => Promise<void>;
   loadStoredRole: () => Promise<void>;
   setAuthenticated: (authenticated: boolean) => void;
@@ -37,7 +36,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   detectRole: async (walletPublicKey: string) => {
     set({ isDetectingRole: true, error: null });
     try {
-      // Fast path: check cached role for this wallet
       const storedWallet = await SecureStore.getItemAsync(WALLET_STORAGE_KEY);
       const storedRole = await SecureStore.getItemAsync(ROLE_STORAGE_KEY);
 
@@ -51,14 +49,12 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      // Slow path: on-chain role detection
       const pubKey = new PublicKey(walletPublicKey);
       const connection = new Connection(DEVNET_RPC, "confirmed");
 
       console.log("Detecting role for wallet:", walletPublicKey);
       const role = await detectUserRole(pubKey, connection);
 
-      // Store role and wallet in SecureStore for persistence
       await SecureStore.setItemAsync(ROLE_STORAGE_KEY, role);
       await SecureStore.setItemAsync(WALLET_STORAGE_KEY, walletPublicKey);
 
@@ -91,9 +87,6 @@ export const useAuthStore = create<AuthState>((set) => ({
         return;
       }
 
-      // Always re-detect role from chain on cold start — stale cache can show
-      // the wrong role (e.g. admin screen for a user wallet) after the on-chain
-      // role changes or after testing with a different role on the same wallet.
       await SecureStore.deleteItemAsync(ROLE_STORAGE_KEY);
       await SecureStore.deleteItemAsync(WALLET_STORAGE_KEY);
 
@@ -117,7 +110,6 @@ export const useAuthStore = create<AuthState>((set) => ({
   setError: (error) => set({ error }),
 
   logout: async () => {
-    // Clear stored credentials
     try {
       await SecureStore.deleteItemAsync(ROLE_STORAGE_KEY);
       await SecureStore.deleteItemAsync(WALLET_STORAGE_KEY);

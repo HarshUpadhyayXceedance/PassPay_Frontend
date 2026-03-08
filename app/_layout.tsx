@@ -35,14 +35,12 @@ export default function RootLayout() {
 
   const [fontsLoaded] = useFonts(fontAssets);
 
-  // Handle app state changes to prevent unwanted navigation on background/foreground
   useEffect(() => {
     const subscription = AppState.addEventListener("change", (nextAppState: AppStateStatus) => {
       if (
         appState.current.match(/inactive|background/) &&
         nextAppState === "active"
       ) {
-        // App has come to the foreground — refresh wallet balance
         console.log("[AppState] App has come to the foreground");
         const ws = useWalletStore.getState();
         if (ws.isConnected && ws.publicKey) {
@@ -58,7 +56,6 @@ export default function RootLayout() {
     };
   }, []);
 
-  // Handle deep links: store pending URL if not authenticated
   useEffect(() => {
     const handleUrl = (event: { url: string }) => {
       const parsed = Linking.parse(event.url);
@@ -77,17 +74,14 @@ export default function RootLayout() {
       }
     };
 
-    // Check initial URL (cold start)
     Linking.getInitialURL().then((url) => {
       if (url) handleUrl({ url });
     });
 
-    // Listen for URLs while app is open
     const sub = Linking.addEventListener("url", handleUrl);
     return () => sub.remove();
   }, [isAuthenticated, isConnected, role]);
 
-  // Process pending deep link after authentication
   useEffect(() => {
     if (isAuthenticated && isConnected && role && pendingDeepLink.current) {
       const parsed = Linking.parse(pendingDeepLink.current);
@@ -110,26 +104,20 @@ export default function RootLayout() {
     if (fontsLoaded) {
       SplashScreen.hideAsync();
 
-      // Check onboarding status and restore persisted session
       const initialize = async () => {
         try {
-          // 1. Restore wallet connection from AsyncStorage (survives Activity restarts)
           const walletRestored = await useWalletStore.getState().restorePersistedWallet();
 
-          // 2. Restore auth role (only succeeds if wallet was restored above)
           await loadStoredRole();
 
-          // 3. If wallet was restored, refresh balance from network
           if (walletRestored) {
             useWalletStore.getState().refreshBalance().catch(() => {});
           }
 
-              // Register 401 handler: when JWT expires mid-session, force re-auth
           registerAuthExpiredHandler(() => {
             useWalletStore.getState().disconnectPhantom().catch(() => {});
           });
 
-          // Check if user has completed onboarding
           const onboardingCompleted = await AsyncStorage.getItem(
             ONBOARDING_COMPLETED_KEY
           );
@@ -140,7 +128,6 @@ export default function RootLayout() {
 
           setOnboardingChecked(true);
 
-          // Register for push notifications (non-blocking)
           registerForPushNotifications().catch(() => {});
         } catch (error) {
           console.error("Failed to initialize app:", error);
@@ -167,26 +154,22 @@ export default function RootLayout() {
     }
   };
 
-  // Show splash while loading
   if (!fontsLoaded || isInitializing || isLoading || !onboardingChecked) {
     return <SplashScreenView />;
   }
 
-  // Show onboarding for first-time users
   if (showOnboarding) {
     return <OnboardingCarousel visible={true} onComplete={handleOnboardingComplete} />;
   }
 
   const inAuthGroup = segments[0] === "(auth)";
 
-  // Not authenticated → redirect to welcome (declarative, no isReady needed)
   if (!isConnected || !isAuthenticated || !role) {
     if (!inAuthGroup) {
       return <Redirect href="/(auth)/welcome" />;
     }
   }
 
-  // Authenticated but still on auth screens → redirect to role-based home
   if (isAuthenticated && role && inAuthGroup) {
     if (role === "super_admin" || role === "admin") {
       return <Redirect href="/(admin)" />;

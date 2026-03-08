@@ -24,25 +24,18 @@ import { findAdminPda } from "../../solana/pda";
 import { SUPER_ADMIN_PUBKEY } from "../../solana/config/constants";
 import { BadgeTier } from "../../types/loyalty";
 
-// Dev SuperAdmin public key (must match roleDetection.ts)
 const DEV_SUPER_ADMIN_PUBKEY = new PublicKey(
   "24PNhTaNtomHhoy3fTRaMhAFCRj4uHqhZEEoWrKDbR5p"
 );
 
-/**
- * Ensure the admin PDA exists for the connected wallet.
- * If the wallet is a super_admin without an on-chain admin PDA,
- * auto-create one so they can create events.
- */
 async function ensureAdminPda(provider: ReturnType<typeof createProvider>): Promise<void> {
   const walletKey = provider.wallet.publicKey;
   const program = getProgram(provider);
   const [adminPda] = findAdminPda(walletKey);
 
   const existing = await program.account.admin.fetchNullable(adminPda);
-  if (existing) return; // Already initialized
+  if (existing) return;
 
-  // Only auto-create for super_admin wallets
   const isSuperAdmin =
     walletKey.equals(SUPER_ADMIN_PUBKEY) ||
     walletKey.equals(DEV_SUPER_ADMIN_PUBKEY);
@@ -63,7 +56,6 @@ export async function apiCreateEvent(params: CreateEventParams): Promise<string>
   if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
   const provider = createProvider(wallet);
 
-  // Ensure admin PDA exists before creating event
   await ensureAdminPda(provider);
 
   return createEvent(provider, params);
@@ -187,9 +179,6 @@ export async function apiCancelEvent(params: {
   });
 }
 
-/**
- * User claims their soulbound badge NFT based on current attendance tier.
- */
 export async function apiClaimBadge(): Promise<{
   signature: string;
   badgeMint: string;
@@ -311,18 +300,13 @@ export async function apiCollectProduct(params: {
   });
 }
 
-/**
- * Admin one-time setup: create 4 tier mints and initialize badge collection.
- */
 export async function apiSetupBadgeCollection(): Promise<string> {
   const wallet = phantomWalletAdapter;
   if (!wallet.getPublicKey()) throw new Error("Wallet not connected");
   const provider = createProvider(wallet);
 
-  // Step 1: Create 4 SPL mints with badge_authority PDA as authority
   const mints = await createBadgeMints(provider);
 
-  // Step 2: Initialize badge collection on-chain
   const tx = await initializeBadgeCollection(provider, {
     collectionName: "PassPay Badges",
     collectionSymbol: "PPBADGE",

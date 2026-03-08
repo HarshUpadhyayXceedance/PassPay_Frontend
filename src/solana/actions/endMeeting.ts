@@ -3,14 +3,6 @@ import { AnchorProvider } from "@coral-xyz/anchor";
 import { getProgram } from "../config/program";
 import { findAdminPda } from "../pda";
 
-/**
- * End meeting for an online event (Admin only).
- * Sets event.is_meeting_ended = true on-chain.
- *
- * @param provider - Anchor provider with admin wallet
- * @param eventPda - The event account public key
- * @returns Transaction signature
- */
 export async function endMeeting(
   provider: AnchorProvider,
   eventPda: PublicKey

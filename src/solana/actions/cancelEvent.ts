@@ -7,10 +7,6 @@ export interface CancelEventParams {
   eventPda: PublicKey;
 }
 
-/**
- * Cancel an event (Admin / SuperAdmin).
- * Sets is_cancelled = true, is_active = false, extends refund window by 30 days.
- */
 export async function cancelEvent(
   provider: AnchorProvider,
   params: CancelEventParams

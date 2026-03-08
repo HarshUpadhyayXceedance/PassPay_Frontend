@@ -1,10 +1,6 @@
 import { PublicKey } from "@solana/web3.js";
 import { PROGRAM_ID, PRODUCT_PURCHASE_SEED } from "../config/constants";
 
-/**
- * Derive the ProductPurchase PDA.
- * Seeds: ["product_purchase", productPda, purchaseIndex (u32 LE bytes)]
- */
 export function findProductPurchasePda(
   product: PublicKey,
   purchaseIndex: number

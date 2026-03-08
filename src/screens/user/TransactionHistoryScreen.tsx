@@ -34,7 +34,6 @@ interface TransactionItem {
   date: Date;
   seatNumber: number;
   mint: string;
-  // payment-specific
   amount?: number;
   merchantName?: string;
   signature?: string;
@@ -64,12 +63,10 @@ export function TransactionHistoryScreen() {
       const connection = getConnection();
       const walletPubkey = new PublicKey(publicKey);
 
-      // Fetch recent signatures for the user's wallet
       const sigs = await connection.getSignaturesForAddress(walletPubkey, {
         limit: 50,
       });
 
-      // Batch fetch parsed transactions (3 at a time to avoid 429)
       const paymentItems: TransactionItem[] = [];
       const chunks: typeof sigs[] = [];
       for (let i = 0; i < sigs.length; i += 3) {

@@ -5,13 +5,6 @@ import { DEVNET_RPC } from "../config/constants";
 import { phantomWalletAdapter } from "../wallet/phantomWalletAdapter";
 import { createProvider } from "../wallet/walletSession";
 
-/**
- * Deactivate an admin account (SuperAdmin only)
- *
- * @param superAdminPubkey - The SuperAdmin's public key (signer)
- * @param adminPubkey - The admin's public key to deactivate
- * @returns Transaction signature
- */
 export async function deactivateAdmin(
   superAdminPubkey: PublicKey,
   adminPubkey: PublicKey

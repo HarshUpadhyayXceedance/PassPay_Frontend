@@ -52,8 +52,6 @@ export function SuperAdminDashboardScreen() {
       );
       const program = getProgram(provider);
       const adminAccounts = await program.account.admin.all();
-      // Use safeFetchAll instead of program.account.event.all() to handle
-      // old-schema accounts missing the image_url field
       const eventAccounts = await safeFetchAll(connection, program, "Event");
 
       const activeEvents = eventAccounts.filter(
@@ -100,7 +98,6 @@ export function SuperAdminDashboardScreen() {
         />
       }
     >
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image
@@ -129,7 +126,6 @@ export function SuperAdminDashboardScreen() {
         )}
       </View>
 
-      {/* Stats Cards */}
       <ScrollView
         horizontal
         showsHorizontalScrollIndicator={false}
@@ -165,7 +161,6 @@ export function SuperAdminDashboardScreen() {
         />
       </ScrollView>
 
-      {/* Quick Actions */}
       <Text style={styles.sectionTitle}>Quick Actions</Text>
       <View style={styles.actionsRow}>
         <ActionButton
@@ -204,7 +199,6 @@ export function SuperAdminDashboardScreen() {
         )}
       </View>
 
-      {/* Admin Management (super admin only) */}
       {isSuperAdmin && (
         <>
           <Text style={styles.sectionTitle}>Admin Management</Text>
@@ -226,7 +220,6 @@ export function SuperAdminDashboardScreen() {
         </>
       )}
 
-      {/* Merchant Management */}
       <Text style={styles.sectionTitle}>Merchant Management</Text>
       <TouchableOpacity
         style={styles.overviewCard}
@@ -244,7 +237,6 @@ export function SuperAdminDashboardScreen() {
         </View>
       </TouchableOpacity>
 
-      {/* Platform Overview */}
       <Text style={styles.sectionTitle}>Platform Overview</Text>
       <View style={styles.overviewCard}>
         <OverviewRow
@@ -276,7 +268,6 @@ export function SuperAdminDashboardScreen() {
         />
       </View>
 
-      {/* System Status */}
       <Text style={styles.sectionTitle}>System Status</Text>
       <View style={styles.statusCard}>
         <StatusRow

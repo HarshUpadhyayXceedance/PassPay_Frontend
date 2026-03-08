@@ -64,7 +64,6 @@ export default function AdminLayout() {
           ),
         }}
       />
-      {/* Hidden routes - not shown in tab bar */}
       <Tabs.Screen name="create-event" options={{ href: null }} />
       <Tabs.Screen name="create-admin" options={{ href: null }} />
       <Tabs.Screen name="admin-list" options={{ href: null }} />

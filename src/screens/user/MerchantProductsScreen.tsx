@@ -107,7 +107,6 @@ export function MerchantProductsScreen() {
                 Haptics.NotificationFeedbackType.Success
               );
 
-              // Compute the purchase record PDA (seeds: product PDA + totalSold before increment)
               const [merchantPda] = findMerchantPda(
                 new PublicKey(eventKey),
                 new PublicKey(merchant.authority)
@@ -127,7 +126,6 @@ export function MerchantProductsScreen() {
               };
               setReceipt(receiptData);
 
-              // Refresh on-chain purchases
               if (publicKey) fetchPurchases(publicKey);
 
               fetchProducts(merchantKey);
@@ -270,7 +268,6 @@ export function MerchantProductsScreen() {
         showsVerticalScrollIndicator={false}
       />
 
-      {/* Purchase Receipt QR Modal */}
       <Modal
         visible={receipt !== null}
         transparent

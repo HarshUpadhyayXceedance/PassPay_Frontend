@@ -46,7 +46,6 @@ export function AdminDashboardScreen() {
   const totalTicketsSold = myEvents.reduce((sum, e) => sum + e.ticketsSold, 0);
   const activeEvents = myEvents.filter((e) => e.isActive && !e.isCancelled && !e.isMeetingEnded).length;
 
-  // Derive total revenue from seat tiers
   const totalRevenue = myEvents.reduce((sum, event) => {
     const eventTiers = seatTiers.filter((t) => t.eventKey === event.publicKey);
     const tierRevenue = eventTiers.reduce(
@@ -69,7 +68,6 @@ export function AdminDashboardScreen() {
         />
       }
     >
-      {/* Header */}
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image
@@ -94,7 +92,6 @@ export function AdminDashboardScreen() {
         </LinearGradient>
       </View>
 
-      {/* Wallet Balance Card */}
       <LinearGradient
         colors={["rgba(0,255,163,0.15)", "rgba(0,206,201,0.05)"]}
         start={{ x: 0, y: 0 }}
@@ -108,7 +105,6 @@ export function AdminDashboardScreen() {
         )}
       </LinearGradient>
 
-      {/* Stats Grid */}
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <View
@@ -163,7 +159,6 @@ export function AdminDashboardScreen() {
         </View>
       </View>
 
-      {/* Quick Actions */}
       <View style={styles.actionsSection}>
         <Text style={styles.sectionTitle}>Quick Actions</Text>
         <View style={styles.actionsGrid}>
@@ -237,7 +232,6 @@ export function AdminDashboardScreen() {
         </View>
       </View>
 
-      {/* Badge Collection Status */}
       <View style={styles.badgeSection}>
         <View style={styles.badgeCard}>
           <View style={styles.badgeCardHeader}>
@@ -303,7 +297,6 @@ export function AdminDashboardScreen() {
         </View>
       </View>
 
-      {/* Recent Events Preview */}
       {myEvents.length > 0 && (
         <View style={styles.recentSection}>
           <View style={styles.sectionHeader}>
@@ -389,7 +382,6 @@ const styles = StyleSheet.create({
     paddingBottom: spacing.xxl,
   },
 
-  // Header
   header: {
     flexDirection: "row",
     justifyContent: "space-between",
@@ -433,7 +425,6 @@ const styles = StyleSheet.create({
     letterSpacing: 1.2,
   },
 
-  // Wallet
   walletCard: {
     marginHorizontal: spacing.lg,
     borderRadius: borderRadius.lg,
@@ -460,7 +451,6 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Stats
   statsRow: {
     flexDirection: "row",
     gap: spacing.md,
@@ -497,7 +487,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Quick Actions
   actionsSection: {
     paddingHorizontal: spacing.lg,
     marginTop: spacing.sm,
@@ -534,7 +523,6 @@ const styles = StyleSheet.create({
     textAlign: "center",
   },
 
-  // Badge Section
   badgeSection: {
     paddingHorizontal: spacing.lg,
     marginBottom: spacing.lg,
@@ -617,7 +605,6 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Section
   sectionTitle: {
     ...typography.h4,
     color: colors.text,
@@ -635,7 +622,6 @@ const styles = StyleSheet.create({
     color: colors.accent,
   },
 
-  // Recent Events
   recentSection: {
     paddingHorizontal: spacing.lg,
   },

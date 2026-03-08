@@ -24,8 +24,6 @@ export function useEvents() {
       const program = getProgram(provider);
       const connection = getConnection();
 
-      // Use safeFetchAll instead of program.account.event.all() to handle
-      // old-schema accounts that are missing the image_url field
       const accounts = await safeFetchAll(connection, program, "Event");
       const events: EventDisplay[] = [];
       for (const acc of accounts) {
@@ -34,7 +32,6 @@ export function useEvents() {
           const totalSeats = data.totalSeats;
           const ticketsSold = data.ticketsSold;
 
-          // Handle both old (ticketPrice) and new (baseTicketPrice/currentTicketPrice) schema
           const basePrice = data.baseTicketPrice
             ? data.baseTicketPrice.toNumber()
             : data.ticketPrice?.toNumber() ?? 0;
@@ -43,7 +40,6 @@ export function useEvents() {
             : basePrice;
 
           const venueStr = decodeAccountString(data.venue);
-          // Use on-chain isOnline field if available, fall back to venue-name detection for old accounts
           const isOnlineOnChain: boolean | undefined = data.isOnline;
           const eventType: "online" | "offline" =
             isOnlineOnChain !== undefined
@@ -84,7 +80,6 @@ export function useEvents() {
             eventType,
           });
         } catch (e) {
-          // Skip accounts with old schema that can't be deserialized
           console.warn("Skipping event account", acc.publicKey.toBase58(), e);
         }
       }

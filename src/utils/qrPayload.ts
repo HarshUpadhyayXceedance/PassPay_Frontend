@@ -9,8 +9,8 @@ export interface PaymentQRPayload {
   type: "payment";
   merchantAuthority: string;
   eventKey: string;
-  amount: number; // in SOL
-  productName?: string; // optional product reference
+  amount: number;
+  productName?: string;
 }
 
 export type QRPayload = TicketQRPayload | PaymentQRPayload;
@@ -23,7 +23,6 @@ export function decodeQRPayload(data: string): QRPayload | null {
   try {
     const parsed = JSON.parse(data);
     if (parsed.type === "ticket") {
-      // Normalize old QR format (mintAddress/eventKey) to new format (mint/event)
       return {
         type: "ticket",
         mint: parsed.mint ?? parsed.mintAddress,

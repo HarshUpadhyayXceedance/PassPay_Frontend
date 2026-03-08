@@ -2,7 +2,6 @@ import { TextStyle } from "react-native";
 import { fonts } from "./fonts";
 
 export const typography: Record<string, TextStyle> = {
-  // Display headings (Almendra - decorative serif)
   display: {
     fontSize: 36,
     fontFamily: fonts.displayBold,
@@ -14,7 +13,6 @@ export const typography: Record<string, TextStyle> = {
     lineHeight: 36,
   },
 
-  // Headings (RobotoCondensed Bold)
   h1: {
     fontSize: 32,
     fontFamily: fonts.heading,
@@ -36,7 +34,6 @@ export const typography: Record<string, TextStyle> = {
     lineHeight: 24,
   },
 
-  // Body text (RobotoCondensed)
   body: {
     fontSize: 16,
     fontFamily: fonts.body,
@@ -58,7 +55,6 @@ export const typography: Record<string, TextStyle> = {
     lineHeight: 20,
   },
 
-  // Caption & Small
   caption: {
     fontSize: 14,
     fontFamily: fonts.caption,
@@ -80,7 +76,6 @@ export const typography: Record<string, TextStyle> = {
     lineHeight: 16,
   },
 
-  // Button
   button: {
     fontSize: 16,
     fontFamily: fonts.bodySemiBold,
@@ -94,7 +89,6 @@ export const typography: Record<string, TextStyle> = {
     letterSpacing: 0.3,
   },
 
-  // Numbers / Prices
   price: {
     fontSize: 24,
     fontFamily: fonts.heading,
@@ -106,7 +100,6 @@ export const typography: Record<string, TextStyle> = {
     lineHeight: 24,
   },
 
-  // Labels
   label: {
     fontSize: 13,
     fontFamily: fonts.bodySemiBold,

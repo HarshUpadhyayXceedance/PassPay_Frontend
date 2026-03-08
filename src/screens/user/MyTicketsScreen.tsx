@@ -283,7 +283,6 @@ export function MyTicketsScreen() {
                     </TouchableOpacity>
                   );
                 }
-                // Valid ticket: Join Event + View Details side by side
                 return (
                   <View style={styles.dualButtonRow}>
                     <TouchableOpacity
@@ -315,7 +314,6 @@ export function MyTicketsScreen() {
                 );
               }
 
-              // Offline event → QR code
               return (
                 <TouchableOpacity
                   style={styles.qrButton}
@@ -355,7 +353,6 @@ export function MyTicketsScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <Text style={styles.headerTitle}>My Passes</Text>
         <TouchableOpacity
@@ -367,7 +364,6 @@ export function MyTicketsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Tab toggle */}
       <View style={styles.tabContainer}>
         <TouchableOpacity
           style={[
@@ -410,7 +406,6 @@ export function MyTicketsScreen() {
         </TouchableOpacity>
       </View>
 
-      {/* Pass list */}
       <Animated.FlatList
         style={{ opacity: fadeAnim }}
         data={displayedTickets}
@@ -452,7 +447,6 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
   },
 
-  /* ---- Header ---- */
   header: {
     flexDirection: "row",
     alignItems: "center",
@@ -481,7 +475,6 @@ const styles = StyleSheet.create({
     fontSize: 20,
   },
 
-  /* ---- Tab toggle ---- */
   tabContainer: {
     flexDirection: "row",
     marginHorizontal: 20,
@@ -517,13 +510,11 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  /* ---- List ---- */
   list: {
     paddingHorizontal: 20,
     paddingBottom: 100,
   },
 
-  /* ---- Pass card ---- */
   card: {
     backgroundColor: colors.surface,
     borderRadius: 20,
@@ -627,7 +618,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
   },
 
-  /* ---- Card content ---- */
   cardContent: {
     padding: 16,
   },
@@ -672,7 +662,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
   },
 
-  /* ---- Action row ---- */
   actionRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -747,7 +736,6 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodySemiBold,
   },
 
-  /* ---- Empty state ---- */
   emptyContainer: {
     alignItems: "center",
     marginTop: 80,

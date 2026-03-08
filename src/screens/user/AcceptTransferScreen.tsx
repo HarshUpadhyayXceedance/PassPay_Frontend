@@ -39,7 +39,6 @@ export function AcceptTransferScreen() {
 
   const event = getEvent(eventKey as string);
 
-  // Verify on-chain that the ticket token exists in recipient's wallet
   const verifyTransfer = useCallback(async () => {
     if (!publicKey || !ticketMint) {
       setVerifying(false);
@@ -53,7 +52,6 @@ export function AcceptTransferScreen() {
 
       const accountInfo = await connection.getAccountInfo(ata);
       if (accountInfo && accountInfo.data.length > 0) {
-        // Parse token account balance (offset 64, 8 bytes LE)
         const data = accountInfo.data;
         const amount =
           data[64] +
@@ -103,7 +101,6 @@ export function AcceptTransferScreen() {
   const handleAccept = async () => {
     setAccepting(true);
     try {
-      // Re-verify on-chain before confirming
       await verifyTransfer();
       await refreshBalance();
       await fetchMyTickets();
@@ -135,7 +132,6 @@ export function AcceptTransferScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -152,7 +148,6 @@ export function AcceptTransferScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* Transfer Icon */}
         <View style={styles.iconContainer}>
           <LinearGradient
             colors={[colors.primary, colors.secondary]}
@@ -164,7 +159,6 @@ export function AcceptTransferScreen() {
           </LinearGradient>
           <Text style={styles.transferTitle}>You've received a ticket!</Text>
 
-          {/* Verification status */}
           {verifying ? (
             <View style={styles.statusRow}>
               <ActivityIndicator size="small" color={colors.primary} />
@@ -187,7 +181,6 @@ export function AcceptTransferScreen() {
           )}
         </View>
 
-        {/* Sender Info */}
         <Text style={styles.sectionLabel}>FROM</Text>
         <View style={styles.card}>
           <View style={styles.row}>
@@ -203,7 +196,6 @@ export function AcceptTransferScreen() {
           </View>
         </View>
 
-        {/* Ticket Details */}
         <Text style={styles.sectionLabel}>TICKET DETAILS</Text>
         <View style={styles.card}>
           <View style={styles.detailRow}>
@@ -234,7 +226,6 @@ export function AcceptTransferScreen() {
           )}
         </View>
 
-        {/* Receiving to */}
         <Text style={styles.sectionLabel}>RECEIVING TO</Text>
         <View style={styles.card}>
           <View style={styles.row}>
@@ -254,7 +245,6 @@ export function AcceptTransferScreen() {
         </View>
       </ScrollView>
 
-      {/* Bottom Actions */}
       <View style={styles.footer}>
         <TouchableOpacity
           style={[styles.acceptButton, accepting && styles.buttonDisabled]}

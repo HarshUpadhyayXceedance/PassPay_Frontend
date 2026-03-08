@@ -19,7 +19,6 @@ export async function clearAll(): Promise<void> {
   await AsyncStorage.clear();
 }
 
-// Storage keys
 export const STORAGE_KEYS = {
   USER_ROLE: "user_role",
   ONBOARDED: "has_onboarded",

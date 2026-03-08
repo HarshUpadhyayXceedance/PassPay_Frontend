@@ -64,7 +64,6 @@ export function useLoyalty() {
 
       store.setBadgeCollection(collection);
     } catch {
-      // Badge collection not initialized yet
       store.setBadgeCollection(null);
     }
   }, []);

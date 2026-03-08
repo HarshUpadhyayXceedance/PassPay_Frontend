@@ -3,7 +3,6 @@ import { CLOUDINARY_UPLOAD_URL, API_KEY, API_SECRET } from "./config";
 export async function uploadImageToCloudinary(
   localUri: string
 ): Promise<string> {
-  // Lazy-load expo-crypto to avoid crash when native module is missing
   let Crypto: typeof import("expo-crypto");
   try {
     Crypto = require("expo-crypto");
@@ -15,7 +14,6 @@ export async function uploadImageToCloudinary(
 
   const timestamp = Math.floor(Date.now() / 1000).toString();
 
-  // Generate SHA-1 signature: sha1("timestamp=<ts><api_secret>")
   const signatureString = `timestamp=${timestamp}${API_SECRET}`;
   const signature = await Crypto.digestStringAsync(
     Crypto.CryptoDigestAlgorithm.SHA1,

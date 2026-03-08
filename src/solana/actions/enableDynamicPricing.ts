@@ -10,9 +10,6 @@ import { phantomWalletAdapter } from "../wallet/phantomWalletAdapter";
 import { createProvider } from "../wallet/walletSession";
 import { EnableDynamicPricingParams } from "../../types/loyalty";
 
-/**
- * Enable dynamic pricing for an event (Admin only)
- */
 export async function enableDynamicPricing(
   adminPubkey: PublicKey,
   eventPubkey: PublicKey,

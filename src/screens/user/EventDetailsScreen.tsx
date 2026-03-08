@@ -42,7 +42,6 @@ export function EventDetailsScreen() {
   const scrollY = useRef(new Animated.Value(0)).current;
   const event = getEvent(eventKey as string);
 
-  // Only tiers are refreshed here, not events — fetchEvents() can trigger auth guard on wallet state mismatch mid-session.
   useFocusEffect(
     useCallback(() => {
       if (eventKey) {

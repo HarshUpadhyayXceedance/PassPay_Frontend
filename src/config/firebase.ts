@@ -10,7 +10,6 @@ const firebaseConfig = {
   appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID,
 };
 
-// Prevent duplicate app initialization (hot reloads)
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApp();
 
 export const firebaseDb = getDatabase(app);

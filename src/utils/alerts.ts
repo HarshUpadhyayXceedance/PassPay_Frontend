@@ -1,13 +1,8 @@
 import { ALERT_TYPE, Toast } from "react-native-alert-notification";
 
-/**
- * Sanitize error messages for user-facing display.
- * Strips Anchor error codes, program IDs, and technical details.
- */
 function sanitizeErrorMessage(message: string): string {
   if (!message) return "Something went wrong. Please try again.";
 
-  // Common Anchor/Solana error patterns → user-friendly messages
   const errorMap: [RegExp, string][] = [
     [/insufficient funds/i, "Insufficient SOL balance for this transaction."],
     [/User rejected/i, "Transaction was cancelled."],
@@ -32,15 +27,13 @@ function sanitizeErrorMessage(message: string): string {
     if (pattern.test(message)) return friendly;
   }
 
-  // Strip technical prefixes like "AnchorError caused by account: ..."
   const cleaned = message
     .replace(/^AnchorError\s*(caused by account:\s*\w+\.)?\s*/i, "")
     .replace(/^Error:\s*/i, "")
     .replace(/\.\s*Error Code:.*$/s, ".")
-    .replace(/\s*at\s+\S+\s*\(.*\)$/gm, "") // stack traces
+    .replace(/\s*at\s+\S+\s*\(.*\)$/gm, "")
     .trim();
 
-  // If still looks technical (has hex codes, program IDs), show generic
   if (/0x[0-9a-f]{2,}|[A-HJ-NP-Za-km-z1-9]{32,}/i.test(cleaned)) {
     return "Something went wrong. Please try again.";
   }
@@ -84,10 +77,6 @@ export function showInfo(title: string, message?: string) {
   });
 }
 
-/**
- * Show a raw error (sanitizes the message automatically).
- * Use for catch blocks where error.message is passed directly.
- */
 export function showErrorRaw(error: any, fallbackTitle = "Error") {
   const msg = error?.message ?? error?.toString?.() ?? "";
   showError(fallbackTitle, msg);

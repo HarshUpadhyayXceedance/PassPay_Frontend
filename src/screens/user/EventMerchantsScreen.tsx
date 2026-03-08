@@ -43,7 +43,6 @@ export function EventMerchantsScreen() {
     fetchMerchants();
   }, []);
 
-  // Fetch products for all merchants of this event
   useEffect(() => {
     const eventMerchants = merchants.filter(
       (m) => m.eventKey === eventKey && m.isActive

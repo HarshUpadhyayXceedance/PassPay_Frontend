@@ -63,7 +63,6 @@ export default function MerchantLayout() {
           ),
         }}
       />
-      {/* Hidden routes - not shown in tab bar */}
       <Tabs.Screen name="manage-products" options={{ href: null }} />
       <Tabs.Screen name="add-product" options={{ href: null }} />
       <Tabs.Screen name="verify-purchase" options={{ href: null }} />
