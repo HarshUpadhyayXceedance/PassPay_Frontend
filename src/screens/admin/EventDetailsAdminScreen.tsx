@@ -55,7 +55,7 @@ export function EventDetailsAdminScreen({
 
   const eventTiers = seatTiers.filter((t) => t.eventKey === event.publicKey);
 
-  // Derive all analytics from seat tiers (not event-level fields)
+
   const totalCapacity = eventTiers.reduce((sum, t) => sum + t.totalSeats, 0);
   const totalSold = eventTiers.reduce((sum, t) => sum + t.seatsSold, 0);
   const totalAvailable = totalCapacity - totalSold;
@@ -64,12 +64,12 @@ export function EventDetailsAdminScreen({
     ? ((totalSold / totalCapacity) * 100).toFixed(0)
     : "0";
 
-  // Tier price range
+
   const tierPrices = eventTiers.map((t) => t.price).filter((p) => p > 0);
   const minTierPrice = tierPrices.length > 0 ? Math.min(...tierPrices) : 0;
   const maxTierPrice = tierPrices.length > 0 ? Math.max(...tierPrices) : 0;
 
-  // Dynamic pricing multiplier
+
   const dynamicMultiplier =
     event.dynamicPricingEnabled && event.baseTicketPrice > 0
       ? event.currentTicketPrice / event.baseTicketPrice
@@ -188,13 +188,13 @@ export function EventDetailsAdminScreen({
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Back / Title Header */}
+
       <AppHeader
         title="Event Details"
         onBack={() => router.back()}
       />
 
-      {/* Event Header */}
+
       <View style={styles.header}>
         {event.imageUrl ? (
           <Image
@@ -224,7 +224,7 @@ export function EventDetailsAdminScreen({
         )}
       </View>
 
-      {/* Pricing Section */}
+
       <AppCard style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
@@ -292,7 +292,7 @@ export function EventDetailsAdminScreen({
         )}
       </AppCard>
 
-      {/* Sales Analytics */}
+
       <AppCard style={styles.card}>
         <View style={styles.cardTitleRow}>
           <Ionicons name="analytics" size={18} color={colors.secondary} />
@@ -306,7 +306,7 @@ export function EventDetailsAdminScreen({
           <StatBox label="Revenue" value={`${formatSOL(tierRevenue)} SOL`} />
         </View>
 
-        {/* Simple capacity bar */}
+
         <View style={styles.capacityBar}>
           <View
             style={[
@@ -320,7 +320,7 @@ export function EventDetailsAdminScreen({
         </Text>
       </AppCard>
 
-      {/* Seat Tiers */}
+
       <AppCard style={styles.card}>
         <View style={styles.cardHeader}>
           <View style={styles.cardTitleRow}>
@@ -386,7 +386,7 @@ export function EventDetailsAdminScreen({
         )}
       </AppCard>
 
-      {/* Loyalty Settings */}
+
       <AppCard style={styles.card}>
         <View style={styles.cardTitleRow}>
           <Ionicons name="heart" size={18} color={colors.accent} />
@@ -419,7 +419,7 @@ export function EventDetailsAdminScreen({
         />
       </AppCard>
 
-      {/* Online Meeting Controls */}
+
       {isOnlineEvent && event.isActive && !event.isCancelled && (
         <AppCard style={styles.card}>
           <View style={styles.cardTitleRow}>
@@ -456,7 +456,7 @@ export function EventDetailsAdminScreen({
         </AppCard>
       )}
 
-      {/* Actions */}
+
       <View style={styles.actions}>
         <AppButton
           title="Edit Event"

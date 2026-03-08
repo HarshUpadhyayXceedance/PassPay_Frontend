@@ -5,10 +5,10 @@ export interface TicketAccount {
   owner: PublicKey;
   mint: PublicKey;
   seatNumber: number;
-  seatTier: number; // 0=Bronze, 1=Silver, 2=Gold, 3=VIP
+  seatTier: number;
   isCheckedIn: boolean;
   checkedInAt: number;
-  pricePaid: number; // lamports - actual price after loyalty discount
+  pricePaid: number;
   bump: number;
 }
 
@@ -34,7 +34,7 @@ export interface TicketDisplay {
   seatTierName: string;
   isCheckedIn: boolean;
   checkedInAt: Date | null;
-  pricePaid: number; // lamports
+  pricePaid: number;
   eventIsCancelled: boolean;
   eventIsActive: boolean;
   eventIsMeetingEnded: boolean;

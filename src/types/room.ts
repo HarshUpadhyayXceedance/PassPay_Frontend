@@ -27,8 +27,8 @@ export interface CreateRoomBody {
 
 export interface ChatMessage {
   id: string;
-  sender: string; // shortened wallet address (display name)
-  senderFull?: string; // full wallet address (used to detect own messages)
+  sender: string;
+  senderFull?: string;
   text: string;
   timestamp: number;
 }

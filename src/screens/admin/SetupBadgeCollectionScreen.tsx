@@ -43,13 +43,13 @@ export function SetupBadgeCollectionScreen() {
 
     try {
       setStep("creating_mints");
-      // apiSetupBadgeCollection handles both steps internally
+
       const sig = await apiSetupBadgeCollection();
 
       setTxSignature(sig);
       setStep("done");
 
-      // Refresh badge collection data
+
       await fetchBadgeCollection();
     } catch (error: any) {
       setStep("error");
@@ -59,7 +59,7 @@ export function SetupBadgeCollectionScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -75,7 +75,7 @@ export function SetupBadgeCollectionScreen() {
         style={styles.scrollView}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Info Section */}
+
         <View style={styles.infoCard}>
           <View style={styles.infoIconWrap}>
             <Ionicons name="ribbon" size={32} color={colors.secondary} />
@@ -88,7 +88,7 @@ export function SetupBadgeCollectionScreen() {
           </Text>
         </View>
 
-        {/* Status */}
+
         {isAlreadyInitialized ? (
           <View style={styles.statusCard}>
             <View style={styles.statusHeader}>
@@ -125,7 +125,7 @@ export function SetupBadgeCollectionScreen() {
           </View>
         ) : (
           <>
-            {/* Steps Preview */}
+
             <View style={styles.stepsCard}>
               <Text style={styles.stepsTitle}>Setup Process</Text>
               <StepItem
@@ -144,7 +144,7 @@ export function SetupBadgeCollectionScreen() {
               />
             </View>
 
-            {/* Progress / Error */}
+
             {step === "creating_mints" && (
               <View style={styles.progressCard}>
                 <ActivityIndicator color={colors.secondary} size="small" />
@@ -183,7 +183,7 @@ export function SetupBadgeCollectionScreen() {
         )}
       </ScrollView>
 
-      {/* Footer Button */}
+
       {!isAlreadyInitialized && step !== "done" && (
         <View style={styles.footer}>
           <TouchableOpacity

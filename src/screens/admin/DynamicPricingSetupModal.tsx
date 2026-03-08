@@ -22,7 +22,7 @@ import { showSuccess, showError } from "../../utils/alerts";
 
 interface DynamicPricingSetupModalProps {
   eventPubkey: string;
-  basePrice: number; // SOL (cheapest tier price)
+  basePrice: number;
   tiers?: SeatTierDisplay[];
   onSuccess?: () => void;
   onCancel?: () => void;
@@ -55,7 +55,7 @@ export function DynamicPricingSetupModal({
   const minPrice = basePrice * (minPricePct / 100);
   const maxPrice = basePrice * (maxPricePct / 100);
 
-  // Preview: at max multiplier, how would each tier be affected?
+
   const maxMultiplier = maxPricePct / 100;
 
   const handleEnable = async () => {
@@ -126,7 +126,7 @@ export function DynamicPricingSetupModal({
           />
         </AppCard>
 
-        {/* Tier Impact Preview */}
+
         {tiers && tiers.length > 0 && (
           <AppCard style={styles.card}>
             <Text style={styles.sectionTitle}>Tier Impact Preview</Text>

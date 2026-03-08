@@ -43,7 +43,7 @@ export function ReleaseFundsScreen() {
     async function fetchEscrowData() {
       if (!eventKey) return;
       try {
-        // Use connected wallet if available, otherwise read-only provider
+
         const wallet = phantomWalletAdapter;
         let provider;
         try {
@@ -171,7 +171,7 @@ export function ReleaseFundsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
       >
-        {/* Event & Escrow Summary */}
+
         <LinearGradient
           colors={colors.gradientPrimary}
           start={{ x: 0, y: 0 }}
@@ -206,7 +206,7 @@ export function ReleaseFundsScreen() {
           </View>
         </LinearGradient>
 
-        {/* Escrow Details */}
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Escrow Details</Text>
 
@@ -238,7 +238,7 @@ export function ReleaseFundsScreen() {
           </View>
         </View>
 
-        {/* Destination */}
+
         <View style={styles.card}>
           <Text style={styles.cardTitle}>Destination</Text>
           <View style={styles.destinationRow}>

@@ -37,10 +37,10 @@ export function SuccessAnimation({
 
   useEffect(() => {
     if (visible) {
-      // Trigger haptic feedback
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Run animations
+
       Animated.sequence([
         Animated.parallel([
           Animated.timing(fadeAnim, {
@@ -69,7 +69,7 @@ export function SuccessAnimation({
         }),
       ]).start();
 
-      // Auto-complete after duration
+
       const timer = setTimeout(() => {
         Animated.timing(fadeAnim, {
           toValue: 0,
@@ -89,13 +89,13 @@ export function SuccessAnimation({
   return (
     <Modal transparent animationType="none" visible={visible}>
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-        {/* Confetti */}
+
         <Confetti />
 
-        {/* Blur backdrop */}
+
         <View style={styles.backdrop} />
 
-        {/* Success card */}
+
         <Animated.View
           style={[
             styles.card,
@@ -108,7 +108,7 @@ export function SuccessAnimation({
             colors={[colors.surface, colors.surfaceLight]}
             style={styles.cardGradient}
           >
-            {/* Success icon */}
+
             <Animated.View
               style={[
                 styles.iconContainer,
@@ -127,7 +127,7 @@ export function SuccessAnimation({
               </LinearGradient>
             </Animated.View>
 
-            {/* Text content */}
+
             <Animated.View
               style={[
                 styles.textContainer,

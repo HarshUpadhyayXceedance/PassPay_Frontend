@@ -21,10 +21,10 @@ export interface CreateEventParams {
   description: string;
   imageUrl?: string;
   eventDate: Date;
-  ticketPrice: number; // in SOL
+  ticketPrice: number;
   totalSeats: number;
   metadataUri: string;
-  refundWindowHours?: number; // default 48
+  refundWindowHours?: number;
   isOnline?: boolean;
 }
 

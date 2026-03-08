@@ -33,7 +33,7 @@ export function ScanToPayScreen() {
     fetchLoyaltyBenefits();
   }, []);
 
-  // Calculate merchant discount
+
   const baseAmount = payment?.amount || 0;
   const merchantDiscount = loyaltyBenefits?.merchantDiscount || 0;
   const discountAmount = baseAmount * (merchantDiscount / 100);

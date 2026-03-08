@@ -76,7 +76,7 @@ export function ProfileScreen() {
 
   return (
     <View style={styles.screen}>
-      {/* ---- Header ---- */}
+
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image
@@ -103,7 +103,7 @@ export function ProfileScreen() {
         contentContainerStyle={styles.scrollContent}
         showsVerticalScrollIndicator={false}
       >
-        {/* ---- Avatar + Tier Section ---- */}
+
         <View style={styles.avatarSection}>
           <View style={styles.avatarWrapper}>
             <LinearGradient
@@ -130,7 +130,7 @@ export function ProfileScreen() {
           <Text style={styles.addressSubtitle}>{displayAddress}</Text>
         </View>
 
-        {/* ---- Stats Row (user only) ---- */}
+
         {isUserRole && (
           <View style={styles.loyaltyStats}>
             <View style={styles.loyaltyStat}>
@@ -159,14 +159,14 @@ export function ProfileScreen() {
           </View>
         )}
 
-        {/* ---- Tier Progress (user only) ---- */}
+
         {isUserRole && (
           <View style={styles.progressSection}>
             <TierProgressBar currentEvents={totalEvents} currentTier={tier} />
           </View>
         )}
 
-        {/* ---- Wallet Info Row ---- */}
+
         <View style={styles.walletCard}>
           <View style={styles.walletLeft}>
             <View
@@ -200,7 +200,7 @@ export function ProfileScreen() {
           </View>
         </View>
 
-        {/* ---- Loyalty Section (user only) ---- */}
+
         {isUserRole && (
           <>
             <Text style={styles.sectionLabel}>LOYALTY</Text>
@@ -256,7 +256,7 @@ export function ProfileScreen() {
           </>
         )}
 
-        {/* ---- Account Section (user only) ---- */}
+
         {isUserRole && (
           <>
             <Text style={styles.sectionLabel}>ACCOUNT</Text>
@@ -287,7 +287,7 @@ export function ProfileScreen() {
           </>
         )}
 
-        {/* ---- Disconnect Section ---- */}
+
         <Text style={styles.sectionLabel}>APP</Text>
         <View style={styles.sectionCard}>
           <TouchableOpacity
@@ -312,7 +312,7 @@ export function ProfileScreen() {
           </TouchableOpacity>
         </View>
 
-        {/* Bottom spacer */}
+
         <View style={{ height: 40 }} />
       </ScrollView>
     </View>
@@ -396,7 +396,7 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 
-  // Loyalty stats
+
   loyaltyStats: {
     flexDirection: "row",
     alignItems: "center",
@@ -431,7 +431,7 @@ const styles = StyleSheet.create({
     marginHorizontal: spacing.sm,
   },
 
-  // Progress section
+
   progressSection: {
     backgroundColor: colors.surface,
     borderRadius: 16,
@@ -441,7 +441,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
 
-  // Icon containers
+
   iconContainer: {
     width: 36,
     height: 36,
@@ -457,7 +457,7 @@ const styles = StyleSheet.create({
     justifyContent: "center",
   },
 
-  // Wallet card
+
   walletCard: {
     flexDirection: "row",
     justifyContent: "space-between",

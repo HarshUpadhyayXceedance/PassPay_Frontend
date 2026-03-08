@@ -32,7 +32,7 @@ export function SuperAdminBadge({ size = "medium" }: SuperAdminBadgeProps) {
 
   return (
     <LinearGradient
-      colors={["#9333EA", "#C026D3", "#DB2777"]} // Purple to Pink gradient
+      colors={["#9333EA", "#C026D3", "#DB2777"]}
       start={{ x: 0, y: 0 }}
       end={{ x: 1, y: 1 }}
       style={[styles.badge, currentSize.badge]}

@@ -9,7 +9,7 @@ import { useMerchants } from "../../src/hooks/useMerchants";
 import { colors } from "../../src/theme/colors";
 import { fonts } from "../../src/theme/fonts";
 
-const POLL_INTERVAL = 15_000; // 15 seconds
+const POLL_INTERVAL = 15_000;
 
 export default function EventDetailsRoute() {
   const { eventKey } = useLocalSearchParams<{ eventKey: string }>();

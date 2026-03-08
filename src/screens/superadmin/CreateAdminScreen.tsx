@@ -46,7 +46,7 @@ export function CreateAdminScreen() {
       return false;
     }
 
-    // Validate wallet address
+
     try {
       new PublicKey(adminWallet.trim());
     } catch (error) {
@@ -69,7 +69,7 @@ export function CreateAdminScreen() {
       const adminPubkey = new PublicKey(adminWallet.trim());
       const superAdminPubkey = new PublicKey(publicKey);
 
-      // Check if admin PDA already exists
+
       const connection = new Connection(DEVNET_RPC, "confirmed");
       const provider = new AnchorProvider(
         connection,
@@ -105,7 +105,7 @@ export function CreateAdminScreen() {
       showSuccess("Success", `Admin "${adminName}" created successfully!`);
       router.back();
 
-      // Reset form
+
       setAdminName("");
       setAdminWallet("");
     } catch (error: any) {

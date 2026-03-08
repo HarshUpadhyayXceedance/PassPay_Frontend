@@ -29,7 +29,7 @@ function SuperAdminTabs() {
           backgroundColor: colors.surface,
           borderTopColor: colors.border,
         },
-        tabBarActiveTintColor: colors.secondary, // Purple for SuperAdmin
+        tabBarActiveTintColor: colors.secondary,
         tabBarInactiveTintColor: colors.textMuted,
       }}
     >
@@ -73,18 +73,18 @@ export function SuperAdminNavigator() {
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       <Stack.Screen name="SuperAdminTabs" component={SuperAdminTabs} />
-      {/* SuperAdmin-specific screens */}
+
       <Stack.Screen
         name="CreateAdmin"
-        component={CreateEventScreen} // Placeholder for Phase 1
+        component={CreateEventScreen}
         options={{ title: "Create Admin" }}
       />
       <Stack.Screen
         name="InitializeBadgeCollection"
-        component={CreateEventScreen} // Placeholder for Phase 1
+        component={CreateEventScreen}
         options={{ title: "Initialize Badges" }}
       />
-      {/* Shared admin screens */}
+
       <Stack.Screen name="CreateEvent" component={CreateEventScreen} />
       <Stack.Screen name="RegisterMerchant" component={RegisterMerchantScreen} />
       <Stack.Screen name="CheckInScanner" component={CheckInScannerScreen} />

@@ -5,8 +5,8 @@ import { colors } from "../../theme/colors";
 import { fonts } from "../../theme/fonts";
 
 interface EarlyAccessBadgeProps {
-  earlyAccessDate: number; // unix timestamp
-  publicSaleDate: number; // unix timestamp
+  earlyAccessDate: number;
+  publicSaleDate: number;
   userTier: BadgeTier;
 }
 
@@ -17,7 +17,7 @@ export function EarlyAccessBadge({
 }: EarlyAccessBadgeProps) {
   const now = Date.now() / 1000;
 
-  // Not in early access window
+
   if (now >= publicSaleDate || earlyAccessDate === 0) return null;
 
   const userEarlyAccessHours = TIER_BENEFITS[userTier]?.earlyAccessHours ?? 0;
@@ -33,7 +33,7 @@ export function EarlyAccessBadge({
     );
   }
 
-  // Show countdown to public sale
+
   const hoursToPublic = Math.max(0, Math.ceil((publicSaleDate - now) / 3600));
 
   return (

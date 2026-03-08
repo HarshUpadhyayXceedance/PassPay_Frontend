@@ -29,7 +29,7 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
 
   useEffect(() => {
     Animated.sequence([
-      // Phase 1: Logo fades in and scales up
+
       Animated.parallel([
         Animated.spring(logoScale, {
           toValue: 1,
@@ -49,7 +49,7 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
         }),
       ]),
 
-      // Phase 2: Brand text slides up
+
       Animated.parallel([
         Animated.timing(textOpacity, {
           toValue: 1,
@@ -64,7 +64,7 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
         }),
       ]),
 
-      // Phase 3: Tagline + green dot pulse
+
       Animated.parallel([
         Animated.timing(taglineOpacity, {
           toValue: 1,
@@ -84,7 +84,7 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
         }),
       ]),
     ]).start(() => {
-      // After everything fades in, animate the progress bar
+
       Animated.timing(progressWidth, {
         toValue: 100,
         duration: 1500,
@@ -92,7 +92,7 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
       }).start();
     });
 
-    // Pulse the green dot continuously
+
     const pulseAnim = Animated.loop(
       Animated.sequence([
         Animated.timing(dotScale, {
@@ -120,7 +120,7 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
 
   return (
     <View style={styles.container}>
-      {/* Background gradient glow */}
+
       <Animated.View style={[styles.glowContainer, { opacity: glowOpacity }]}>
         <LinearGradient
           colors={["rgba(0, 255, 163, 0.08)", "transparent"]}
@@ -136,9 +136,9 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
         />
       </Animated.View>
 
-      {/* Center content */}
+
       <View style={styles.content}>
-        {/* Logo */}
+
         <Animated.View
           style={[
             styles.logoContainer,
@@ -157,7 +157,7 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
           </View>
         </Animated.View>
 
-        {/* Brand name */}
+
         <Animated.View
           style={[
             styles.brandContainer,
@@ -176,13 +176,13 @@ export function SplashScreenView({ onFinish }: SplashScreenViewProps) {
           />
         </Animated.View>
 
-        {/* Tagline */}
+
         <Animated.Text style={[styles.tagline, { opacity: taglineOpacity }]}>
           Solana-Powered Event Tickets
         </Animated.Text>
       </View>
 
-      {/* Bottom loader */}
+
       <Animated.View style={[styles.bottomSection, { opacity: loaderOpacity }]}>
         <View style={styles.loaderTrack}>
           <Animated.View

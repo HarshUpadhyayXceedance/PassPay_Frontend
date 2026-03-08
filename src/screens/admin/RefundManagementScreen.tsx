@@ -32,7 +32,7 @@ interface RefundItem {
   event: string;
   ticketMint: string;
   holder: string;
-  amount: number; // lamports
+  amount: number;
   status: RefundStatusKey;
   requestedAt: number;
   processedAt: number;
@@ -64,19 +64,7 @@ const STATUS_CONFIG: Record<
   },
 };
 
-// RefundRequest discriminator from IDL: sha256("account:RefundRequest")[0:8]
 const REFUND_REQUEST_DISCRIMINATOR = [40, 79, 128, 211, 184, 96, 201, 204];
-
-// RefundRequest byte layout (130 bytes total):
-// 0-7:     discriminator (8)
-// 8-39:    event pubkey (32)
-// 40-71:   ticket_mint pubkey (32)
-// 72-103:  holder pubkey (32)
-// 104-111: amount u64 LE (8)
-// 112:     status u8 (0=Pending, 1=Approved, 2=Rejected)
-// 113-120: requested_at i64 LE (8)
-// 121-128: processed_at i64 LE (8)
-// 129:     bump u8 (1)
 
 function readU64LE(data: Uint8Array, offset: number): number {
   let val = 0;
@@ -96,7 +84,7 @@ function readPubkey(data: Uint8Array, offset: number): string {
 
 function parseRefundAccount(pubkey: PublicKey, data: Uint8Array): RefundItem | null {
   if (data.length < 130) return null;
-  // Verify discriminator
+
   for (let i = 0; i < 8; i++) {
     if (data[i] !== REFUND_REQUEST_DISCRIMINATOR[i]) return null;
   }
@@ -127,23 +115,23 @@ export function RefundManagementScreen() {
   const fetchRefunds = useCallback(async () => {
     setError(null);
     try {
-      // Bypass Anchor BorshCoder (BadgeTier repr issue causes variant mismatch).
-      // Use raw getProgramAccounts + manual byte parsing instead.
+
+
       const connection = getConnection();
       const accounts = await connection.getProgramAccounts(PROGRAM_ID, {
-        filters: [{ dataSize: 130 }], // RefundRequest is exactly 130 bytes
+        filters: [{ dataSize: 130 }],
       });
 
       const items: RefundItem[] = [];
       for (const { pubkey, account } of accounts) {
         const parsed = parseRefundAccount(pubkey, account.data as Uint8Array);
         if (!parsed) continue;
-        // Filter by event if eventKey provided
+
         if (eventKey && parsed.event !== eventKey) continue;
         items.push(parsed);
       }
 
-      // Sort: pending first, then by requestedAt desc
+
       items.sort((a, b) => {
         if (a.status === "Pending" && b.status !== "Pending") return -1;
         if (a.status !== "Pending" && b.status === "Pending") return 1;
@@ -175,7 +163,7 @@ export function RefundManagementScreen() {
   const pendingRefunds = refunds.filter((r) => r.status === "Pending");
   const processedRefunds = refunds.filter((r) => r.status !== "Pending");
 
-  // Resolve seat tier PDA for a refund item by reading the ticket's seat_tier field
+
   const resolveSeatTierPda = useCallback(
     async (item: RefundItem): Promise<string> => {
       const connection = getConnection();
@@ -183,16 +171,16 @@ export function RefundManagementScreen() {
       const mintPubkey = new PublicKey(item.ticketMint);
       const [ticketPda] = findTicketPda(eventPubkey, mintPubkey);
 
-      // Read ticket account to get seat_tier level
-      // Ticket layout: disc(8) + event(32) + owner(32) + mint(32) + seat_number(4) + seat_tier(1)
+
+
       const ticketInfo = await connection.getAccountInfo(ticketPda);
       if (!ticketInfo || !ticketInfo.data) {
         throw new Error("Ticket account not found");
       }
       const data = ticketInfo.data as Uint8Array;
-      const tierLevel = data[8 + 32 + 32 + 32 + 4]; // offset 108
+      const tierLevel = data[8 + 32 + 32 + 32 + 4];
 
-      // Fetch seat tiers for this event and find matching tier
+
       await fetchSeatTiers(item.event);
       const eventTiers = seatTiers.filter((t) => t.eventKey === item.event);
       const matchingTier = eventTiers.find((t) => t.tierLevel === tierLevel);

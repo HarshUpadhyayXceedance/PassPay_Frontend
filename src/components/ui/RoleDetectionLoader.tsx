@@ -25,14 +25,14 @@ export function RoleDetectionLoader({ visible }: RoleDetectionLoaderProps) {
 
   useEffect(() => {
     if (visible) {
-      // Fade in
+
       Animated.timing(fadeAnim, {
         toValue: 1,
         duration: 300,
         useNativeDriver: true,
       }).start();
 
-      // Continuous rotation
+
       Animated.loop(
         Animated.timing(rotateAnim, {
           toValue: 1,
@@ -41,7 +41,7 @@ export function RoleDetectionLoader({ visible }: RoleDetectionLoaderProps) {
         })
       ).start();
 
-      // Pulse animation
+
       Animated.loop(
         Animated.sequence([
           Animated.timing(pulseAnim, {
@@ -57,7 +57,7 @@ export function RoleDetectionLoader({ visible }: RoleDetectionLoaderProps) {
         ])
       ).start();
 
-      // Dots animation (simple interval)
+
       const dotsInterval = setInterval(() => {
         setDots((prev) => {
           if (prev === "") return ".";
@@ -89,12 +89,12 @@ export function RoleDetectionLoader({ visible }: RoleDetectionLoaderProps) {
   return (
     <Modal transparent animationType="none" visible={visible}>
       <Animated.View style={[styles.container, { opacity: fadeAnim }]}>
-        {/* Backdrop */}
+
         <View style={styles.backdrop} />
 
-        {/* Content */}
+
         <View style={styles.content}>
-          {/* Spinning loader */}
+
           <Animated.View
             style={[
               styles.loaderContainer,
@@ -115,13 +115,13 @@ export function RoleDetectionLoader({ visible }: RoleDetectionLoaderProps) {
             </LinearGradient>
           </Animated.View>
 
-          {/* Text */}
+
           <View style={styles.textContainer}>
             <Text style={styles.title}>Detecting Role</Text>
             <Text style={styles.subtitle}>Checking blockchain{dots}</Text>
           </View>
 
-          {/* Progress steps */}
+
           <View style={styles.stepsContainer}>
             <StepItem icon="✓" label="Wallet Connected" active={true} />
             <StepItem icon="◎" label="Querying Blockchain" active={true} />

@@ -32,8 +32,6 @@ interface AppButtonProps {
   textStyle?: TextStyle;
 }
 
-// ---------- Lookup tables ----------
-
 const GRADIENT_COLORS: Record<string, readonly [string, string]> = {
   primary: colors.gradientPrimary as unknown as [string, string],
   secondary: colors.gradientSecondary as unknown as [string, string],
@@ -75,16 +73,16 @@ export function AppButton({
 }: AppButtonProps) {
   const isDisabled = disabled || loading;
 
-  // When selected, promote to secondary gradient
+
   const resolved = selected ? "secondary" : variant;
   const useGradient = resolved === "primary" || resolved === "secondary";
 
-  // Determine gradient colors
+
   const gradientColors = useGradient
     ? GRADIENT_COLORS[resolved]
     : TRANSPARENT_GRADIENT;
 
-  // Determine text / icon color
+
   const foreground =
     resolved === "outline" || resolved === "ghost"
       ? colors.primary
@@ -92,13 +90,13 @@ export function AppButton({
       ? colors.white
       : colors.white;
 
-  // Loader color
+
   const loaderColor =
     resolved === "outline" || resolved === "ghost"
       ? colors.primary
       : colors.background;
 
-  // Surface styles: border + background for non-gradient variants
+
   const surfaceStyle: ViewStyle[] = [styles.surface, styles[`size_${size}`]];
   if (resolved === "outline") {
     surfaceStyle.push(styles.outlineSurface);
@@ -108,7 +106,7 @@ export function AppButton({
     surfaceStyle.push(styles.dangerSurface);
   }
 
-  // Wrapper shadow for gradient variants
+
   const wrapperStyle: ViewStyle[] = [styles.wrapper];
   if (useGradient) {
     const shadow = SHADOW_STYLES[resolved];
@@ -177,7 +175,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   ghostSurface: {
-    // transparent, no border
+
   },
   dangerSurface: {
     backgroundColor: colors.error,

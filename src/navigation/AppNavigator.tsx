@@ -19,16 +19,16 @@ export function AppNavigator() {
   const [isInitializing, setIsInitializing] = useState(true);
 
   useEffect(() => {
-    // Quick initialization - just mark as ready
+
     const init = async () => {
-      // In the new flow, there's no wallet restoration
-      // User will connect Phantom on WelcomeScreen
+
+
       setTimeout(() => setIsInitializing(false), 100);
     };
     init();
   }, []);
 
-  // Show loading spinner during initialization or role detection
+
   if (isInitializing || isLoading) {
     return (
       <View
@@ -44,7 +44,7 @@ export function AppNavigator() {
     );
   }
 
-  // If not connected or not authenticated, show WelcomeScreen
+
   if (!isConnected || !isAuthenticated || !role) {
     return (
       <Stack.Navigator screenOptions={{ headerShown: false }}>
@@ -53,7 +53,7 @@ export function AppNavigator() {
     );
   }
 
-  // Role-based routing
+
   return (
     <Stack.Navigator screenOptions={{ headerShown: false }}>
       {role === "super_admin" ? (

@@ -6,11 +6,11 @@ import { spacing } from "../../theme/spacing";
 
 interface StreakCalendarProps {
   currentStreak: number;
-  lastAttendanceDate: number; // unix timestamp in seconds
+  lastAttendanceDate: number;
 }
 
 const DAY_LABELS = ["S", "M", "T", "W", "T", "F", "S"];
-const TOTAL_DAYS = 28; // 4 weeks
+const TOTAL_DAYS = 28;
 
 export function StreakCalendar({
   currentStreak,
@@ -20,7 +20,7 @@ export function StreakCalendar({
     const now = new Date();
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
 
-    // Build set of attended dates (derive from streak counting backwards)
+
     const attendedSet = new Set<string>();
     if (currentStreak > 0 && lastAttendanceDate > 0) {
       const lastDate = new Date(lastAttendanceDate * 1000);
@@ -37,11 +37,11 @@ export function StreakCalendar({
       }
     }
 
-    // Build 28-day grid ending today
+
     const startDate = new Date(today);
     startDate.setDate(startDate.getDate() - (TOTAL_DAYS - 1));
 
-    // Align to start of week (Sunday)
+
     const dayOfWeek = startDate.getDay();
     startDate.setDate(startDate.getDate() - dayOfWeek);
 
@@ -93,7 +93,7 @@ export function StreakCalendar({
       <Text style={styles.title}>Attendance Calendar</Text>
       <Text style={styles.subtitle}>Last 4 weeks</Text>
 
-      {/* Day headers */}
+
       <View style={styles.headerRow}>
         {DAY_LABELS.map((label, i) => (
           <View key={i} style={styles.headerCell}>
@@ -102,7 +102,7 @@ export function StreakCalendar({
         ))}
       </View>
 
-      {/* Calendar grid */}
+
       {weeks.map((week, wi) => (
         <View key={wi} style={styles.weekRow}>
           {week.map((day, di) => {
@@ -137,7 +137,7 @@ export function StreakCalendar({
         </View>
       ))}
 
-      {/* Legend */}
+
       <View style={styles.legend}>
         <View style={styles.legendItem}>
           <View style={[styles.legendDot, { backgroundColor: colors.primary }]} />

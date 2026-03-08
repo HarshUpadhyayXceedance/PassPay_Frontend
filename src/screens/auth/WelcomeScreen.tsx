@@ -31,7 +31,7 @@ export function WelcomeScreen() {
   const { connectPhantom } = useWalletStore();
   const { detectRole, isDetectingRole } = useAuthStore();
 
-  // Animation values
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const logoScale = useRef(new Animated.Value(0.8)).current;
   const logoPulse = useRef(new Animated.Value(1)).current;
@@ -39,7 +39,7 @@ export function WelcomeScreen() {
   const buttonScale = useRef(new Animated.Value(0.95)).current;
 
   useEffect(() => {
-    // Entrance animations
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -68,7 +68,7 @@ export function WelcomeScreen() {
       }),
     ]).start();
 
-    // Continuous logo pulse
+
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(logoPulse, {
@@ -93,34 +93,34 @@ export function WelcomeScreen() {
 
     setIsConnecting(true);
     try {
-      // Connect to Phantom wallet
+
       await connectPhantom();
 
-      // Get the connected wallet's public key
+
       const publicKey = useWalletStore.getState().publicKey;
 
       if (!publicKey) {
         throw new Error("Failed to get wallet public key");
       }
 
-      // Show success animation
+
       setShowSuccess(true);
 
-      // Wait a moment before role detection
+
       await new Promise((resolve) => setTimeout(resolve, 800));
 
-      // Detect user role on-chain
+
       await detectRole(publicKey);
 
       console.log("Connection and role detection complete!");
-      // Success animation will auto-close and navigation will happen
+
     } catch (error: any) {
       console.error("Connection failed:", error);
 
-      // Error haptic
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error);
 
-      // Check if user needs to install Phantom
+
       if (
         error.message?.includes("No wallet") ||
         error.message?.includes("not installed")
@@ -144,7 +144,7 @@ export function WelcomeScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Animated gradient background */}
+
       <LinearGradient
         colors={["#6C5CE7", "#00CEC9", "transparent"]}
         style={styles.glowTop}

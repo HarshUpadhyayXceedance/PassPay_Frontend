@@ -5,7 +5,7 @@ import { findAdminPda, findEscrowPda, findEscrowVaultPda } from "../pda";
 
 export interface ReleaseFundsParams {
   eventPda: PublicKey;
-  /** The wallet that created the event (event.admin). SOL is sent here. */
+
   eventCreator: PublicKey;
 }
 

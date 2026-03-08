@@ -46,8 +46,8 @@ export function MerchantListScreen() {
     await Promise.all([fetchMerchants(), fetchEvents()]);
   }, [fetchMerchants, fetchEvents]);
 
-  // If eventKey is provided, show only merchants for that event
-  // Otherwise: SuperAdmin sees all merchants, normal admin sees only merchants for their events
+
+
   const myEventKeys = new Set(
     isSuperAdmin
       ? events.map((e) => e.publicKey)
@@ -116,19 +116,19 @@ export function MerchantListScreen() {
             />
           ) : null}
           <View style={styles.cardContent}>
-            {/* Merchant Name */}
+
             <Text style={styles.merchantName} numberOfLines={1}>
               {item.name}
             </Text>
 
-            {/* Description */}
+
             {item.description ? (
               <Text style={styles.merchantDescription} numberOfLines={2}>
                 {item.description}
               </Text>
             ) : null}
 
-            {/* Wallet Address */}
+
             <View style={styles.infoRow}>
               <Ionicons
                 name="wallet-outline"
@@ -140,7 +140,7 @@ export function MerchantListScreen() {
               </Text>
             </View>
 
-            {/* Event */}
+
             <View style={styles.infoRow}>
               <Ionicons
                 name="calendar-outline"
@@ -152,7 +152,7 @@ export function MerchantListScreen() {
               </Text>
             </View>
 
-            {/* Bottom row: total received + status */}
+
             <View style={styles.bottomRow}>
               <View style={styles.statChip}>
                 <Ionicons
@@ -197,7 +197,7 @@ export function MerchantListScreen() {
             </View>
           </View>
 
-          {/* Toggle Button */}
+
           <TouchableOpacity
             style={[
               styles.toggleButton,
@@ -323,7 +323,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // Header
+
   headerSection: {
     paddingHorizontal: spacing.lg,
     paddingTop: 60,
@@ -360,7 +360,7 @@ const styles = StyleSheet.create({
     color: colors.background,
   },
 
-  // Merchant Card
+
   merchantCard: {
     marginHorizontal: spacing.md,
     backgroundColor: colors.surface,
@@ -472,7 +472,7 @@ const styles = StyleSheet.create({
     height: spacing.sm,
   },
 
-  // Empty State
+
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",

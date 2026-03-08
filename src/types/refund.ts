@@ -9,7 +9,7 @@ export interface RefundRequestData {
   event: string;
   ticketMint: string;
   holder: string;
-  amount: number; // lamports
+  amount: number;
   status: RefundStatus;
   requestedAt: Date;
   processedAt: Date | null;
@@ -19,11 +19,11 @@ export interface EscrowData {
   publicKey: string;
   event: string;
   admin: string;
-  totalCollected: number; // lamports
-  totalRefunded: number; // lamports
+  totalCollected: number;
+  totalRefunded: number;
   refundDeadline: Date;
   refundWindowHours: number;
   isReleased: boolean;
   releasedAt: Date | null;
-  releasedAmount: number; // lamports
+  releasedAmount: number;
 }

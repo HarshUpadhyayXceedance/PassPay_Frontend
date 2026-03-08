@@ -11,8 +11,8 @@ export interface Achievement {
   description: string;
   icon: keyof typeof Ionicons.glyphMap;
   unlocked: boolean;
-  progress: number; // 0-1
-  target: string; // e.g. "5 events", "1.0 SOL"
+  progress: number;
+  target: string;
 }
 
 interface AchievementCardProps {

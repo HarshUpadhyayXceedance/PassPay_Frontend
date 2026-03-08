@@ -25,29 +25,23 @@ const CENTER_BUTTON_SIZE = 62;
 const Tab = createBottomTabNavigator<UserTabParamList>();
 const Stack = createNativeStackNavigator<UserStackParamList>();
 
-/**
- * Returns a Unicode symbol for each tab name.
- */
 function getTabIcon(routeName: string): string {
   switch (routeName) {
     case "Explore":
-      return "\u{1F9ED}"; // compass
+      return "\u{1F9ED}";
     case "MyPasses":
-      return "\u{1F3AB}"; // ticket
+      return "\u{1F3AB}";
     case "Scan":
-      return "\u{1F4F7}"; // scan / QR placeholder — overridden by custom button
+      return "\u{1F4F7}";
     case "Shop":
-      return "\u{1F6CD}\uFE0F"; // shopping bag
+      return "\u{1F6CD}\uFE0F";
     case "Profile":
-      return "\u{1F464}"; // person silhouette
+      return "\u{1F464}";
     default:
-      return "\u{25CF}"; // filled circle fallback
+      return "\u{25CF}";
   }
 }
 
-/**
- * Custom center button that renders a raised circular green button for the Scan tab.
- */
 function CenterScanButton({
   onPress,
   accessibilityState,
@@ -91,7 +85,7 @@ function UserTabs() {
         tabBarActiveTintColor: ACTIVE_TINT,
         tabBarInactiveTintColor: INACTIVE_TINT,
         tabBarIcon: ({ color, size }) => {
-          // The Scan tab uses a custom button, so no icon here
+
           if (route.name === "Scan") return null;
           return (
             <Text style={{ fontSize: size ?? 22, color, textAlign: "center" }}>

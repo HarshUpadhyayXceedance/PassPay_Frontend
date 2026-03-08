@@ -6,7 +6,7 @@ import { findMerchantPda, findProductPda } from "../pda";
 export interface UpdateProductParams {
   eventPda: PublicKey;
   productName: string;
-  price?: number; // in lamports
+  price?: number;
   description?: string;
   imageUrl?: string;
   isAvailable?: boolean;

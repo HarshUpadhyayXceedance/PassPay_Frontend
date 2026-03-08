@@ -37,7 +37,7 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
   const [uploading, setUploading] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Reset state when event prop changes
+
   useEffect(() => {
     setVenue(event.venue);
     setDescription(event.description ?? "");
@@ -130,7 +130,7 @@ export function UpdateEventScreen({ event }: UpdateEventScreenProps) {
           </View>
         </AppCard>
 
-        {/* Seat Tier Management */}
+
         <AppCard style={styles.card}>
           <Text style={styles.tierCardTitle}>Pricing & Capacity</Text>
           <Text style={styles.tierCardHint}>

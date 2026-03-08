@@ -36,10 +36,10 @@ export function TicketPurchaseSuccess({
 
   useEffect(() => {
     if (visible) {
-      // Success haptic
+
       Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-      // Entrance animation
+
       Animated.parallel([
         Animated.timing(fadeAnim, {
           toValue: 1,
@@ -59,7 +59,7 @@ export function TicketPurchaseSuccess({
         }),
       ]).start();
 
-      // Auto-complete
+
       const timer = setTimeout(() => {
         Animated.parallel([
           Animated.timing(fadeAnim, {
@@ -98,7 +98,7 @@ export function TicketPurchaseSuccess({
             },
           ]}
         >
-          {/* Success Icon */}
+
           <View style={styles.iconContainer}>
             <View style={styles.iconCircle}>
               <Ionicons name="ticket-outline" size={48} color={colors.primary} />
@@ -108,26 +108,26 @@ export function TicketPurchaseSuccess({
             </View>
           </View>
 
-          {/* Title */}
+
           <Text style={styles.title}>Ticket Secured!</Text>
 
-          {/* Event Name */}
+
           <Text style={styles.eventName} numberOfLines={2}>
             {eventName}
           </Text>
 
-          {/* Mint Address */}
+
           <View style={styles.mintContainer}>
             <Text style={styles.mintLabel}>NFT MINTED</Text>
             <Text style={styles.mintAddress}>{shortenedMint}</Text>
           </View>
 
-          {/* Description */}
+
           <Text style={styles.description}>
             Your NFT ticket has been added to My Passes
           </Text>
 
-          {/* Loading indicator */}
+
           <View style={styles.loadingContainer}>
             <View style={styles.dot} />
             <View style={[styles.dot, styles.dotDelay1]} />

@@ -50,7 +50,7 @@ export function AdminListScreen() {
       );
       const program = getProgram(provider);
 
-      // Fetch all Admin accounts
+
       const adminAccounts = await program.account.admin.all();
 
       const adminsData: AdminAccount[] = adminAccounts
@@ -63,7 +63,7 @@ export function AdminListScreen() {
           isActive: true,
         }));
 
-      // Sort by name
+
       adminsData.sort((a, b) => a.name.localeCompare(b.name));
 
       setAdmins(adminsData);
@@ -115,7 +115,7 @@ export function AdminListScreen() {
               console.log("Admin deactivated:", signature);
               showSuccess("Success", `Admin "${admin.name}" has been deactivated`);
 
-              // Refresh the list
+
               fetchAdmins();
             } catch (error: any) {
               console.error("Failed to deactivate admin:", error);

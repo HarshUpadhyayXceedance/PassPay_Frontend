@@ -59,11 +59,11 @@ export function CreateEventScreen() {
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
 
-  // Online-only fields
+
   const [onlinePrice, setOnlinePrice] = useState("");
   const [onlineCapacity, setOnlineCapacity] = useState("");
 
-  // Date picker state
+
   const [eventDate, setEventDate] = useState(() => {
     const d = new Date();
     d.setDate(d.getDate() + 7);
@@ -77,7 +77,7 @@ export function CreateEventScreen() {
   const [tempHour, setTempHour] = useState(10);
   const [tempMinute, setTempMinute] = useState(0);
 
-  // Reset all form fields when screen gains focus (expo-router keeps screens mounted)
+
   useFocusEffect(
     useCallback(() => {
       setName("");
@@ -182,15 +182,15 @@ export function CreateEventScreen() {
         }
       }
 
-      // Use placeholder values — actual pricing/capacity comes from seat tiers
+
       await apiCreateEvent({
         name,
         venue: isOnline ? "Online" : venue,
         description,
         imageUrl,
         eventDate,
-        ticketPrice: 0.000000001, // placeholder — real price comes from seat tiers
-        totalSeats: 10000, // placeholder cap — real limits come from seat tiers
+        ticketPrice: 0.000000001,
+        totalSeats: 10000,
         isOnline,
         metadataUri: await uploadMetadata({
           name: `${name} - Event Collection`,
@@ -204,13 +204,13 @@ export function CreateEventScreen() {
         }),
       });
 
-      // Compute the event PDA address from admin wallet + event name
+
       const adminPubkey = new PublicKey(publicKey!);
       const [eventPda] = findEventPda(adminPubkey, name);
       const eventPdaStr = eventPda.toBase58();
 
       if (isOnline) {
-        // Auto-create a single "General" tier — no seat concept for online events
+
         await apiAddSeatTier({
           eventPda: eventPdaStr,
           name: "General",
@@ -276,7 +276,7 @@ export function CreateEventScreen() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Section: Event Details */}
+
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={[styles.sectionIconWrap, { backgroundColor: colors.primaryMuted }]}>
@@ -294,7 +294,7 @@ export function CreateEventScreen() {
             maxLength={MAX_EVENT_NAME_LEN}
           />
 
-          {/* Online / Offline toggle */}
+
           <View style={styles.eventModeRow}>
             <Text style={styles.eventModeLabel}>Event Mode</Text>
             <View style={styles.eventModeToggle}>
@@ -384,7 +384,7 @@ export function CreateEventScreen() {
           />
         </View>
 
-        {/* Section: Date & Time */}
+
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={[styles.sectionIconWrap, { backgroundColor: colors.accentMuted }]}>
@@ -421,7 +421,7 @@ export function CreateEventScreen() {
           ) : null}
         </View>
 
-        {/* Section: Event Image */}
+
         <View style={styles.sectionCard}>
           <View style={styles.sectionHeader}>
             <View style={[styles.sectionIconWrap, { backgroundColor: colors.secondaryMuted }]}>
@@ -438,7 +438,7 @@ export function CreateEventScreen() {
           />
         </View>
 
-        {/* Tier Hint */}
+
         <View style={styles.tierHintCard}>
           <View style={styles.tierHintIcon}>
             <Ionicons name="information-circle" size={20} color={colors.primary} />
@@ -448,7 +448,7 @@ export function CreateEventScreen() {
           </Text>
         </View>
 
-        {/* Custom Date/Time Picker Modal */}
+
         <Modal
           visible={pickerMode !== null}
           transparent
@@ -645,7 +645,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
   },
 
-  // Online price + capacity fields
+
   onlineFieldsRow: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -655,7 +655,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
 
-  // Online/Offline toggle
+
   eventModeRow: {
     marginBottom: spacing.sm,
   },
@@ -700,7 +700,7 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
   },
 
-  // Section Cards
+
   sectionCard: {
     backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
@@ -727,7 +727,7 @@ const styles = StyleSheet.create({
     color: colors.text,
   },
 
-  // Tier Hint
+
   tierHintCard: {
     flexDirection: "row",
     alignItems: "flex-start",
@@ -747,7 +747,7 @@ const styles = StyleSheet.create({
     lineHeight: 20,
   },
 
-  // Date section
+
   dateRow: {
     flexDirection: "row",
     gap: spacing.sm,
@@ -786,7 +786,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.xs,
   },
 
-  // Picker modal
+
   modalOverlay: {
     flex: 1,
     backgroundColor: colors.overlay,

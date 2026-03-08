@@ -93,7 +93,7 @@ export function UpcomingEventSkeleton() {
 }
 
 const styles = StyleSheet.create({
-  /* Featured Card Skeleton */
+
   featuredCardWrapper: {
     marginRight: 16,
   },
@@ -136,7 +136,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.surfaceLight,
   },
 
-  /* Upcoming Card Skeleton */
+
   upcomingCard: {
     flexDirection: "row",
     alignItems: "center",

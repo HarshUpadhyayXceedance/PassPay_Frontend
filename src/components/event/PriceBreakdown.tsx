@@ -7,8 +7,8 @@ import { spacing } from "../../theme/spacing";
 import { formatSOL } from "../../utils/formatters";
 
 interface PriceBreakdownProps {
-  basePrice: number; // SOL
-  currentPrice: number; // SOL
+  basePrice: number;
+  currentPrice: number;
   discountPercent: number;
   tier: BadgeTier;
   showDynamic?: boolean;

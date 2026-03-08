@@ -32,7 +32,7 @@ export function MerchantDashboardScreen() {
     fetchEvents();
   }, []);
 
-  // Fetch products for each of my merchants
+
   useEffect(() => {
     const mine = merchants.filter((m) => m.authority === publicKey);
     mine.forEach((m) => fetchProducts(m.publicKey));
@@ -184,7 +184,7 @@ export function MerchantDashboardScreen() {
         />
       }
     >
-      {/* Header */}
+
       <View style={styles.header}>
         <View style={styles.headerLeft}>
           <Image
@@ -209,7 +209,7 @@ export function MerchantDashboardScreen() {
         </LinearGradient>
       </View>
 
-      {/* Wallet Balance Card */}
+
       <LinearGradient
         colors={["rgba(108,92,231,0.15)", "rgba(108,92,231,0.03)"]}
         start={{ x: 0, y: 0 }}
@@ -223,7 +223,7 @@ export function MerchantDashboardScreen() {
         )}
       </LinearGradient>
 
-      {/* Stats Row */}
+
       <View style={styles.statsRow}>
         <View style={styles.statCard}>
           <View
@@ -251,7 +251,7 @@ export function MerchantDashboardScreen() {
         </View>
       </View>
 
-      {/* My Events Section */}
+
       {myMerchants.length > 0 && (
         <View style={styles.eventsSection}>
           <Text style={styles.sectionTitle}>
@@ -264,7 +264,7 @@ export function MerchantDashboardScreen() {
         </View>
       )}
 
-      {/* Empty State */}
+
       {myMerchants.length === 0 && !isLoading && (
         <View style={styles.emptyContainer}>
           <View style={styles.emptyIconWrap}>

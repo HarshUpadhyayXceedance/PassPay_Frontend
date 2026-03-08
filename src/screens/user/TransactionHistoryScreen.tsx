@@ -83,13 +83,13 @@ export function TransactionHistoryScreen() {
           const tx = txs[j];
           if (!tx || tx.meta?.err) continue;
 
-          // Check if this transaction interacts with our program
+
           const programInvoked = tx.transaction.message.accountKeys.some(
             (key) => key.pubkey.equals(PROGRAM_ID)
           );
           if (!programInvoked) continue;
 
-          // Check if user's balance decreased (they paid something)
+
           const walletIndex = tx.transaction.message.accountKeys.findIndex(
             (key) => key.pubkey.equals(walletPubkey)
           );
@@ -99,18 +99,18 @@ export function TransactionHistoryScreen() {
           const postBal = tx.meta?.postBalances[walletIndex] ?? 0;
           const diff = preBal - postBal;
 
-          // Filter: only SOL outflows > 0.001 SOL (skip tiny fees / ticket buys handled separately)
-          // Merchant payments are typically > rent-exempt min but less than ticket purchases
+
+
           if (diff <= 1_000_000) continue;
 
-          // Check if any merchant PDA received funds
+
           const merchantMatch = merchants.find((m) =>
             tx.transaction.message.accountKeys.some(
               (key) => key.pubkey.toBase58() === m.authority
             )
           );
 
-          // If no merchant matched, skip (could be a ticket purchase)
+
           if (!merchantMatch) continue;
 
           paymentItems.push({
@@ -127,7 +127,7 @@ export function TransactionHistoryScreen() {
           });
         }
 
-        // Rate limit between chunks
+
         if (chunks.indexOf(chunk) < chunks.length - 1) {
           await new Promise((r) => setTimeout(r, 300));
         }
@@ -145,7 +145,7 @@ export function TransactionHistoryScreen() {
     const items: TransactionItem[] = [];
 
     tickets.forEach((ticket: TicketDisplay) => {
-      // Purchase transaction
+
       items.push({
         id: `purchase-${ticket.publicKey}`,
         type: "purchase",
@@ -156,7 +156,7 @@ export function TransactionHistoryScreen() {
         mint: ticket.mint,
       });
 
-      // Check-in transaction
+
       if (ticket.isCheckedIn && ticket.checkedInAt) {
         items.push({
           id: `checkin-${ticket.publicKey}`,
@@ -170,10 +170,10 @@ export function TransactionHistoryScreen() {
       }
     });
 
-    // Add merchant payments
+
     items.push(...payments);
 
-    // Sort by date, newest first
+
     items.sort((a, b) => b.date.getTime() - a.date.getTime());
     return items;
   }, [tickets, payments]);
@@ -284,7 +284,7 @@ export function TransactionHistoryScreen() {
 
   const ListHeader = () => (
     <View>
-      {/* Stats Card */}
+
       <LinearGradient
         colors={[colors.primary + "20", colors.secondary + "15"]}
         start={{ x: 0, y: 0 }}
@@ -310,7 +310,7 @@ export function TransactionHistoryScreen() {
         </View>
       </LinearGradient>
 
-      {/* Filter Tabs */}
+
       <View style={styles.filterRow}>
         {FILTERS.map((f) => {
           const isActive = activeFilter === f.key;
@@ -338,7 +338,7 @@ export function TransactionHistoryScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -424,7 +424,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  // Stats card
+
   statsCard: {
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
@@ -468,7 +468,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
 
-  // Filter tabs
+
   filterRow: {
     flexDirection: "row",
     marginBottom: spacing.md,
@@ -495,7 +495,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Transaction row
+
   txRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -561,12 +561,12 @@ const styles = StyleSheet.create({
     marginTop: 1,
   },
 
-  // Separator
+
   separator: {
     height: spacing.sm,
   },
 
-  // Empty state
+
   emptyContainer: {
     alignItems: "center",
     paddingTop: spacing.xxl * 2,

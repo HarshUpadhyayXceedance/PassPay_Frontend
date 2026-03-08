@@ -95,14 +95,14 @@ export function OnboardingCarousel({
   return (
     <Modal animationType="fade" transparent={false} visible={visible}>
       <View style={styles.container}>
-        {/* Skip button */}
+
         {!isLastSlide && (
           <TouchableOpacity style={styles.skipButton} onPress={handleSkip}>
             <Text style={styles.skipText}>Skip</Text>
           </TouchableOpacity>
         )}
 
-        {/* Slides */}
+
         <FlatList
           ref={flatListRef}
           data={SLIDES}
@@ -123,7 +123,7 @@ export function OnboardingCarousel({
           )}
         />
 
-        {/* Dots indicator */}
+
         <View style={styles.dotsContainer}>
           {SLIDES.map((_, index) => {
             const inputRange = [
@@ -159,7 +159,7 @@ export function OnboardingCarousel({
           })}
         </View>
 
-        {/* Next/Get Started button */}
+
         <TouchableOpacity
           style={styles.nextButton}
           onPress={handleNext}
@@ -195,7 +195,7 @@ function SlideItem({
 }) {
   return (
     <View style={styles.slide}>
-      {/* Background gradient */}
+
       <LinearGradient
         colors={[...gradient, "transparent"]}
         style={styles.slideGradient}
@@ -203,9 +203,9 @@ function SlideItem({
         end={{ x: 0.5, y: 0.6 }}
       />
 
-      {/* Content */}
+
       <View style={styles.slideContent}>
-        {/* Icon */}
+
         <View style={styles.emojiContainer}>
           <LinearGradient
             colors={gradient}
@@ -217,7 +217,7 @@ function SlideItem({
           </LinearGradient>
         </View>
 
-        {/* Text */}
+
         <View style={styles.textContainer}>
           <Text style={styles.title}>{title}</Text>
           <Text style={styles.description}>{description}</Text>

@@ -25,24 +25,16 @@ import { useWallet } from "../../hooks/useWallet";
 import { useMerchants } from "../../hooks/useMerchants";
 import { confirm } from "../../components/ui/ConfirmDialogProvider";
 
-// ---------------------------------------------------------------------------
-// Types
-// ---------------------------------------------------------------------------
-
 type FilterTab = "all" | "today" | "week";
 
 interface MerchantTransaction {
   signature: string;
   customerAddress: string;
-  amount: number; // SOL
+  amount: number;
   merchantName: string;
   timestamp: Date;
   status: "confirmed" | "failed";
 }
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
 
 function timeAgo(date: Date): string {
   const now = Date.now();
@@ -71,21 +63,10 @@ function isWithinLastWeek(date: Date): boolean {
   return date >= oneWeekAgo;
 }
 
-/** Delay helper for rate-limiting RPC calls */
 function delay(ms: number): Promise<void> {
   return new Promise((r) => setTimeout(r, ms));
 }
 
-/**
- * Parse a confirmed transaction to extract payment details.
- *
- * Primary: Parse inner CPI instructions for system_program::transfer
- * directed at the merchant wallet. pay_merchant / buy_product use
- * system_program::transfer CPI, which appears as a parsed inner
- * instruction with type "transfer".
- *
- * Fallback: Balance-delta detection across known merchant addresses.
- */
 function parseMerchantPayment(
   tx: ParsedTransactionWithMeta,
   signature: string,
@@ -94,7 +75,7 @@ function parseMerchantPayment(
 ): MerchantTransaction | null {
   if (!tx || !tx.meta) return null;
 
-  // Check for transaction errors
+
   if (tx.meta.err) {
     const ts = tx.blockTime ? new Date(tx.blockTime * 1000) : new Date();
     return {
@@ -110,11 +91,11 @@ function parseMerchantPayment(
   const knownSet = new Set(merchantAddresses);
   let totalInbound = 0;
 
-  // ── Method 1: Parse inner CPI instructions ──
-  // pay_merchant / buy_product execute system_program::transfer as a CPI
-  // call. In the parsed transaction this appears as an inner instruction
-  // with parsed.type === "transfer" and parsed.info.destination set to the
-  // merchant authority wallet.
+
+
+
+
+
   if (tx.meta.innerInstructions) {
     for (const inner of tx.meta.innerInstructions) {
       for (const ix of inner.instructions) {
@@ -133,7 +114,7 @@ function parseMerchantPayment(
     }
   }
 
-  // ── Method 2: Balance-change fallback ──
+
   if (totalInbound === 0) {
     const accountKeys = tx.transaction.message.accountKeys;
     for (let idx = 0; idx < accountKeys.length; idx++) {
@@ -145,7 +126,7 @@ function parseMerchantPayment(
     }
   }
 
-  // Ignore dust (< 0.0001 SOL)
+
   if (totalInbound <= 100_000) return null;
 
   const customer =
@@ -162,10 +143,6 @@ function parseMerchantPayment(
   };
 }
 
-// ---------------------------------------------------------------------------
-// Component
-// ---------------------------------------------------------------------------
-
 export function TransactionHistoryScreen() {
   const router = useRouter();
   const { publicKey } = useWallet();
@@ -180,17 +157,17 @@ export function TransactionHistoryScreen() {
     [merchants, publicKey]
   );
 
-  // ----- Fetch on-chain transactions for merchant PDAs -----
-  //
-  // Strategy: Query ONLY the merchant PDA for recent signatures. Every
-  // pay_merchant / buy_product transaction involves the merchant PDA, so
-  // this single query covers all payment activity. We skip querying the
-  // authority wallet separately, which halves the RPC calls and avoids
-  // noise from non-payment transactions (event creation, airdrops, etc.).
-  //
-  // Total RPC calls per merchant: 2 (getSignaturesForAddress + getParsedTransactions)
-  // Devnet public RPC rate-limits aggressively (~40 req/10s), so minimizing
-  // calls is critical to avoid silent 429 failures.
+
+
+
+
+
+
+
+
+
+
+
 
   const fetchTransactions = useCallback(async () => {
     if (!publicKey || myMerchants.length === 0) {
@@ -208,7 +185,7 @@ export function TransactionHistoryScreen() {
       const knownAddresses = [merchant.authority, merchant.publicKey];
 
       try {
-        // 1. Get recent signatures for the merchant PDA
+
         const signatures = await connection.getSignaturesForAddress(
           new PublicKey(merchant.publicKey),
           { limit: 10 }
@@ -220,10 +197,10 @@ export function TransactionHistoryScreen() {
         }
         console.log(`[TxHistory] ${merchant.name}: ${signatures.length} signatures found`);
 
-        // Small pause before next RPC call
+
         await delay(200);
 
-        // 2. Fetch parsed transactions in a single batch
+
         const sigs = signatures.map((s) => s.signature);
         let parsedTxns: (ParsedTransactionWithMeta | null)[] = [];
         try {
@@ -231,7 +208,7 @@ export function TransactionHistoryScreen() {
             maxSupportedTransactionVersion: 0,
           });
         } catch (e: any) {
-          // Retry with smaller chunks on 429
+
           console.warn(`[TxHistory] Batch failed for ${merchant.name}, chunking:`, e.message);
           await delay(600);
           const CHUNK = 5;
@@ -251,7 +228,7 @@ export function TransactionHistoryScreen() {
           }
         }
 
-        // 3. Parse each transaction for payment data
+
         let found = 0;
         for (let j = 0; j < parsedTxns.length; j++) {
           const parsed = parsedTxns[j];
@@ -277,7 +254,7 @@ export function TransactionHistoryScreen() {
         console.warn(`[TxHistory] Failed for ${merchant.name}:`, e.message);
       }
 
-      // Brief delay between merchants
+
       if (mi < myMerchants.length - 1) await delay(300);
     }
 
@@ -286,7 +263,7 @@ export function TransactionHistoryScreen() {
     setTransactions(allTxns);
   }, [publicKey, myMerchants]);
 
-  // Initial load: fetch merchants then transactions
+
   useEffect(() => {
     const init = async () => {
       setLoading(true);
@@ -297,11 +274,11 @@ export function TransactionHistoryScreen() {
       } catch (e) {
         console.warn("Failed to fetch merchants:", e);
       }
-      // fetchMerchants() swallows errors internally (never throws).
-      // If merchants failed to load, store stays [], second useEffect
-      // won't fire, and loading would stay true forever.
-      // Setting loading=false here ensures the screen recovers.
-      // The second useEffect will set loading=true again if merchants loaded.
+
+
+
+
+
       setLoading(false);
     };
     init();
@@ -312,12 +289,12 @@ export function TransactionHistoryScreen() {
       setLoading(true);
       fetchTransactions().finally(() => setLoading(false));
     } else if (merchants.length > 0) {
-      // Merchants loaded but none belong to this wallet — stop loading
+
       setLoading(false);
     }
   }, [myMerchants.length, merchants.length, fetchTransactions]);
 
-  // ----- Filtering -----
+
 
   const filtered = useMemo(() => {
     switch (activeFilter) {
@@ -330,7 +307,7 @@ export function TransactionHistoryScreen() {
     }
   }, [transactions, activeFilter]);
 
-  // ----- Summary calculations -----
+
 
   const todayEarnings = useMemo(
     () =>
@@ -350,13 +327,13 @@ export function TransactionHistoryScreen() {
     [transactions]
   );
 
-  // On-chain totalReceived (always accurate — read directly from merchant account data)
+
   const onChainTotal = useMemo(
     () => myMerchants.reduce((sum, m) => sum + m.totalReceived, 0),
     [myMerchants]
   );
 
-  // ----- Refresh -----
+
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -368,13 +345,13 @@ export function TransactionHistoryScreen() {
     }
   }, [fetchMerchants, fetchTransactions]);
 
-  // ----- Open in Explorer -----
+
 
   const openExplorer = useCallback((signature: string) => {
     Linking.openURL(getTxUrl(signature));
   }, []);
 
-  // ----- Transaction detail alert -----
+
 
   const showDetail = useCallback((tx: MerchantTransaction) => {
     const dateStr = tx.timestamp.toLocaleString("en-US", {
@@ -403,7 +380,7 @@ export function TransactionHistoryScreen() {
     });
   }, [openExplorer]);
 
-  // ----- Filter tabs -----
+
 
   const FILTERS: { key: FilterTab; label: string }[] = [
     { key: "all", label: "All" },
@@ -411,7 +388,7 @@ export function TransactionHistoryScreen() {
     { key: "week", label: "This Week" },
   ];
 
-  // ----- Render helpers -----
+
 
   const renderTransaction = ({ item }: { item: MerchantTransaction }) => {
     const isConfirmed = item.status === "confirmed";
@@ -423,7 +400,7 @@ export function TransactionHistoryScreen() {
         activeOpacity={0.7}
         onPress={() => showDetail(item)}
       >
-        {/* Left icon */}
+
         <View style={[styles.txIcon, { backgroundColor: amountColor + "18" }]}>
           <Ionicons
             name={isConfirmed ? "checkmark-circle" : "close-circle"}
@@ -432,7 +409,7 @@ export function TransactionHistoryScreen() {
           />
         </View>
 
-        {/* Middle: customer + merchant */}
+
         <View style={styles.txInfo}>
           <Text style={styles.txCustomer} numberOfLines={1}>
             {shortenAddress(item.customerAddress)}
@@ -442,7 +419,7 @@ export function TransactionHistoryScreen() {
           </Text>
         </View>
 
-        {/* Right: amount + time + status */}
+
         <View style={styles.txRight}>
           <Text style={[styles.txAmount, { color: amountColor }]}>
             +{formatSOL(item.amount)} SOL
@@ -460,7 +437,7 @@ export function TransactionHistoryScreen() {
 
   const ListHeader = () => (
     <View>
-      {/* Summary Card */}
+
       <LinearGradient
         colors={[colors.secondary + "25", colors.secondaryDark + "15"]}
         start={{ x: 0, y: 0 }}
@@ -494,7 +471,7 @@ export function TransactionHistoryScreen() {
         </View>
       </LinearGradient>
 
-      {/* Filter Tabs */}
+
       <View style={styles.filterRow}>
         {FILTERS.map((f) => {
           const isActive = activeFilter === f.key;
@@ -520,7 +497,7 @@ export function TransactionHistoryScreen() {
     </View>
   );
 
-  // ----- Main render -----
+
 
   if (loading && transactions.length === 0) {
     return (
@@ -580,10 +557,6 @@ export function TransactionHistoryScreen() {
   );
 }
 
-// ---------------------------------------------------------------------------
-// Styles
-// ---------------------------------------------------------------------------
-
 const styles = StyleSheet.create({
   container: {
     flex: 1,
@@ -595,7 +568,7 @@ const styles = StyleSheet.create({
     flexGrow: 1,
   },
 
-  // Summary card
+
   summaryCard: {
     borderRadius: borderRadius.lg,
     padding: spacing.lg,
@@ -639,7 +612,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.border,
   },
 
-  // Filter tabs
+
   filterRow: {
     flexDirection: "row",
     marginBottom: spacing.md,
@@ -666,7 +639,7 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
 
-  // Transaction row
+
   txRow: {
     flexDirection: "row",
     alignItems: "center",
@@ -723,12 +696,12 @@ const styles = StyleSheet.create({
     color: colors.textMuted,
   },
 
-  // Separator
+
   separator: {
     height: spacing.sm,
   },
 
-  // Loading state
+
   loadingContainer: {
     flex: 1,
     alignItems: "center",

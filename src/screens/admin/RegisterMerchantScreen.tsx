@@ -50,7 +50,7 @@ export function RegisterMerchantScreen() {
     fetchEvents();
   }, []);
 
-  // Reset all form fields when screen gains focus (expo-router keeps screens mounted)
+
   useFocusEffect(
     useCallback(() => {
       setSelectedEvent(null);
@@ -65,7 +65,7 @@ export function RegisterMerchantScreen() {
     }, [])
   );
 
-  // SuperAdmin sees all events, normal admin sees only their own
+
   const availableEvents = isSuperAdmin
     ? events
     : events.filter((e) => e.admin === publicKey);
@@ -133,7 +133,7 @@ export function RegisterMerchantScreen() {
         contentContainerStyle={styles.content}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Event Selector */}
+
         <View style={styles.fieldContainer}>
           <Text style={styles.label}>Event</Text>
           <TouchableOpacity
@@ -175,7 +175,7 @@ export function RegisterMerchantScreen() {
             <Text style={styles.errorText}>{errors.event}</Text>
           )}
 
-          {/* Dropdown */}
+
           {showEventPicker && (
             <ScrollView
               style={styles.eventDropdown}

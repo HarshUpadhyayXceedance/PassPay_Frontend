@@ -230,7 +230,7 @@ export function RoomScreen() {
                 ticketMint: params.ticketMint ?? "",
                 isAlreadyCheckedIn: params.isAlreadyCheckedIn ?? "false",
                 eventDate: String(eventDateMs),
-                joinTimestamp, // same timestamp so re-join won't reset state again
+                joinTimestamp,
               },
             });
           }
@@ -943,7 +943,6 @@ export function RoomScreen() {
           </Text>
         </View>
       )}
-
 
       {isMeeting && hostLeft && initialRole !== "speaker" && (
         <View style={styles.hostLeftBanner}>

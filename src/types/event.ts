@@ -6,9 +6,9 @@ export interface EventAccount {
   venue: string;
   description: string;
   imageUrl: string;
-  eventDate: number; // unix timestamp
-  baseTicketPrice: number; // lamports
-  currentTicketPrice: number; // lamports
+  eventDate: number;
+  baseTicketPrice: number;
+  currentTicketPrice: number;
   totalSeats: number;
   ticketsSold: number;
   isActive: boolean;
@@ -35,9 +35,9 @@ export interface EventDisplay {
   description: string;
   imageUrl: string;
   eventDate: Date;
-  ticketPrice: number; // current price in SOL (for backward compat)
-  baseTicketPrice: number; // base price in SOL
-  currentTicketPrice: number; // current price in SOL
+  ticketPrice: number;
+  baseTicketPrice: number;
+  currentTicketPrice: number;
   totalSeats: number;
   ticketsSold: number;
   availableSeats: number;
@@ -48,8 +48,8 @@ export interface EventDisplay {
   publicSaleDate: Date;
   loyaltyDiscountsEnabled: boolean;
   dynamicPricingEnabled: boolean;
-  minTicketPrice: number; // in SOL
-  maxTicketPrice: number; // in SOL
+  minTicketPrice: number;
+  maxTicketPrice: number;
   lastPriceUpdate: number;
   priceUpdateInterval: number;
   demandFactor: number;

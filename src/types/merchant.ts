@@ -7,7 +7,7 @@ export interface MerchantAccount {
   description: string;
   imageUrl: string;
   isActive: boolean;
-  totalReceived: number; // lamports
+  totalReceived: number;
   bump: number;
 }
 
@@ -19,14 +19,14 @@ export interface MerchantDisplay {
   description: string;
   imageUrl: string;
   isActive: boolean;
-  totalReceived: number; // in SOL
+  totalReceived: number;
 }
 
 export interface MerchantProductAccount {
   merchant: PublicKey;
   name: string;
   description: string;
-  price: number; // lamports
+  price: number;
   imageUrl: string;
   isAvailable: boolean;
   totalSold: number;
@@ -38,7 +38,7 @@ export interface MerchantProductDisplay {
   merchantKey: string;
   name: string;
   description: string;
-  price: number; // in SOL
+  price: number;
   imageUrl: string;
   isAvailable: boolean;
   totalSold: number;
@@ -48,7 +48,7 @@ export interface SeatTierDisplay {
   publicKey: string;
   eventKey: string;
   name: string;
-  price: number; // in SOL
+  price: number;
   priceLamports: number;
   totalSeats: number;
   seatsSold: number;

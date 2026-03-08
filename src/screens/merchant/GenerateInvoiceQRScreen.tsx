@@ -32,7 +32,7 @@ export function GenerateInvoiceQRScreen() {
     fetchMerchants();
   }, []);
 
-  // If params provided, use them. Otherwise find first merchant for this wallet.
+
   const myMerchant = paramMerchantKey
     ? merchants.find((m) => m.publicKey === paramMerchantKey)
     : merchants.find((m) => m.authority === publicKey);
@@ -103,7 +103,7 @@ export function GenerateInvoiceQRScreen() {
         <>
           <Text style={styles.merchantName}>{myMerchant.name}</Text>
 
-          {/* Product selector */}
+
           {myProducts.length > 0 && (
             <View style={styles.productSection}>
               <Text style={styles.productLabel}>

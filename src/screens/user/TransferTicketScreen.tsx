@@ -143,7 +143,7 @@ export function TransferTicketScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -161,7 +161,7 @@ export function TransferTicketScreen() {
         showsVerticalScrollIndicator={false}
         keyboardShouldPersistTaps="handled"
       >
-        {/* Ticket Info Card */}
+
         <Text style={styles.sectionLabel}>TICKET DETAILS</Text>
         <View style={styles.card}>
           <View style={styles.itemRow}>
@@ -222,7 +222,7 @@ export function TransferTicketScreen() {
           </View>
         </View>
 
-        {/* Recipient Address */}
+
         <Text style={styles.sectionLabel}>RECIPIENT WALLET</Text>
         <View style={styles.card}>
           <View style={styles.inputContainer}>
@@ -281,7 +281,7 @@ export function TransferTicketScreen() {
           </Text>
         </View>
 
-        {/* Warning */}
+
         <View style={styles.warningCard}>
           <Ionicons
             name="warning-outline"
@@ -299,7 +299,7 @@ export function TransferTicketScreen() {
         </View>
       </ScrollView>
 
-      {/* Footer */}
+
       <View style={styles.footer}>
         <TouchableOpacity
           style={[

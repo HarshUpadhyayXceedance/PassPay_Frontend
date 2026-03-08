@@ -15,14 +15,9 @@ const ConfirmDialogContext = createContext<ConfirmDialogContextValue>({
   hideDialog: () => {},
 });
 
-// Singleton ref for imperative access outside React components
 let _showDialog: ((config: ShowDialogOptions) => void) | null = null;
 let _hideDialog: (() => void) | null = null;
 
-/**
- * Imperative confirm dialog — can be called from anywhere (screens, utils, etc.)
- * Must have ConfirmDialogProvider mounted in the component tree.
- */
 export function confirm(config: ShowDialogOptions) {
   if (_showDialog) {
     _showDialog(config);
@@ -46,11 +41,11 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
 
   const hideDialog = useCallback(() => {
     setVisible(false);
-    // Delay clearing config to allow fade-out animation
+
     setTimeout(() => setConfig(null), 300);
   }, []);
 
-  // Register singleton refs
+
   _showDialog = showDialog;
   _hideDialog = hideDialog;
 
@@ -62,9 +57,6 @@ export function ConfirmDialogProvider({ children }: { children: React.ReactNode 
   );
 }
 
-/**
- * Hook for accessing confirm dialog from React components.
- */
 export function useConfirmDialog() {
   return useContext(ConfirmDialogContext);
 }

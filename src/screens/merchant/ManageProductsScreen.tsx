@@ -31,7 +31,7 @@ export function ManageProductsScreen() {
   const { merchants, products, fetchMerchants, fetchProducts, isLoading } =
     useMerchants();
 
-  // If params provided, use them. Otherwise find first merchant for this wallet.
+
   const myMerchant = merchantKey
     ? merchants.find((m) => m.publicKey === merchantKey)
     : merchants.find((m) => m.authority === publicKey);

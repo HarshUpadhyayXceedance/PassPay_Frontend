@@ -60,7 +60,7 @@ export function ShopScreen() {
     ]);
   }, [publicKey]);
 
-  // Resolve product name from the products store using the product PDA
+
   const getProductName = useCallback(
     (productPda: string): string => {
       const product = products.find((p) => p.publicKey === productPda);
@@ -69,7 +69,7 @@ export function ShopScreen() {
     [products]
   );
 
-  // Resolve merchant authority + event PDA from merchant store
+
   const getMerchantDetails = useCallback(
     (merchantPda: string) => {
       const merchant = merchants.find((m) => m.publicKey === merchantPda);
@@ -82,7 +82,7 @@ export function ShopScreen() {
     [merchants]
   );
 
-  // Get event name for a merchant PDA
+
   const getEventName = useCallback(
     (merchantPda: string): string => {
       const merchant = merchants.find((m) => m.publicKey === merchantPda);
@@ -93,7 +93,7 @@ export function ShopScreen() {
     [merchants, events]
   );
 
-  // Get unique event keys from user's tickets
+
   const myEventKeys = [...new Set(tickets.map((t) => t.eventKey))];
 
   const myEvents = myEventKeys
@@ -208,7 +208,7 @@ export function ShopScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
       <View style={styles.header}>
         <Text style={styles.title}>Shop</Text>
         <TouchableOpacity
@@ -237,7 +237,7 @@ export function ShopScreen() {
         }
         ListHeaderComponent={
           <View>
-            {/* Scan to Pay CTA */}
+
             <TouchableOpacity activeOpacity={0.8} onPress={navigateToScan}>
               <LinearGradient
                 colors={[colors.primary, colors.secondary]}

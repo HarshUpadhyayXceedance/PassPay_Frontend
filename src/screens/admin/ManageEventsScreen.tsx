@@ -33,8 +33,8 @@ export function ManageEventsScreen() {
     fetchSeatTiers();
   }, []);
 
-  // SuperAdmin sees all events, normal admin sees only their own
-  // Sort newest first by event date
+
+
   const myEvents = (isSuperAdmin
     ? events
     : events.filter((e) => e.admin === publicKey)
@@ -72,14 +72,14 @@ export function ManageEventsScreen() {
         activeOpacity={0.7}
       >
         <View style={styles.eventCardInner}>
-          {/* Left content */}
+
           <View style={styles.eventContent}>
-            {/* Event name */}
+
             <Text style={styles.eventName} numberOfLines={1}>
               {item.name}
             </Text>
 
-            {/* Venue row */}
+
             <View style={styles.infoRow}>
               <Ionicons
                 name="location-outline"
@@ -91,7 +91,7 @@ export function ManageEventsScreen() {
               </Text>
             </View>
 
-            {/* Date row */}
+
             <View style={styles.infoRow}>
               <Ionicons
                 name="calendar-outline"
@@ -103,9 +103,9 @@ export function ManageEventsScreen() {
               </Text>
             </View>
 
-            {/* Bottom row: tickets + price + status */}
+
             <View style={styles.bottomRow}>
-              {/* Ticket stats */}
+
               <View style={styles.statChip}>
                 <Ionicons
                   name="ticket-outline"
@@ -117,7 +117,7 @@ export function ManageEventsScreen() {
                 </Text>
               </View>
 
-              {/* Price */}
+
               <View style={styles.statChip}>
                 <Ionicons
                   name="logo-usd"
@@ -129,7 +129,7 @@ export function ManageEventsScreen() {
                 </Text>
               </View>
 
-              {/* Status badge */}
+
               {(() => {
                 const statusLabel = item.isCancelled
                   ? "Cancelled"
@@ -161,7 +161,7 @@ export function ManageEventsScreen() {
               })()}
             </View>
 
-            {/* Sell percentage bar */}
+
             <View style={styles.progressBarContainer}>
               <View
                 style={[
@@ -180,7 +180,7 @@ export function ManageEventsScreen() {
             </View>
           </View>
 
-          {/* Chevron */}
+
           <View style={styles.chevronContainer}>
             <Ionicons
               name="chevron-forward"
@@ -270,7 +270,7 @@ export function ManageEventsScreen() {
         ItemSeparatorComponent={() => <View style={styles.separator} />}
       />
 
-      {/* Floating Action Button */}
+
       {myEvents.length > 0 && (
         <TouchableOpacity
           style={styles.fab}
@@ -293,7 +293,7 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
 
-  // ── Header ──────────────────────────────────────────
+
   headerSection: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.lg,
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     color: colors.background,
   },
 
-  // ── Event Card ──────────────────────────────────────
+
   eventCard: {
     marginHorizontal: spacing.md,
     backgroundColor: colors.surface,
@@ -430,7 +430,7 @@ const styles = StyleSheet.create({
     height: spacing.sm,
   },
 
-  // ── Empty State ─────────────────────────────────────
+
   emptyContainer: {
     alignItems: "center",
     justifyContent: "center",
@@ -483,7 +483,7 @@ const styles = StyleSheet.create({
     marginTop: spacing.md,
   },
 
-  // ── FAB ─────────────────────────────────────────────
+
   fab: {
     position: "absolute",
     bottom: spacing.xl,

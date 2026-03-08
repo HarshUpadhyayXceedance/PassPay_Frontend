@@ -22,7 +22,7 @@ import { lamportsToSOL } from "../../utils/formatters";
 export function LoyaltyBenefitsScreen() {
   const { loyaltyBenefits, userAttendance, isLoading, error, fetchLoyaltyBenefits } = useLoyalty();
 
-  // Explicitly fetch on mount
+
   useEffect(() => {
     fetchLoyaltyBenefits();
   }, []);
@@ -46,7 +46,7 @@ export function LoyaltyBenefitsScreen() {
 
   return (
     <ScrollView style={styles.container} contentContainerStyle={styles.content}>
-      {/* Hero Section */}
+
       <LinearGradient
         colors={[colors.surface, colors.background]}
         style={styles.hero}
@@ -63,7 +63,7 @@ export function LoyaltyBenefitsScreen() {
         </View>
       </LinearGradient>
 
-      {/* Error banner */}
+
       {error && (
         <View style={styles.errorBox}>
           <Text style={styles.errorText}>
@@ -72,7 +72,7 @@ export function LoyaltyBenefitsScreen() {
         </View>
       )}
 
-      {/* Streak */}
+
       <AppCard style={styles.section}>
         <StreakDisplay
           currentStreak={currentStreak}
@@ -81,7 +81,7 @@ export function LoyaltyBenefitsScreen() {
         />
       </AppCard>
 
-      {/* Attendance Calendar */}
+
       <AppCard style={styles.section}>
         <StreakCalendar
           currentStreak={currentStreak}
@@ -89,13 +89,13 @@ export function LoyaltyBenefitsScreen() {
         />
       </AppCard>
 
-      {/* Progress */}
+
       <AppCard style={styles.section}>
         <Text style={styles.sectionTitle}>Tier Progress</Text>
         <TierProgressBar currentEvents={totalEvents} currentTier={tier} />
       </AppCard>
 
-      {/* Benefits */}
+
       <AppCard style={styles.section}>
         <Text style={styles.sectionTitle}>Your Benefits</Text>
 
@@ -148,7 +148,7 @@ export function LoyaltyBenefitsScreen() {
         />
       </AppCard>
 
-      {/* Achievements */}
+
       <View style={styles.achievementsSection}>
         <Text style={styles.sectionTitlePadded}>
           Achievements ({unlockedCount}/{achievements.length})

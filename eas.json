@@ -12,6 +12,14 @@
       "distribution": "internal",
       "android": {
         "buildType": "apk"
+      },
+      "env": {
+        "EXPO_PUBLIC_FIREBASE_API_KEY": "AIzaSyDp8R4NB78-F4Atfy0zUtv8aXabRGlYmbg",
+        "EXPO_PUBLIC_FIREBASE_PROJECT_ID": "passpay-69fb3",
+        "EXPO_PUBLIC_FIREBASE_DATABASE_URL": "https://passpay-69fb3-default-rtdb.firebaseio.com",
+        "EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET": "passpay-69fb3.firebasestorage.app",
+        "EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID": "419340418994",
+        "EXPO_PUBLIC_FIREBASE_APP_ID": "1:419340418994:android:7b632327c6e1c868196eab"
       }
     },
     "production": {

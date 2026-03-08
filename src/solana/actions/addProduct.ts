@@ -7,7 +7,7 @@ export interface AddProductParams {
   eventPda: PublicKey;
   name: string;
   description: string;
-  price: number; // in lamports
+  price: number;
   imageUrl: string;
 }
 

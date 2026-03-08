@@ -6,7 +6,7 @@ import { findMerchantPda, findUserAttendancePda } from "../pda";
 export interface PayMerchantParams {
   eventPda: PublicKey;
   merchantAuthority: PublicKey;
-  amount: number; // in SOL
+  amount: number;
 }
 
 export async function payMerchant(

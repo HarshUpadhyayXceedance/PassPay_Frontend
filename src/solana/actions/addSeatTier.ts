@@ -6,9 +6,9 @@ import { findAdminPda, findSeatTierPda } from "../pda";
 export interface AddSeatTierParams {
   eventPda: PublicKey;
   name: string;
-  price: number; // in lamports
+  price: number;
   totalSeats: number;
-  tierLevel: number; // 0=Bronze, 1=Silver, 2=Gold, 3=VIP
+  tierLevel: number;
   isRestricted: boolean;
 }
 

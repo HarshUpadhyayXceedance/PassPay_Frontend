@@ -23,7 +23,7 @@ import { DEVNET_RPC } from "../../solana/config/constants";
 
 interface DeliveryPayload {
   type: "delivery";
-  purchaseRecord: string; // on-chain PDA address
+  purchaseRecord: string;
   productName: string;
   buyer: string;
   merchant: string;
@@ -32,13 +32,12 @@ interface DeliveryPayload {
   timestamp: number;
 }
 
-/** Check is_collected byte at offset 112 in the ProductPurchase account */
 async function checkOnChainCollected(purchaseRecord: string): Promise<boolean> {
   try {
     const connection = new Connection(DEVNET_RPC, "confirmed");
     const info = await connection.getAccountInfo(new PublicKey(purchaseRecord));
     if (!info || info.data.length < 130) return false;
-    // is_collected is at offset 8 + 32 + 32 + 32 + 8 = 112
+
     return info.data[112] !== 0;
   } catch {
     return false;
@@ -53,7 +52,7 @@ export function VerifyPurchaseScreen() {
   const [isAlreadyUsed, setIsAlreadyUsed] = useState(false);
   const [isCollecting, setIsCollecting] = useState(false);
 
-  // Reset screen state when re-focused
+
   useFocusEffect(
     useCallback(() => {
       setResult(null);
@@ -72,7 +71,7 @@ export function VerifyPurchaseScreen() {
         return;
       }
 
-      // Check on-chain if already collected
+
       const alreadyCollected = await checkOnChainCollected(parsed.purchaseRecord);
       if (alreadyCollected) {
         Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning);

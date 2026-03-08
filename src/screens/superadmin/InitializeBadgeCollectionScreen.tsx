@@ -50,7 +50,7 @@ export function InitializeBadgeCollectionScreen() {
       return false;
     }
 
-    // Validate all mint addresses
+
     const mints = [
       { name: "Bronze", value: bronzeMint },
       { name: "Silver", value: silverMint },

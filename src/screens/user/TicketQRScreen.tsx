@@ -31,10 +31,10 @@ export function TicketQRScreen() {
   const ticket = tickets.find((t) => t.publicKey === ticketKey);
 
   useEffect(() => {
-    // Success haptic on load
+
     Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
 
-    // Entrance animation
+
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
@@ -49,7 +49,7 @@ export function TicketQRScreen() {
       }),
     ]).start();
 
-    // Continuous pulse animation for border
+
     const pulse = Animated.loop(
       Animated.sequence([
         Animated.timing(pulseAnim, {
@@ -89,7 +89,7 @@ export function TicketQRScreen() {
     );
   }
 
-  // Create QR payload (matches TicketQRPayload interface)
+
   const qrPayload = JSON.stringify({
     type: "ticket",
     mint: ticket.mint,
@@ -99,7 +99,7 @@ export function TicketQRScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
+
       <View style={styles.header}>
         <TouchableOpacity
           style={styles.backButton}
@@ -120,7 +120,7 @@ export function TicketQRScreen() {
           },
         ]}
       >
-        {/* Status Badge */}
+
         {ticket.isCheckedIn ? (
           <View style={[styles.statusBadge, styles.usedBadge]}>
             <View style={styles.statusDot} />
@@ -133,7 +133,7 @@ export function TicketQRScreen() {
           </View>
         )}
 
-        {/* QR Code Container with Animated Border */}
+
         <Animated.View
           style={[
             styles.qrContainer,
@@ -154,7 +154,7 @@ export function TicketQRScreen() {
           </View>
         </Animated.View>
 
-        {/* Ticket Information */}
+
         <View style={styles.infoSection}>
           <View style={styles.infoRow}>
             <Text style={styles.infoLabel}>EVENT</Text>
@@ -183,7 +183,7 @@ export function TicketQRScreen() {
           </View>
         </View>
 
-        {/* Instructions */}
+
         <View style={styles.instructionsContainer}>
           {ticket.isCheckedIn ? (
             <>
@@ -202,7 +202,7 @@ export function TicketQRScreen() {
           )}
         </View>
 
-        {/* NFT Badge */}
+
         <View style={styles.nftBadge}>
           <Text style={styles.nftBadgeText}>VERIFIED NFT TICKET</Text>
         </View>
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
     color: colors.textSecondary,
   },
 
-  /* ---- Content ---- */
+
   content: {
     flex: 1,
     alignItems: "center",
@@ -267,7 +267,7 @@ const styles = StyleSheet.create({
     paddingBottom: 40,
   },
 
-  /* ---- Status Badge ---- */
+
   statusBadge: {
     flexDirection: "row",
     alignItems: "center",
@@ -297,7 +297,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.bodyBold,
   },
 
-  /* ---- QR Code ---- */
+
   qrContainer: {
     padding: 8,
     borderRadius: 24,
@@ -322,7 +322,7 @@ const styles = StyleSheet.create({
     borderRadius: 18,
   },
 
-  /* ---- Info Section ---- */
+
   infoSection: {
     width: "100%",
     backgroundColor: colors.surface,
@@ -356,7 +356,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.heading,
   },
 
-  /* ---- Instructions ---- */
+
   instructionsContainer: {
     flexDirection: "row",
     alignItems: "center",
@@ -378,7 +378,7 @@ const styles = StyleSheet.create({
     fontFamily: fonts.body,
   },
 
-  /* ---- NFT Badge ---- */
+
   nftBadge: {
     backgroundColor: colors.primaryMuted,
     paddingHorizontal: 16,

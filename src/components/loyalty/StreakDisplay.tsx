@@ -7,7 +7,7 @@ import { spacing } from "../../theme/spacing";
 interface StreakDisplayProps {
   currentStreak: number;
   longestStreak: number;
-  multiplier: number; // raw value, e.g. 110 = 1.1x
+  multiplier: number;
 }
 
 export function StreakDisplay({ currentStreak, longestStreak, multiplier }: StreakDisplayProps) {

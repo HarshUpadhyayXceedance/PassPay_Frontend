@@ -70,7 +70,7 @@ export function ConfirmDialog({ visible, config, onDismiss }: ConfirmDialogProps
         <View style={styles.overlay}>
           <TouchableWithoutFeedback>
             <View style={styles.dialog}>
-              {/* Top accent line */}
+
               <LinearGradient
                 colors={[typeColor, typeColor + "66"]}
                 start={{ x: 0, y: 0 }}
@@ -78,18 +78,18 @@ export function ConfirmDialog({ visible, config, onDismiss }: ConfirmDialogProps
                 style={styles.accentLine}
               />
 
-              {/* Icon */}
+
               <View style={[styles.iconCircle, { backgroundColor: typeColor + "1A" }]}>
                 <Ionicons name={icon} size={32} color={typeColor} />
               </View>
 
-              {/* Title */}
+
               <Text style={styles.title}>{config.title}</Text>
 
-              {/* Message */}
+
               <Text style={styles.message}>{config.message}</Text>
 
-              {/* Buttons */}
+
               <View style={styles.buttonRow}>
                 {config.buttons.map((btn, idx) => {
                   const isCancel = btn.style === "cancel";

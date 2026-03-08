@@ -90,7 +90,7 @@ export const useAuthStore = create<AuthState>((set) => ({
       await SecureStore.deleteItemAsync(ROLE_STORAGE_KEY);
       await SecureStore.deleteItemAsync(WALLET_STORAGE_KEY);
 
-      await get().detectRole(publicKey);
+      await useAuthStore.getState().detectRole(publicKey);
       set({ isLoading: false });
     } catch (error) {
       console.error("Failed during startup:", error);

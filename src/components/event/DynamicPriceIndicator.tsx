@@ -5,8 +5,8 @@ import { fonts } from "../../theme/fonts";
 
 interface DynamicPriceIndicatorProps {
   isEnabled: boolean;
-  basePrice: number; // SOL
-  currentPrice: number; // SOL
+  basePrice: number;
+  currentPrice: number;
 }
 
 export function DynamicPriceIndicator({

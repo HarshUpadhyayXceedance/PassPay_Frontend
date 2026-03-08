@@ -42,7 +42,7 @@ export function AddSeatTierScreen() {
   const [creating, setCreating] = useState(false);
   const [errors, setErrors] = useState<Record<string, string | null>>({});
 
-  // Fetch existing tiers for this event
+
   useFocusEffect(
     useCallback(() => {
       if (eventKey) fetchSeatTiers(eventKey);
@@ -91,13 +91,13 @@ export function AddSeatTierScreen() {
       await apiAddSeatTier({
         eventPda: eventKey,
         name: tierName.trim(),
-        price: Math.round(parseFloat(price) * 1_000_000_000), // SOL → lamports
+        price: Math.round(parseFloat(price) * 1_000_000_000),
         totalSeats: parseInt(totalSeats, 10),
         tierLevel,
         isRestricted,
       });
 
-      // Fetch updated tiers immediately after creation
+
       await fetchSeatTiers(eventKey);
 
       confirm({
@@ -135,7 +135,7 @@ export function AddSeatTierScreen() {
   const applyPreset = (preset: (typeof TIER_PRESETS)[number]) => {
     setTierName(preset.name);
     setTierLevel(preset.level);
-    setIsRestricted(preset.level === 3); // VIP is restricted by default
+    setIsRestricted(preset.level === 3);
   };
 
   return (
@@ -154,7 +154,7 @@ export function AddSeatTierScreen() {
           <Text style={styles.eventLabel}>{eventName}</Text>
         )}
 
-        {/* Existing tiers summary */}
+
         {eventTiers.length > 0 && (
           <View style={styles.existingSection}>
             <Text style={styles.existingTitle}>
@@ -172,7 +172,7 @@ export function AddSeatTierScreen() {
           </View>
         )}
 
-        {/* Tier presets */}
+
         <Text style={styles.sectionLabel}>QUICK PRESETS</Text>
         <View style={styles.presetsRow}>
           {TIER_PRESETS.map((preset) => {
@@ -200,7 +200,7 @@ export function AddSeatTierScreen() {
           })}
         </View>
 
-        {/* Form */}
+
         <AppInput
           label="Tier Name"
           value={tierName}
@@ -228,7 +228,7 @@ export function AddSeatTierScreen() {
           error={errors.totalSeats ?? undefined}
         />
 
-        {/* Tier level */}
+
         <View style={styles.levelSection}>
           <Text style={styles.levelLabel}>Tier Level</Text>
           <View style={styles.levelRow}>
@@ -256,7 +256,7 @@ export function AddSeatTierScreen() {
           </Text>
         </View>
 
-        {/* VIP Restriction toggle */}
+
         <View style={styles.switchRow}>
           <View style={styles.switchInfo}>
             <Text style={styles.switchLabel}>VIP Restriction</Text>
